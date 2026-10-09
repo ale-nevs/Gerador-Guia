@@ -1,0 +1,8 @@
+# Dados operacionais nunca vão para o repositório
+config.json
+registros/
+*.eml
+pasta-compartilhada/
+testes/
+.vercel
+node_modules

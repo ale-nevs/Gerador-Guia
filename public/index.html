@@ -1,0 +1,1609 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Conferidor de Guias · Promédica</title>
+<link rel="icon" type="image/png" href="logo-promedica.png">
+<style>
+:root{
+  /* Marca Promédica — padrão único dos sistemas internos */
+  --font-sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --brand-50:#f2f6fb; --brand-100:#e1eaf4; --brand-200:#c5d5e8; --brand-300:#9bb6d5; --brand-400:#6a90bd; --brand-500:#4872a4;
+  --brand-600:#375b88; --brand-700:#2c4a70; --brand-800:#233c5c; --brand-900:#1e3350; --brand-950:#13223a;
+  --accent-50:#effaf8; --accent-100:#d3f0ea; --accent-200:#a7e0d5; --accent-300:#6fc9b9; --accent-400:#3aae9c; --accent-500:#1f9282;
+  --accent-600:#17786b; --accent-700:#155f56; --accent-800:#144d47; --accent-900:#12403b;
+  --ink:#2b2b2b; --muted:#6b7280; --line:#e2e8f0; --line-soft:#f1f5f9; --bg:#f4f6f9; --bar:#f8fafc; --panel:#fff;
+  --th1:#1d4f91; --th2:#8fb3e0; --th3:#dde9f7;
+  --ok:#15803d; --ok-bg:#ecfdf5; --warn:#78350f; --warn-bg:#fffbeb; --warn-tag:#fef3c7; --warn-line:#fcd34d;
+  --grp:#4c1d95; --grp-bg:#f5f3ff; --bad:#dc2626; --bad-dk:#7f1d1d; --bad-bg:#fee2e2; --empty:#9ca3af;
+  --mono:var(--font-sans);
+  --r:16px; --r-sm:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 var(--font-sans)}
+body{display:flex;flex-direction:column;min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{width:100%;max-width:1600px;margin:0 auto;padding:0 12px}
+@media (min-width:640px){.wrap{padding:0 24px}}
+/* Topo */
+header.topo{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 2px rgba(15,23,42,.05);position:sticky;top:0;z-index:20}
+header .topo-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding-top:12px;padding-bottom:12px}
+header .marca{display:flex;align-items:center}
+header .logo{height:40px;width:auto;display:block}
+header .div{width:1px;height:36px;background:var(--line);margin:0 16px;display:none}
+@media (min-width:640px){header .div{display:block}}
+header h1{margin:0;font-size:18px;font-weight:800;color:var(--brand-800);letter-spacing:-.01em;line-height:1.2}
+header .sub{margin:2px 0 0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--accent-600)}
+header .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-sm);padding:6px 10px;font-size:12px;font-weight:600;background:var(--line-soft);color:#334155;border:1px solid var(--line)}
+.chip.ctx{background:var(--brand-50);color:var(--brand-950);border-color:var(--brand-50)}
+.chip.num{background:var(--accent-50);color:var(--accent-700);border-color:var(--accent-200)}
+.chip select{width:auto;min-width:120px;border:0;background:transparent;padding:0;font-weight:600;color:inherit;cursor:pointer}
+.chip select:focus{outline:none;box-shadow:none}
+.chip:has(select:focus){border-color:var(--accent-500);box-shadow:0 0 0 1px var(--accent-500)}
+button.chip{cursor:pointer}
+button.chip:hover{background:var(--brand-50)}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b}
+.chip.ok{background:#f0fdf4;color:var(--ok);border-color:#bbf7d0}
+.chip.ok .dot{background:#22c55e}
+.chip.bad{background:var(--bad);color:#fff;border-color:var(--bad)}
+.chip.bad .dot{background:#fff}
+.ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ic.g{width:16px;height:16px}
+/* Navegação por abas (cartão único com as barras) */
+nav.abas{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;margin:12px 0 0;background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(15,23,42,.04)}
+nav.abas button{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--brand-50);color:var(--brand-800);padding:7px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer}
+nav.abas button:hover{background:var(--brand-100)}
+nav.abas button.ativo{background:var(--brand-700);color:#fff}
+main{width:100%;max-width:1600px;margin:0 auto;padding:12px 12px 24px;flex:1}
+@media (min-width:640px){main{padding:12px 24px 24px}}
+main > * + *{margin-top:12px}
+.passos{display:flex;gap:6px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:8px 12px}
+.passos div{flex:1;min-width:140px;border-radius:var(--r-sm);padding:6px 10px;font-size:11px;color:#94a3b8;background:transparent}
+.passos div b{display:block;font-size:12px;font-weight:600}
+.passos div.atual{background:var(--brand-700);color:var(--brand-200)}
+.passos div.atual b{color:#fff}
+.passos div.feito{background:var(--brand-50);color:var(--brand-600)}
+.passos div.feito b{color:var(--brand-800)}
+/* Cartões */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.card h2{font-size:16px;font-weight:700;color:var(--brand-800);margin:0 0 10px;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.card h3{font-size:13px;font-weight:700;color:var(--brand-800);margin:14px 0 8px}
+.dica{color:var(--muted);font-size:11px;margin:-4px 0 10px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px;align-items:start}
+@media (max-width:980px){.grid2{grid-template-columns:1fr}}
+/* Botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;border:1px solid var(--brand-200);background:var(--brand-50);color:var(--brand-800);border-radius:var(--r-sm);padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s}
+.btn:hover{background:var(--brand-100)}
+.btn.pri{background:var(--brand-700);border-color:var(--brand-700);color:#fff}
+.btn.pri:hover{background:var(--brand-800)}
+.btn.apoio{background:var(--accent-600);border-color:var(--accent-600);color:#fff}
+.btn.apoio:hover{background:var(--accent-700)}
+.btn.contorno{background:#fff}
+.btn.contorno:hover{background:var(--brand-50)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.peq{min-height:26px;padding:3px 9px;font-size:11px}
+.btn.perigo{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.perigo:hover{background:#fef2f2;color:#b91c1c}
+.btn.copiar{padding:3px 8px;font-variant-numeric:tabular-nums;background:#fff}
+.btn.copiar.copiado{background:var(--ok-bg);border-color:#86efac;color:var(--ok)}
+.btn:focus-visible,nav.abas button:focus-visible,.chip:focus-visible{outline:2px solid var(--accent-500);outline-offset:1px}
+.acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.acoes .esp{flex:1}
+/* Campos */
+input[type=text],input[type=number],input[type=date],select,textarea{border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 9px;background:#fff;width:100%;font-size:12px;min-height:32px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent-500);box-shadow:0 0 0 1px var(--accent-500)}
+textarea{font-size:12px;line-height:1.5;resize:vertical}
+label.chk{display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin:6px 0}
+label.chk input{margin-top:3px;width:auto;min-height:0;accent-color:var(--brand-700)}
+.mono{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+/* Estado vazio */
+.vazio{border:2px dashed var(--brand-200);border-radius:var(--r);padding:40px 20px;text-align:center;background:var(--panel);transition:.15s}
+.vazio.sobre{border-color:var(--accent-500);background:var(--accent-50)}
+.vazio .ico{width:56px;height:56px;border-radius:12px;background:var(--brand-50);color:var(--brand-700);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px}
+.vazio .ico .ic{width:28px;height:28px}
+.vazio h2{justify-content:center;margin:0 0 4px}
+.vazio p{margin:0 0 14px;color:var(--muted);font-size:12px}
+.email-meta{display:grid;grid-template-columns:90px 1fr;gap:3px 10px;font-size:12px;margin-bottom:10px}
+.email-meta dt{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase}
+.email-meta dd{margin:0;word-break:break-word}
+pre.original{white-space:pre-wrap;word-break:break-word;font-family:var(--font-sans);font-size:12px;background:var(--bar);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;margin:0;max-height:62vh;overflow:auto}
+pre.original .hist{color:#94a3b8}
+mark{border-radius:3px;padding:0 2px}
+mark.m-ok{background:#bbf7d0;color:var(--ok)}
+mark.m-warn{background:var(--warn-tag);color:var(--warn);outline:1px solid var(--warn-line)}
+mark.m-cart{background:var(--brand-100);color:var(--brand-800)}
+.tag{display:inline-block;font-size:11px;border-radius:var(--r-sm);padding:2px 8px;font-weight:700;background:var(--line-soft);color:#334155;white-space:nowrap}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.bad{background:var(--bad-bg);color:var(--bad-dk)}
+.tag.warn{background:var(--warn-tag);color:var(--warn)}
+.tag.ac{background:var(--accent-50);color:var(--accent-700)}
+/* Alertas e ocorrências (sempre abaixo do conteúdo principal) */
+.card.painel-al{padding:0;border-color:#fecaca;overflow:hidden}
+.card.painel-al h2{margin:0;padding:10px 12px;background:#fef2f2;border-left:4px solid var(--bad);color:var(--bad-dk);font-size:14px}
+.card.painel-al .alertas{padding:12px}
+.alertas{display:flex;flex-direction:column;gap:6px}
+.al{border-radius:var(--r-sm);padding:8px 10px;font-size:12px;border-left:4px solid}
+.al.bloqueio{background:var(--bad-bg);border-color:var(--bad);color:var(--bad-dk)}
+.al.alerta,.al.carteira{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.al.alerta.resolvido{background:var(--ok-bg);border-color:#86efac;color:var(--ok)}
+.al.info{background:var(--bar);border-color:#cbd5e1;color:#475569}
+.al .nv{display:inline-block;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-right:8px;padding:1px 7px;border-radius:var(--r-sm);background:rgba(255,255,255,.7)}
+.al.bloqueio .nv{background:var(--bad);color:#fff}
+.al .linha2{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;color:var(--ink)}
+.al .linha2 input[type=text]{flex:1;min-width:180px;padding:4px 8px}
+.al .linha2 select{width:auto;min-width:220px;padding:4px 8px}
+/* Tabelas de dados: cabeçalho em azul, grade preta de 1px */
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:4px 6px;border:1px solid #000;vertical-align:middle;font-size:11px}
+th{font-weight:700;text-transform:uppercase;background:var(--th1);color:#fff;text-align:center;position:sticky;top:0}
+td:first-child{font-weight:700;color:var(--brand-800)}
+td.num,th.num{text-align:center}
+.qtd{font-size:16px;font-weight:700;color:var(--accent-700)}
+.campos{display:grid;grid-template-columns:150px 1fr;gap:8px 10px;align-items:center}
+.campos > label{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase}
+.cart-box{display:flex;gap:8px;align-items:center}
+.cart-box input{font-size:14px;letter-spacing:.04em}
+.cab-tab td:first-child{width:170px;background:var(--brand-50)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+.seg button{border:0;background:var(--brand-50);color:var(--brand-800);padding:5px 11px;cursor:pointer;font-size:12px;font-weight:600}
+.seg button:hover{background:var(--brand-100)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on.igual{background:var(--brand-700);color:#fff}
+.seg button.on.corrigi{background:var(--warn-tag);color:var(--warn)}
+.cega{background:var(--bar);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px}
+.cega-linhas{display:grid;grid-template-columns:60px 170px 110px;gap:6px 10px;align-items:center;margin-top:10px}
+.cega-linhas input{font-size:15px;text-align:center;font-variant-numeric:tabular-nums}
+.cega-linhas .h{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.res-ok{background:var(--ok-bg);color:var(--ok);border-radius:var(--r-sm);padding:10px 12px;font-weight:600}
+.res-bad{background:var(--bad-bg);color:var(--bad-dk);border-radius:var(--r-sm);padding:10px 12px}
+.res-bad ul{margin:6px 0 0;padding-left:20px;color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.kpi b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--accent-700)}
+.kpi span{font-size:11px;color:var(--muted)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand-800);color:#fff;padding:9px 16px;border-radius:var(--r-sm);font-size:13px;z-index:99;box-shadow:0 6px 24px rgba(15,23,42,.25);opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.vis{opacity:1}
+.toast.bad{background:var(--bad)}
+.tabela-scroll{overflow:auto;max-height:60vh}
+.cfg-cl input{padding:4px 7px;font-size:12px}
+.oculto{display:none!important}
+.aviso{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn);border-radius:var(--r);padding:10px 14px;font-size:12px}
+.ultimo{background:var(--ok-bg);border:1px solid #86efac;color:var(--ok);border-radius:var(--r);padding:10px 14px;font-size:12px}
+details summary{cursor:pointer;color:var(--accent-600);font-weight:600}
+.linha-flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.linha-flex > *{width:auto}
+/* Rodapé */
+footer.rodape{width:100%;max-width:1600px;margin:0 auto;border-top:1px solid var(--line);padding:16px 12px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+@media (min-width:640px){footer.rodape{flex-direction:row;justify-content:space-between;padding:16px 24px}}
+footer.rodape b{font-weight:600;color:var(--brand-800)}
+.print-head{display:none}
+/* Impressão: A4 paisagem, sem topo, barras, botões e campos */
+@page{size:A4 landscape;margin:7mm}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  header.topo,nav.abas,.btn,.chip,input,select,.toast,.passos,.acoes{display:none!important}
+  .print-head{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--brand-700);padding-bottom:6px;margin-bottom:8px}
+  .print-head img{height:10mm}
+  .print-head b{font-size:14px;font-weight:800;color:var(--brand-700)}
+  .print-head span{color:var(--accent-600);font-weight:700}
+  .print-head small{margin-left:auto;font-size:9px;color:var(--muted)}
+  html,body{background:#fff}
+  .card{box-shadow:none}
+}
+
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="wrap topo-in">
+    <div class="marca">
+      <img class="logo" src="logo-promedica.png" alt="Promédica">
+      <span class="div"></span>
+      <div>
+        <h1>Conferidor de Guias</h1>
+        <p class="sub">Núcleo Gestão de Terapias</p>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip ctx" title="Data de hoje"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span id="chipData"></span></span>
+      <label class="chip" title="Operador"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><select id="operador" aria-label="Operador"></select></label>
+      <button class="chip" id="pastaPill" data-act="pasta" title="Pasta compartilhada"><span class="dot"></span><span id="pastaTxt">Pasta…</span></button>
+      <span class="chip num" id="versao" title="Versão"></span>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="abas" aria-label="Seções">
+    <button data-act="aba" data-aba="atend" class="ativo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>Atendimento</button>
+    <button data-act="aba" data-aba="painel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>Painel do dia</button>
+    <button data-act="aba" data-aba="config"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Configurações</button>
+  </nav>
+</div>
+<div class="wrap print-wrap"><div class="print-head"><img src="logo-promedica.png" alt="Promédica"><b>Conferidor de Guias · <span>Núcleo Gestão de Terapias</span></b><small id="printData"></small></div></div>
+<main id="app"></main>
+<footer class="rodape">
+  <span>© <span id="anoRodape"></span> Promédica · Conferidor de Guias</span>
+  <span>Criado por <b>Alexandre Neves</b></span>
+</footer>
+<div class="toast" id="toast"></div>
+<input type="file" id="arquivoEml" accept=".eml,message/rfc822" class="oculto">
+
+<script>
+'use strict';
+const VERSAO = '1.0.0';
+
+/* ====================================================================
+   Configuração padrão (sobrescrita pelo config.json da pasta compartilhada)
+   ==================================================================== */
+const CONFIG_PADRAO = {
+  operadores: ['Alípio', 'Rafael', 'Thiago', 'Apoio'],
+  parametros: { diasDuplicidade: 7, mesesEmissaoAntiga: 6, diasHistorico: 30 },
+  clinicas: [],
+  modelos: {
+    autorizada: { nome: 'Guia autorizada', texto:
+`{GUIA}
+
+{SAUDACAO}!
+
+Informamos que a guia acima foi devidamente autorizada e encaminhada pelo e-mail nao-responda@promedica.com.br.
+
+Beneficiário: {BENEFICIARIO}
+Serviços autorizados:
+{ITENS}
+
+Se algum serviço ou quantidade não corresponder ao solicitado, responda este e-mail informando a divergência.
+
+Permanecemos à disposição para eventuais esclarecimentos.
+Desejamos um ótimo dia de trabalho!` },
+    correcao: { nome: 'Correção realizada', texto:
+`{GUIA}
+
+{SAUDACAO}!
+
+A guia acima foi corrigida conforme solicitado e reencaminhada pelo e-mail nao-responda@promedica.com.br.
+
+Beneficiário: {BENEFICIARIO}
+Serviços autorizados:
+{ITENS}
+
+Permanecemos à disposição para eventuais esclarecimentos.` },
+    pendencia: { nome: 'Pendência de dados (automático)', texto:
+`{SAUDACAO}!
+
+Não foi possível gerar a guia de {BENEFICIARIO} pelo(s) motivo(s) abaixo:
+
+{PROBLEMAS}
+
+Por gentileza, responda este e-mail com as informações corrigidas para darmos continuidade.
+
+Modelo de pedido:
+{MODELO_PEDIDO}
+
+Permanecemos à disposição.` },
+    ja_autorizado: { nome: 'Já autorizado (cobrança)', texto:
+`{SAUDACAO}!
+
+O pedido de {BENEFICIARIO} já foi autorizado anteriormente na guia {GUIA_ANTERIOR}, em {DATA_ANTERIOR}, com os serviços:
+
+{ITENS_ANTERIOR}
+
+A guia foi encaminhada pelo e-mail nao-responda@promedica.com.br. Caso não a tenha recebido, responda este e-mail que faremos o reenvio.
+
+Permanecemos à disposição.` },
+    carteira_nao_localizada: { nome: 'Beneficiário não localizado', texto:
+`{SAUDACAO}!
+
+Não localizamos o beneficiário {BENEFICIARIO} com a carteira informada ({CARTEIRA_INFORMADA}).
+
+Por gentileza, confirme o nome completo e o número da carteira Promédica (17 caracteres, sem espaços).
+
+Permanecemos à disposição.` },
+    nome_carteira: { nome: 'Nome e carteira não conferem', texto:
+`{SAUDACAO}!
+
+A carteira informada ({CARTEIRA_INFORMADA}) não pertence a {BENEFICIARIO}.
+
+Por gentileza, confirme o nome completo e o número da carteira Promédica do beneficiário.
+
+Permanecemos à disposição.` },
+    anexo: { nome: 'Pedido em anexo', texto:
+`{SAUDACAO}!
+
+Não recebemos pedidos em anexo. Por gentileza, envie as informações no corpo do e-mail, conforme o modelo abaixo:
+
+{MODELO_PEDIDO}
+
+Permanecemos à disposição.` },
+    observacao: { nome: 'Observação da guia', texto:
+`Solicitante: {REMETENTE}
+Recebido em: {DATA_EMAIL}
+Assunto: {ASSUNTO}
+----- Pedido original -----
+{TEXTO_ORIGINAL}` },
+    modelo_pedido: { nome: 'Modelo de pedido para as clínicas', texto:
+`Beneficiário:
+Carteira: (17 caracteres, sem espaços)
+Serviços (um por linha: CÓDIGO - DESCRIÇÃO - QUANTIDADE):
+Médico: (nome e CRM)
+CID:
+Emissão: (dd/mm/aaaa ou SEM DATA)
+Local de emissão:
+Observações:` }
+  }
+};
+const MODELOS_RESPOSTA_GUIA = ['autorizada', 'correcao'];
+const MODELOS_SEM_GUIA = ['pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'anexo'];
+const STATUS = { em_andamento: 'Em andamento', concluido: 'Concluído', aguardando_clinica: 'Aguardando clínica', devolvido: 'Devolvido à caixa', descartado: 'Descartado' };
+const MOTIVOS_CORRECAO = ['Serviço omitido', 'Quantidade errada', 'Código errado', 'Serviço a mais', 'Cabeçalho (executante, local, data, médico, CID)', 'Beneficiário/carteira errada', 'Outro'];
+const DETECTADO_POR = ['Clínica', 'Apoio (amostragem)', 'Faturamento', 'Atendimento', 'Próprio operador', 'Outro'];
+
+/* ====================================================================
+   Utilidades
+   ==================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const semAcento = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+const slug = s => semAcento(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
+const pad = n => String(n).padStart(2, '0');
+const isoDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDias = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const fmtData = v => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
+const fmtHora = v => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fmtDH = v => `${fmtData(v)} ${fmtHora(v)}`;
+const agora = () => new Date().toISOString();
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2));
+const cartValida = c => /^\d{15}[A-Z0-9]{2}$/.test(c || '');
+const normCart = c => String(c || '').toUpperCase().replace(/[\s.\-\/]/g, '');
+const fmtCart = c => cartValida(c) ? c.replace(/^(\d{4})(\d{4})(\d{4})(\d{3})(..)$/, '$1 $2 $3 $4 $5') : (c || '');
+const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('conferidor.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('conferidor.' + k, JSON.stringify(v)); } catch (e) { } },
+  del(k) { try { localStorage.removeItem('conferidor.' + k); } catch (e) { } },
+  chaves(prefixo) { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('conferidor.' + prefixo)) out.push(k.slice(11)); } } catch (e) { } return out; }
+};
+
+let toastT;
+function toast(msg, tipo) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast vis' + (tipo ? ' ' + tipo : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', tipo === 'bad' ? 4500 : 2000);
+}
+async function copiar(texto) {
+  try { await navigator.clipboard.writeText(texto); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+}
+function baixar(nome, conteudo, tipo) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo || 'text/plain' }));
+  a.download = nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ====================================================================
+   Leitura de .eml (MIME)
+   ==================================================================== */
+function bin2bytes(s) { const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i) & 255; return u; }
+function bytes2bin(u) { let s = ''; for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return s; }
+function decodificar(bytes, charset) {
+  let cs = String(charset || 'utf-8').toLowerCase().replace(/["']/g, '').trim();
+  if (cs === 'us-ascii' || cs === 'ascii') cs = 'windows-1252';
+  try { return new TextDecoder(cs).decode(bytes); } catch (e) { return new TextDecoder('utf-8').decode(bytes); }
+}
+function talvezUtf8(s) {
+  if (!/[\x80-\xff]/.test(s) || /[^\x00-\xff]/.test(s)) return s;
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bin2bytes(s)); } catch (e) { return s; }
+}
+function decodificarPalavras(s) {
+  if (!s) return '';
+  s = s.replace(/(=\?[^?]+\?[QqBb]\?[^?]*\?=)\s+(?==\?)/g, '$1');
+  return s.replace(/=\?([^?]+)\?([QqBb])\?([^?]*)\?=/g, (m, cs, enc, txt) => {
+    let bin;
+    if (enc.toUpperCase() === 'B') { try { bin = atob(txt); } catch (e) { return m; } }
+    else bin = txt.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
+    return decodificar(bin2bytes(bin), cs.split('*')[0]);
+  });
+}
+function parseCabecalhos(txt) {
+  const h = {};
+  txt.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/).forEach(l => {
+    const i = l.indexOf(':'); if (i <= 0) return;
+    const k = l.slice(0, i).trim().toLowerCase(); (h[k] = h[k] || []).push(l.slice(i + 1).trim());
+  });
+  return h;
+}
+function parseCT(v) {
+  const tipo = (v.split(';')[0] || 'text/plain').trim().toLowerCase();
+  const params = {};
+  for (const m of v.matchAll(/([\w*-]+)\s*=\s*("([^"]*)"|[^;\s]+)/g)) params[m[1].toLowerCase().replace(/\*.*$/, '')] = m[3] != null ? m[3] : m[2];
+  return { tipo, params };
+}
+function parseParte(raw) {
+  let cab, corpo;
+  if (/^\r?\n/.test(raw)) { cab = ''; corpo = raw.replace(/^\r?\n/, ''); }
+  else { const m = raw.match(/\r?\n\r?\n/); cab = m ? raw.slice(0, m.index) : raw; corpo = m ? raw.slice(m.index + m[0].length) : ''; }
+  const h = parseCabecalhos(cab);
+  const ct = parseCT((h['content-type'] || ['text/plain'])[0]);
+  const parte = { h, tipo: ct.tipo, params: ct.params, corpo, partes: [] };
+  if (ct.tipo.startsWith('multipart/') && ct.params.boundary) {
+    const segs = corpo.split('--' + ct.params.boundary);
+    for (let i = 1; i < segs.length; i++) {
+      let s = segs[i]; if (s.startsWith('--')) break;
+      s = s.replace(/^[ \t]*\r?\n/, '').replace(/\r?\n$/, '');
+      parte.partes.push(parseParte(s));
+    }
+  } else if (ct.tipo === 'message/rfc822') {
+    parte.partes.push(parseParte(corpo));
+  }
+  return parte;
+}
+function corpoTexto(p) {
+  const enc = ((p.h['content-transfer-encoding'] || [''])[0]).toLowerCase().trim();
+  let bin = p.corpo;
+  if (enc === 'quoted-printable') bin = bin.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
+  else if (enc === 'base64') { try { bin = atob(bin.replace(/[^A-Za-z0-9+/=]/g, '')); } catch (e) { } }
+  return decodificar(bin2bytes(bin), p.params.charset);
+}
+function coletarPartes(p, out) {
+  if (p.partes.length) { p.partes.forEach(x => coletarPartes(x, out)); return; }
+  const disp = (p.h['content-disposition'] || [''])[0];
+  const nomeM = disp.match(/filename\*?=\s*"?([^";]+)"?/i) || ((p.h['content-type'] || [''])[0]).match(/name\*?=\s*"?([^";]+)"?/i);
+  const nome = nomeM ? decodificarPalavras(nomeM[1]) : '';
+  const ehAnexo = /^\s*attachment/i.test(disp) || (nome && !p.tipo.startsWith('text/') && !p.tipo.startsWith('image/'));
+  if (ehAnexo) { out.anexos.push(nome || p.tipo); return; }
+  if (p.tipo === 'text/plain' && out.plain == null) out.plain = corpoTexto(p);
+  else if (p.tipo === 'text/html' && out.html == null) out.html = corpoTexto(p);
+}
+function htmlParaTexto(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script,style,head,title').forEach(n => n.remove());
+  const bloco = /^(P|DIV|TR|LI|H[1-6]|TABLE|UL|OL|BLOCKQUOTE|SECTION|ARTICLE|HEADER|FOOTER|PRE)$/;
+  let s = '';
+  (function andar(n) {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) s += c.nodeValue.replace(/[ \t\r\n]+/g, ' ');
+      else if (c.nodeType === 1) {
+        if (c.tagName === 'BR') { s += '\n'; continue; }
+        const b = bloco.test(c.tagName);
+        if (b) s += '\n';
+        if (c.tagName === 'TD' || c.tagName === 'TH') s += ' ';
+        andar(c);
+        if (b) s += '\n';
+      }
+    }
+  })(doc.body || doc.documentElement);
+  return s;
+}
+function limparTexto(t) {
+  return String(t || '').replace(/\r\n?/g, '\n').replace(/[   ]/g, ' ').replace(/[​‌‍﻿]/g, '')
+    .split('\n').map(l => l.replace(/[ \t]+$/g, '').replace(/^[ \t]+/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function endereco(v) {
+  const m = v.match(/<([^>]+)>/);
+  const email = (m ? m[1] : (v.match(/[\w.+'-]+@[\w.-]+/) || [''])[0]).trim().toLowerCase();
+  let nome = (m ? v.slice(0, m.index) : '').trim().replace(/^"|"$/g, '').trim();
+  return { nome, email };
+}
+function hashTexto(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function cortarHistorico(t) {
+  const L = t.split('\n');
+  for (let i = 1; i < L.length; i++) {
+    const l = L[i].trim();
+    const prox = [L[i + 1], L[i + 2], L[i + 3]].map(x => (x || '').trim());
+    const corte =
+      /^(-{2,}\s*)?(mensagem original|original message|mensagem encaminhada|forwarded message)/i.test(l) ||
+      /^(em|on)\s.{4,}(escreveu|wrote)\s*:?$/i.test(l) ||
+      (/^(de|from)\s*:/i.test(l) && prox.some(x => /^(enviad[ao]|sent|data|date|para|to|assunto|subject)\s*:/i.test(x))) ||
+      (/^>/.test(l) && i > 2);
+    if (corte) return { principal: L.slice(0, i).join('\n').trim(), restante: L.slice(i).join('\n'), cortado: true };
+  }
+  return { principal: t.trim(), restante: '', cortado: false };
+}
+function lerEml(buf) {
+  const raw = bytes2bin(new Uint8Array(buf));
+  const raiz = parseParte(raw);
+  const out = { plain: null, html: null, anexos: [] };
+  coletarPartes(raiz, out);
+  const H = n => decodificarPalavras(talvezUtf8((raiz.h[n] || [''])[0])).trim();
+  let texto = out.plain != null && out.plain.trim() ? out.plain : (out.html != null ? htmlParaTexto(out.html) : (out.plain || ''));
+  texto = limparTexto(texto);
+  const remetente = endereco(H('from'));
+  const responderPara = H('reply-to') ? endereco(H('reply-to')) : null;
+  const d = new Date(H('date'));
+  const assunto = H('subject');
+  const messageId = H('message-id') || ('sem-id-' + hashTexto(remetente.email + H('date') + assunto + texto.slice(0, 500)));
+  const corte = cortarHistorico(texto);
+  return {
+    messageId, data: isNaN(d) ? null : d.toISOString(), remetente, responderPara, assunto,
+    textoCompleto: texto, textoPrincipal: corte.principal, restante: corte.restante, cortado: corte.cortado,
+    anexos: out.anexos, origem: 'eml'
+  };
+}
+function emailDeTexto(texto, remetenteTxt) {
+  texto = limparTexto(texto);
+  const corte = cortarHistorico(texto);
+  return {
+    messageId: 'colado-' + hashTexto(texto), data: new Date().toISOString(), remetente: endereco(remetenteTxt || ''), responderPara: null,
+    assunto: '(colado manualmente)', textoCompleto: texto, textoPrincipal: corte.principal, restante: corte.restante, cortado: corte.cortado,
+    anexos: [], origem: 'colado'
+  };
+}
+
+/* ZIP (para conciliação) — suporta armazenado e deflate */
+async function lerZip(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('Arquivo ZIP inválido.');
+  const total = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+  const saida = [];
+  for (let k = 0; k < total; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const flags = dv.getUint16(p + 8, true), metodo = dv.getUint16(p + 10, true), tam = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const nomeB = u.subarray(p + 46, p + 46 + nl);
+    const nome = (flags & 0x800) ? new TextDecoder().decode(nomeB) : bytes2bin(nomeB);
+    p += 46 + nl + el + cl;
+    if (nome.endsWith('/')) continue;
+    const inicio = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    const dados = u.slice(inicio, inicio + tam);
+    let conteudo;
+    if (metodo === 0) conteudo = dados.buffer;
+    else if (metodo === 8) conteudo = await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    else continue;
+    saida.push({ nome, dados: conteudo });
+  }
+  return saida;
+}
+
+/* ====================================================================
+   Leitura do pedido
+   ==================================================================== */
+const ROTULOS = [
+  ['local', /^local(\s+d[aeo]s?\s+(emissao|pedido|atendimento|solicitacao))?\b/],
+  ['emissao', /^((data\s+(da\s+|de\s+)?)?(emissao|do\s+pedido(\s+medico)?)|data\s+de\s+solicitacao)\b/],
+  ['beneficiario', /^(beneficiari[oa]s?|paciente|nome(\s+do\s+(beneficiario|paciente))?)\b/],
+  ['carteira', /^((n[or°º.]*\s*)?(da\s+)?(carteir(a|inha)|matricula|cartao))\b(\s+(promedica|do\s+beneficiario))?/],
+  ['servico', /^(servicos?|procedimentos?|codigos?(\s+do\s+servico)?)\b/],
+  ['quantidade', /^(quantidade|qtde?|quant)\b\.?/],
+  ['medico', /^(medic[oa]s?(\s+solicitante)?|solicitante|profissional(\s+solicitante)?)\b/],
+  ['cid', /^cid(-?10)?\b/],
+  ['obs', /^(obs|observac(ao|oes))\b\.?/]
+];
+function normUnidades(l) { let s = ''; for (let i = 0; i < l.length; i++) { const n = semAcento(l[i]).toLowerCase(); s += n.length ? n[0] : l[i]; } return s; }
+function detectarRotulo(linhaOrig) {
+  const limpa = linhaOrig.replace(/[*_ ]/g, ' ').replace(/^\s*[•·▪►]\s*/, '').trim();
+  const norm = normUnidades(limpa);
+  for (const [k, re] of ROTULOS) {
+    const m = norm.match(re);
+    if (!m) continue;
+    const resto = limpa.slice(m[0].length);
+    if (/^\s*([:=\-–—]|$)/.test(resto)) return { k, valor: resto.replace(/^\s*[:=\-–—]\s*/, '').trim() };
+  }
+  return null;
+}
+function secionar(texto) {
+  const secoes = [{ k: null, linhas: [] }];
+  for (const l of texto.split('\n')) {
+    const r = detectarRotulo(l);
+    if (r) secoes.push({ k: r.k, linhas: [r.valor] });
+    else secoes[secoes.length - 1].linhas.push(l.replace(/[*_]/g, ' ').trim());
+  }
+  return secoes;
+}
+const primeiraLinha = s => ((s && s.linhas.find(x => x.trim())) || '').trim().replace(/[.;,]+$/, '').trim();
+function extrairItens(bloco) {
+  const ms = [...bloco.matchAll(/(?<!\d)(\d{8})(?!\d)/g)];
+  const pats = [
+    /\(?\s*(?:quantidade|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
+    /(?:^|\s)[x×]\s*(\d{1,2})(?!\d)/i,
+    /[-–—:|]\s*(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o))?\s*\.?\s*$/im
+  ];
+  const itens = ms.map((m, k) => {
+    const seg = bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
+    let qtd = null, qm = null;
+    for (const p of pats) { qm = seg.match(p); if (qm) { qtd = Number(qm[1]); break; } }
+    let desc = (qm ? seg.slice(0, qm.index) : seg).split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+    desc = desc.replace(/^[\s\-–—:|.]+/, '').replace(/[\s\-–—:|(.,]+$/, '').trim();
+    return { codigo: m[1], desc, qtd, origemQtd: qtd != null ? 'linha' : null };
+  });
+  const invalidos = [...bloco.matchAll(/(?<!\d)(\d{5,7}|\d{9,12})(?!\d)/g)].map(m => m[1]);
+  return { itens, invalidos };
+}
+function lerMedico(bruto) {
+  const conselho = (bruto.match(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/i) || [''])[0].toUpperCase();
+  const dig = (bruto.match(/\d[\d.\s]{1,10}\d|\d{3,}/) || [''])[0].replace(/\D/g, '');
+  const nome = bruto.replace(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/gi, ' ').replace(/\b[A-Z]{2}\b(?=\s*[:\-\/]?\s*\d)/g, ' ')
+    .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return { bruto, nome, crm: dig.length >= 3 ? dig : '', conselho };
+}
+function lerEmissao(bruto, referencia) {
+  const b = (bruto || '').trim();
+  if (!b) return { estado: 'ausente', bruto: '' };
+  if (/sem\s*data/i.test(b)) return { estado: 'sem_data', bruto: b };
+  const m = b.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (!m) return { estado: 'invalida', bruto: b };
+  let [, d, mo, a] = m.map(Number); if (a < 100) a += 2000;
+  const dt = new Date(a, mo - 1, d);
+  if (dt.getDate() !== d || dt.getMonth() !== mo - 1) return { estado: 'invalida', bruto: b };
+  const ref = referencia ? new Date(referencia) : new Date();
+  return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: dt > ref, mesesAtras: (ref - dt) / (30.44 * 864e5) };
+}
+function lerPedido(texto, referencia) {
+  const secoes = secionar(texto);
+  const de = k => secoes.filter(s => s.k === k);
+  const p = { itens: [], invalidos: [], soltos: [], qtdUnicaAplicada: false, semRotulo: false };
+  p.beneficiarios = de('beneficiario').map(primeiraLinha).filter(Boolean);
+  p.beneficiario = p.beneficiarios[0] || '';
+  p.carteiraBruta = primeiraLinha(de('carteira')[0]);
+  const lc = normCart(p.carteiraBruta);
+  p.carteira = cartValida(lc) ? lc : null;
+  p.medico = lerMedico(primeiraLinha(de('medico')[0]));
+  p.cid = primeiraLinha(de('cid')[0]).toUpperCase();
+  p.emissao = lerEmissao(primeiraLinha(de('emissao')[0]), referencia);
+  p.local = primeiraLinha(de('local')[0]);
+  p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
+  const aplicarQtd = (lista, qsec) => {
+    const q = (primeiraLinha(qsec).match(/\d+/) || [null])[0];
+    const sem = lista.filter(it => it.qtd == null);
+    if (q != null && sem.length) { sem.forEach(it => { it.qtd = Number(q); it.origemQtd = 'campo'; }); if (sem.length > 1) p.qtdUnicaAplicada = true; qsec.usada = true; }
+  };
+  for (let i = 0; i < secoes.length; i++) {
+    if (secoes[i].k !== 'servico') continue;
+    const r = extrairItens(secoes[i].linhas.join('\n'));
+    p.invalidos.push(...r.invalidos);
+    for (let j = i + 1; j < secoes.length && secoes[j].k !== 'servico'; j++) if (secoes[j].k === 'quantidade' && !secoes[j].usada) { aplicarQtd(r.itens, secoes[j]); break; }
+    p.itens.push(...r.itens);
+  }
+  if (!de('servico').length) {
+    const livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*\d{8}(?!\d)/.test(l));
+    const r = extrairItens(livres.join('\n'));
+    if (r.itens.length) { p.semRotulo = true; p.itens = r.itens; }
+  }
+  const qLivre = de('quantidade').filter(s => !s.usada);
+  if (qLivre.length === 1 && p.itens.filter(i => i.qtd == null).length) aplicarQtd(p.itens, qLivre[0]);
+  const usados = new Set(p.itens.map(i => i.codigo));
+  const textoLivre = secoes.filter(s => !['carteira', 'medico', 'emissao', 'cid'].includes(s.k)).flatMap(s => s.linhas).join('\n');
+  p.soltos = [...new Set([...textoLivre.matchAll(/(?<!\d)(\d{8})(?!\d)/g)].map(m => m[1]).filter(c => !usados.has(c)))];
+  p.secoesEncontradas = [...new Set(secoes.map(s => s.k).filter(Boolean))];
+  return p;
+}
+
+/* ====================================================================
+   Pasta compartilhada (File System Access API) + IndexedDB
+   ==================================================================== */
+function idbAbrir() { return new Promise((res, rej) => { const r = indexedDB.open('conferidor', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbGet(k) { try { const db = await idbAbrir(); return await new Promise(res => { const t = db.transaction('kv').objectStore('kv').get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(null); }); } catch (e) { return null; } }
+async function idbSet(k, v) { const db = await idbAbrir(); await new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+
+const Pasta = {
+  handle: null, ok: false, suportado: 'showDirectoryPicker' in window,
+  async init() {
+    if (!this.suportado) return;
+    this.handle = await idbGet('pasta');
+    if (this.handle) { try { this.ok = (await this.handle.queryPermission({ mode: 'readwrite' })) === 'granted'; } catch (e) { this.ok = false; } }
+  },
+  async conectar() {
+    const h = await window.showDirectoryPicker({ id: 'conferidor-pasta', mode: 'readwrite' });
+    this.handle = h; await idbSet('pasta', h); this.ok = true;
+  },
+  async reautorizar() {
+    if (!this.handle) return this.conectar();
+    this.ok = (await this.handle.requestPermission({ mode: 'readwrite' })) === 'granted';
+  },
+  async dir(partes, criar) { let d = this.handle; for (const p of partes) d = await d.getDirectoryHandle(p, { create: !!criar }); return d; },
+  async ler(partes, nome) { try { const d = await this.dir(partes, false); const f = await (await d.getFileHandle(nome)).getFile(); return JSON.parse(await f.text()); } catch (e) { return null; } },
+  async gravar(partes, nome, obj) {
+    const d = await this.dir(partes, true); const fh = await d.getFileHandle(nome, { create: true });
+    const w = await fh.createWritable(); await w.write(JSON.stringify(obj, null, 1)); await w.close();
+  },
+  async listar(partes) { try { const d = await this.dir(partes, false); const out = []; for await (const [n, h] of d.entries()) out.push([n, h]); return out; } catch (e) { return []; } },
+  async apagar(partes, nome) { try { const d = await this.dir(partes, false); await d.removeEntry(nome); return true; } catch (e) { return false; } }
+};
+
+/* Configuração */
+let cfg = JSON.parse(JSON.stringify(CONFIG_PADRAO));
+function mesclarConfig(base, c) {
+  const r = JSON.parse(JSON.stringify(base));
+  if (!c) return r;
+  if (Array.isArray(c.operadores) && c.operadores.length) r.operadores = c.operadores;
+  if (Array.isArray(c.clinicas)) r.clinicas = c.clinicas;
+  if (c.parametros) Object.assign(r.parametros, c.parametros);
+  if (c.modelos) for (const k in c.modelos) r.modelos[k] = Object.assign({}, r.modelos[k] || {}, c.modelos[k]);
+  r.clinicas.forEach(cl => { cl.id = cl.id || slug(cl.nome); cl.emails = (cl.emails || []).map(e => e.toLowerCase().trim()).filter(Boolean); cl.codigos = cl.codigos || {}; });
+  return r;
+}
+async function carregarConfig() {
+  let c = LS.get('config', null);
+  if (Pasta.ok) { const p = await Pasta.ler([], 'config.json'); if (p) { c = p; LS.set('config', p); } }
+  cfg = mesclarConfig(CONFIG_PADRAO, c);
+}
+function configParaSalvar(c) {
+  return { versao: VERSAO, atualizadoEm: agora(), atualizadoPor: operador(), operadores: c.operadores, parametros: c.parametros, clinicas: c.clinicas, modelos: c.modelos };
+}
+async function salvarConfig(novo) {
+  const obj = configParaSalvar(novo);
+  LS.set('config', obj);
+  if (Pasta.ok) await Pasta.gravar([], 'config.json', obj);
+  cfg = mesclarConfig(CONFIG_PADRAO, obj);
+}
+async function alterarConfig(fn) {
+  // relê o arquivo da pasta antes de alterar, para não sobrescrever mudanças de outro operador
+  await carregarConfig(); fn(cfg); await salvarConfig(cfg);
+}
+
+/* Registros */
+const Reg = {
+  cache: [],
+  arquivo(dia, op) { return { partes: ['registros', dia.slice(0, 7)], nome: `${dia}_${slug(op)}.json` }; },
+  async salvar(reg) {
+    const { partes, nome } = this.arquivo(reg.dia, reg.operador);
+    const chave = `reg.${reg.dia}.${slug(reg.operador)}`;
+    let doc = LS.get(chave, null);
+    if (Pasta.ok) { const lido = await Pasta.ler(partes, nome); if (lido) doc = lido; }
+    if (!doc) doc = { operador: reg.operador, dia: reg.dia, registros: [] };
+    const i = doc.registros.findIndex(r => r.id === reg.id);
+    if (i >= 0) doc.registros[i] = reg; else doc.registros.push(reg);
+    LS.set(chave, doc);
+    let erro = null;
+    if (Pasta.ok) { try { await Pasta.gravar(partes, nome, doc); } catch (e) { erro = e; } }
+    const j = this.cache.findIndex(r => r.id === reg.id);
+    if (j >= 0) this.cache[j] = reg; else this.cache.push(reg);
+    if (erro) toast('Não consegui gravar na pasta compartilhada. O registro ficou só neste computador.', 'bad');
+  },
+  async carregar(diasExtra) {
+    const dias = (cfg.parametros.diasHistorico || 30) + (diasExtra || 0);
+    const limite = isoDia(addDias(new Date(), -dias));
+    const docs = [];
+    if (Pasta.ok) {
+      const meses = new Set(); for (let d = 0; d <= dias; d += 10) meses.add(isoDia(addDias(new Date(), -d)).slice(0, 7)); meses.add(limite.slice(0, 7));
+      for (const m of meses) for (const [n, h] of await Pasta.listar(['registros', m])) {
+        if (!n.endsWith('.json') || n.slice(0, 10) < limite) continue;
+        try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
+      }
+    } else {
+      for (const k of LS.chaves('reg.')) if (k.slice(4, 14) >= limite) { const d = LS.get(k, null); if (d) docs.push(d); }
+    }
+    this.cache = docs.flatMap(d => d.registros || []);
+  },
+  doDia(dia) { return this.cache.filter(r => r.dia === dia); }
+};
+
+/* ====================================================================
+   Estado do atendimento
+   ==================================================================== */
+let S = null;          // pedido em atendimento
+let aba = 'atend';
+let ultimoConcluido = LS.get('ultimo', null);
+const operador = () => $('#operador').value;
+function persistir() { if (S) LS.set('atual', S); else LS.del('atual'); }
+function clinicaAtual() { return S && S.clinicaId ? cfg.clinicas.find(c => c.id === S.clinicaId) || null : null; }
+const PALAVRAS_VAZIAS = new Set(['clinica', 'clinicas', 'de', 'da', 'do', 'das', 'dos', 'e', 'autorizacao', 'convenio', 'contato', 'espaco', 're', 'res', 'enc', 'fw', 'fwd', 'pedido', 'guia', 'guias', 'terapia', 'terapias', 'integrada', 'multidisciplinar']);
+const tokens = s => semAcento(s).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !PALAVRAS_VAZIAS.has(w));
+function acharClinica(email) {
+  const e = (email.remetente.email || '').toLowerCase();
+  let cl = cfg.clinicas.find(c => c.emails.includes(e));
+  if (cl) return { cl, como: 'email' };
+  const dom = e.split('@')[1] || '';
+  if (dom && !/(gmail|hotmail|outlook|yahoo|live|icloud|bol|uol|terra)\./.test(dom)) {
+    cl = cfg.clinicas.find(c => c.emails.some(x => x.endsWith('@' + dom)));
+    if (cl) return { cl, como: 'dominio' };
+  }
+  return null;
+}
+function sugerirClinica(email) {
+  const tk = new Set(tokens(email.remetente.nome + ' ' + email.assunto + ' ' + email.remetente.email.split('@')[0]));
+  let melhor = null, pts = 0;
+  for (const c of cfg.clinicas) { const n = tokens(c.nome).filter(t => tk.has(t)).length; if (n > pts) { pts = n; melhor = c; } }
+  return melhor;
+}
+function novoEstado(email) {
+  const pedido = lerPedido(email.textoPrincipal, email.data);
+  if (email.cortado && !pedido.itens.length && !pedido.carteiraBruta) {
+    email.textoPrincipal = email.textoCompleto; email.cortado = false; email.restante = '';
+    Object.assign(pedido, lerPedido(email.textoCompleto, email.data));
+  }
+  const achou = acharClinica(email);
+  const sug = achou ? null : sugerirClinica(email);
+  return {
+    etapa: 2, email, pedido,
+    carteiraUsada: pedido.carteira || '',
+    clinicaId: achou ? achou.cl.id : null, clinicaComo: achou ? achou.como : null, clinicaSugerida: sug ? sug.id : null,
+    itensEditados: false, editandoItens: false,
+    conf: {}, cab: {}, cega: { iniciada: false, tentativas: 0, linhas: '', entradas: [], resultado: null, ok: false, historico: [] },
+    guia: '', modeloResposta: /^\s*(re|res)\s*:/i.test(email.assunto) ? 'correcao' : 'autorizada', respostaEditada: null,
+    copiados: {}, checks: {}, semGuia: null,
+    registroId: uid(), abertoEm: agora(), dia: isoDia(new Date())
+  };
+}
+
+/* Alertas */
+function avaliar() {
+  const A = [], p = S.pedido, e = S.email, P = cfg.parametros;
+  const add = (key, nivel, texto, extra = {}) => A.push({ key, nivel, texto, ...extra });
+  if (p.beneficiarios.length > 1) add('multi', 'bloqueio', `O e-mail traz ${p.beneficiarios.length} beneficiários (${p.beneficiarios.join('; ')}). Processe um por vez ou peça um e-mail por beneficiário.`, { clinica: 'O e-mail contém mais de um beneficiário. Por gentileza, envie um e-mail para cada beneficiário.' });
+  if (!p.beneficiario) add('falta-benef', 'bloqueio', 'Beneficiário não informado.', { clinica: 'Nome do beneficiário não informado.' });
+  if (!p.itens.length) add('falta-serv', 'bloqueio', 'Nenhum código de serviço de 8 dígitos foi encontrado.', { clinica: 'Código do serviço (8 dígitos) não informado.' });
+  [...new Set(p.invalidos)].forEach(c => add('inv-' + c, 'bloqueio', `Código "${c}" tem ${c.length} dígitos (o correto são 8).`, { clinica: `O código "${c}" está incorreto ou incompleto: os códigos de serviço têm 8 dígitos.` }));
+  const cont = {}; p.itens.forEach(i => cont[i.codigo] = (cont[i.codigo] || 0) + 1);
+  Object.entries(cont).filter(([, n]) => n > 1).forEach(([c, n]) => add('rep-' + c, 'bloqueio', `Código ${c} aparece ${n} vezes no pedido.`, { clinica: `O código ${c} foi informado mais de uma vez. Por gentileza, informe a quantidade total em uma única linha.` }));
+  p.itens.forEach(it => {
+    if (it.qtd == null) add('qtd-' + it.codigo, 'bloqueio', `Quantidade não encontrada para ${it.codigo}.`, { clinica: `Quantidade não informada para o serviço ${it.codigo}.` });
+    else if (it.qtd < 1 || it.qtd > 9) add('qtdinv-' + it.codigo, 'bloqueio', `Quantidade ${it.qtd} inválida para ${it.codigo} (aceita de 1 a 9).`, { clinica: `Quantidade inválida (${it.qtd}) para o serviço ${it.codigo}.` });
+  });
+  if (!p.medico.nome && !p.medico.crm) add('falta-med', 'bloqueio', 'Médico solicitante não informado.', { clinica: 'Nome do médico solicitante não informado.' });
+  if (!cartValida(S.carteiraUsada)) {
+    if (!p.beneficiario && !p.carteiraBruta) add('cart', 'bloqueio', 'Carteira e nome do beneficiário não informados.', { clinica: 'Número da carteira Promédica não informado.' });
+    else add('cart', 'carteira', p.carteiraBruta ? `Carteira fora do padrão: "${p.carteiraBruta}". Localize o beneficiário pelo nome no sistema e informe a carteira usada.` : 'Carteira não informada. Localize o beneficiário pelo nome no sistema e informe a carteira usada.');
+  } else if (p.carteira !== S.carteiraUsada) {
+    add('cart-dif-' + S.carteiraUsada, 'alerta', `Carteira usada (${S.carteiraUsada}) diferente da informada no e-mail (${p.carteiraBruta || 'não informada'}). Confirme que nome e carteira são do mesmo beneficiário.`, { motivo: true });
+  }
+  if (p.qtdUnicaAplicada) add('qtd-unica', 'alerta', 'Havia uma única "Quantidade" para vários serviços e ela foi aplicada a todos. Confirme no e-mail.');
+  if (p.semRotulo) add('sem-rotulo', 'alerta', 'O e-mail não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.');
+  p.soltos.forEach(n => add('solto-' + n, 'alerta', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`));
+  if (S.itensEditados) add('editado', 'alerta', 'Dados ou itens foram editados à mão. Confira de novo com o e-mail original.');
+  const cl = clinicaAtual();
+  if (!cl) add('remetente', 'alerta', `Remetente ${e.remetente.email || '(sem endereço)'} não está no cadastro de clínicas.`, { motivo: true, vincular: true });
+  else {
+    if (S.clinicaComo === 'manual') add('rem-manual-' + cl.id, 'alerta', `Clínica escolhida manualmente (${cl.nome}); o remetente ${e.remetente.email} não está no cadastro dela.`, { motivo: true });
+    const ta = tokens(e.assunto);
+    if (ta.length && !tokens(cl.nome + ' ' + (cl.apelidos || '')).some(t => ta.includes(t))) add('assunto', 'alerta', `O assunto ("${e.assunto}") não cita ${cl.nome}, a clínica do remetente.`);
+  }
+  if (/^\s*(re|res|enc|fw|fwd|tr)\s*:/i.test(e.assunto)) add('re', 'alerta', 'Assunto de resposta ou encaminhamento. Verifique se é correção, cobrança ou pedido novo antes de gerar guia.');
+  if (e.anexos.length) add('anexo', 'alerta', `E-mail com anexo (${e.anexos.join(', ')}). Pedidos em anexo não são aceitos.`);
+  if (e.responderPara && e.responderPara.email && e.responderPara.email !== e.remetente.email) add('replyto', 'alerta', `A resposta irá para ${e.responderPara.email}, diferente do remetente ${e.remetente.email}.`);
+  const em = p.emissao;
+  if (em.estado === 'invalida') add('em-inv', 'alerta', `Data de emissão não reconhecida: "${em.bruto}".`);
+  if (em.estado === 'valida' && em.futura) add('em-fut', 'alerta', `Data de emissão no futuro (${fmtData(em.data)}).`);
+  if (em.estado === 'valida' && em.mesesAtras > P.mesesEmissaoAntiga) add('em-ant', 'alerta', `Pedido médico emitido há ${Math.floor(em.mesesAtras)} meses (${fmtData(em.data)}).`);
+  if (em.estado === 'sem_data') add('em-sd', 'info', 'Emissão: "SEM DATA", informado pela clínica.');
+  if (em.estado === 'ausente') add('em-aus', 'info', 'Data de emissão não informada (não obrigatória).');
+  if ((p.medico.nome) && !p.medico.crm) add('crm', 'info', 'CRM do médico não informado.');
+  if (!p.cid) add('cid', 'info', 'CID não informado (não obrigatório).');
+  if (e.cortado) add('cortado', 'info', 'Mensagens anteriores da conversa foram ignoradas na leitura (em cinza no e-mail).');
+  if (e.origem === 'colado') add('colado', 'info', 'Texto colado: remetente informado à mão, sem verificação pelo cabeçalho do e-mail.');
+  if (cl && Object.keys(cl.codigos || {}).length) p.itens.forEach(it => { if (!cl.codigos[it.codigo]) add('novo-' + it.codigo, 'alerta', `Código ${it.codigo} ainda não foi usado para ${cl.nome}. Confira a descrição que o sistema mostra.`); });
+  Reg.cache.filter(r => !r.tipo && r.messageId === e.messageId && r.id !== S.registroId && !['descartado', 'devolvido'].includes(r.status)).forEach(r =>
+    add('mesmo-' + r.id, 'alerta', r.status === 'concluido' ? `Este e-mail já foi concluído por ${r.operador} em ${fmtDH(r.concluidoEm)} (guia ${r.guia}).` : `${r.operador} abriu este e-mail em ${fmtDH(r.abertoEm)} (${STATUS[r.status]}).`, { motivo: true }));
+  if (cartValida(S.carteiraUsada)) {
+    const limite = addDias(new Date(), -P.diasDuplicidade);
+    const meus = new Set(p.itens.map(i => i.codigo));
+    Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.carteira === S.carteiraUsada && r.messageId !== e.messageId && new Date(r.concluidoEm) >= limite && (r.itens || []).some(i => meus.has(i.c)))
+      .forEach(r => add('dup-' + r.id, 'alerta', `Possível cobrança ou repetição: a guia ${r.guia}, de ${fmtDH(r.concluidoEm)} (${r.operador}), já autorizou ${r.itens.filter(i => meus.has(i.c)).map(i => i.c + ' ×' + i.q).join(', ')} para esta carteira.`, { motivo: true, dup: r }));
+  }
+  return A;
+}
+function situacao(A) {
+  const bloqueios = A.filter(a => a.nivel === 'bloqueio');
+  const cart = A.find(a => a.nivel === 'carteira');
+  const pend = A.filter(a => a.nivel === 'alerta' && !alertaResolvido(a));
+  return { bloqueios, cart, pend, pode: !bloqueios.length && !cart && !pend.length };
+}
+function alertaResolvido(a) { const c = S.conf[a.key]; return !!(c && c.ok && (!a.motivo || (c.motivo || '').trim().length >= 3)); }
+
+/* Textos gerados */
+function linhasItens(itens) { return itens.map(i => `• ${i.codigo} – ${i.desc || 'serviço'} – quantidade: ${i.qtd}`).join('\n'); }
+function preencher(modelo, extra = {}) {
+  const p = S.pedido, e = S.email;
+  const v = {
+    GUIA: S.guia || '{GUIA}', SAUDACAO: saudacao(), BENEFICIARIO: p.beneficiario || 'o beneficiário', CARTEIRA: S.carteiraUsada || '',
+    CARTEIRA_INFORMADA: p.carteiraBruta || 'não informada', ITENS: linhasItens(p.itens), CLINICA: clinicaAtual()?.nome || '',
+    REMETENTE: e.remetente.nome ? `${e.remetente.nome} <${e.remetente.email}>` : e.remetente.email, DATA_EMAIL: fmtDH(e.data), ASSUNTO: e.assunto,
+    TEXTO_ORIGINAL: e.textoPrincipal, MODELO_PEDIDO: (cfg.modelos.modelo_pedido || {}).texto || '', ...extra
+  };
+  return String((cfg.modelos[modelo] || {}).texto || '').replace(/\{([A-Z_]+)\}/g, (m, k) => v[k] != null ? v[k] : m);
+}
+function textoSemGuia(modelo) {
+  const A = avaliar(); const extra = {};
+  if (modelo === 'pendencia') extra.PROBLEMAS = A.filter(a => a.clinica).map(a => '• ' + a.clinica).join('\n') || '• (descreva a pendência)';
+  if (modelo === 'ja_autorizado') {
+    const d = A.find(a => a.dup);
+    if (d) { extra.GUIA_ANTERIOR = d.dup.guia; extra.DATA_ANTERIOR = fmtData(d.dup.concluidoEm); extra.ITENS_ANTERIOR = d.dup.itens.map(i => `• ${i.c} – ${i.d || 'serviço'} – quantidade: ${i.q}`).join('\n'); }
+  }
+  return preencher(modelo, extra);
+}
+
+/* Registro gravado (sem nome, CID ou médico) */
+function montarRegistro(status, extra = {}) {
+  const p = S.pedido, cl = clinicaAtual(), A = avaliar();
+  return {
+    id: S.registroId, versao: VERSAO, messageId: S.email.messageId, recebidoEm: S.email.data, assunto: S.email.assunto,
+    remetente: S.email.remetente.email, clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: operador(), dia: S.dia,
+    abertoEm: S.abertoEm, atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status,
+    carteira: S.carteiraUsada || p.carteira || null, itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc })), guia: S.guia || null,
+    alertas: A.filter(a => a.nivel === 'alerta' && S.conf[a.key] && S.conf[a.key].ok).map(a => ({ k: a.key.replace(/-.*/, ''), t: a.texto, m: (S.conf[a.key].motivo || '').trim() })),
+    bloqueios: A.filter(a => a.nivel === 'bloqueio').map(a => a.texto),
+    cabecalhoCorrigido: Object.keys(S.cab).filter(k => S.cab[k] === 'corrigi'),
+    conferencia: { tentativas: S.cega.tentativas, divergencias: S.cega.historico },
+    editadoAMao: S.itensEditados, duracaoSeg: Math.round((Date.now() - new Date(S.abertoEm)) / 1000), ...extra
+  };
+}
+async function gravarStatus(status, extra) { await Reg.salvar(montarRegistro(status, extra)); }
+
+/* ====================================================================
+   Telas
+   ==================================================================== */
+function render() {
+  $$('nav.abas button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === aba));
+  renderPasta();
+  const app = $('#app');
+  if (aba === 'painel') return renderPainel(app);
+  if (aba === 'config') return renderConfig(app);
+  if (!S) return renderEntrada(app);
+  const passos = ['E-mail', 'Pedido e alertas', 'Guia e conferência', 'Finalizar'];
+  let html = `<div class="passos">${passos.map((n, i) => `<div class="${i + 1 === S.etapa ? 'atual' : i + 1 < S.etapa ? 'feito' : ''}"><span>Etapa ${i + 1}</span><b>${n}</b></div>`).join('')}</div>`;
+  app.innerHTML = html + `<div id="etapa"></div>`;
+  const alvo = $('#etapa');
+  if (S.etapa === 2) renderPedido(alvo);
+  else if (S.etapa === 3) renderGuia(alvo);
+  else renderFinal(alvo);
+}
+function renderPasta() {
+  const pill = $('#pastaPill'), txt = $('#pastaTxt');
+  pill.className = 'chip ' + (Pasta.ok ? 'ok' : Pasta.handle ? '' : 'bad');
+  txt.textContent = !Pasta.suportado ? 'Use o Google Chrome' : Pasta.ok ? `Pasta: ${Pasta.handle.name}` : Pasta.handle ? 'Clique para reautorizar a pasta' : 'Pasta não conectada';
+}
+
+function renderEntrada(app) {
+  const semOp = !operador();
+  app.innerHTML = `
+  ${semOp ? `<div class="aviso">Escolha seu nome em <b>Operador</b>, no topo, antes de começar.</div>` : ''}
+  ${!Pasta.ok ? `<div class="aviso">${Pasta.handle ? 'A pasta compartilhada precisa ser reautorizada (um clique por dia).' : 'A pasta compartilhada não está conectada: os registros ficam só neste computador e não há detecção de duplicidade entre operadores.'} <button class="btn peq" data-act="pasta">${Pasta.handle ? 'Reautorizar' : 'Conectar pasta'}</button></div>` : ''}
+  ${ultimoConcluido ? `<div class="ultimo">Último registrado: <b>${esc(ultimoConcluido.texto)}</b> às ${fmtHora(ultimoConcluido.em)}.</div>` : ''}
+  <div class="vazio" id="zona">
+    <div class="ico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg></div>
+    <h2>Nenhum pedido carregado</h2>
+    <p>Arraste aqui o .eml do e-mail que você vai atender ou escolha o arquivo. No SmarterMail: abra o e-mail › menu ⋮ › baixar/salvar como .eml.</p>
+    <button class="btn pri" data-act="escolherEml"><svg class="ic g" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Fazer upload do e-mail (.eml)</button>
+  </div>
+  <div class="card">
+    <details>
+      <summary>Sem o arquivo? Colar o texto do e-mail</summary>
+      <p class="dica" style="margin-top:8px">Use só se não for possível baixar o .eml. O remetente não é verificado.</p>
+      <div class="campos">
+        <label>E-mail do remetente</label><input type="text" id="coladoDe" placeholder="contato@clinica.com.br">
+        <label>Corpo do e-mail</label><textarea id="coladoTxt" rows="9"></textarea>
+      </div>
+      <div class="acoes"><button class="btn" data-act="usarColado">Ler texto colado</button></div>
+    </details>
+  </div>`;
+  const z = $('#zona');
+  z.addEventListener('dragover', ev => { ev.preventDefault(); z.classList.add('sobre'); });
+  z.addEventListener('dragleave', () => z.classList.remove('sobre'));
+  z.addEventListener('drop', ev => { ev.preventDefault(); z.classList.remove('sobre'); const f = ev.dataTransfer.files[0]; if (f) abrirArquivo(f); });
+}
+async function abrirArquivo(f) {
+  if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
+  if (!/\.eml$/i.test(f.name) && f.type !== 'message/rfc822') { toast('Esse arquivo não é um .eml.', 'bad'); return; }
+  try { await iniciar(lerEml(await f.arrayBuffer())); }
+  catch (e) { console.error(e); toast('Não consegui ler esse .eml: ' + e.message, 'bad'); }
+}
+async function iniciar(email) {
+  await Reg.carregar();
+  S = novoEstado(email);
+  await gravarStatus('em_andamento');
+  persistir(); render(); window.scrollTo(0, 0);
+}
+
+function realceEmail() {
+  const e = S.email, usados = new Set(S.pedido.itens.map(i => i.codigo));
+  let html = esc(e.textoPrincipal).replace(/(?<!\d)(\d{8})(?!\d)/g, m => `<mark class="${usados.has(m) ? 'm-ok' : 'm-warn'}">${m}</mark>`);
+  if (S.pedido.carteiraBruta) { const c = esc(S.pedido.carteiraBruta); const i = html.indexOf(c); if (i >= 0) html = html.slice(0, i) + `<mark class="m-cart">${c}</mark>` + html.slice(i + c.length); }
+  if (e.cortado && e.restante) html += `\n\n<span class="hist">${esc(e.restante)}</span>`;
+  return html;
+}
+function htmlAlertas(A) {
+  const ordem = { bloqueio: 0, carteira: 1, alerta: 2, info: 3 };
+  const nomes = { bloqueio: 'Bloqueio', carteira: 'Carteira', alerta: 'Alerta', info: 'Info' };
+  return [...A].sort((a, b) => ordem[a.nivel] - ordem[b.nivel]).map(a => {
+    const c = S.conf[a.key] || {};
+    let extra = '';
+    if (a.nivel === 'alerta') extra = `<div class="linha2"><label class="chk" style="margin:0"><input type="checkbox" data-conf="${esc(a.key)}" ${c.ok ? 'checked' : ''}> Conferi</label>${a.motivo ? `<input type="text" placeholder="Motivo / o que foi verificado (obrigatório)" data-motivo="${esc(a.key)}" value="${esc(c.motivo || '')}">` : ''}</div>`;
+    if (a.vincular) extra += `<div class="linha2"><select id="selClinica"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn peq" data-act="vincularClinica">Vincular e salvar e-mail no cadastro</button><button class="btn peq" data-act="clinicaSoAgora">Usar só neste pedido</button></div>`;
+    if (a.nivel === 'carteira') extra = `<div class="linha2"><button class="btn peq" data-act="semGuia" data-modelo="carteira_nao_localizada">Não localizei → responder</button><button class="btn peq" data-act="semGuia" data-modelo="nome_carteira">Nome e carteira não conferem → responder</button></div>`;
+    if (a.dup) extra += `<div class="linha2"><button class="btn peq" data-act="semGuia" data-modelo="ja_autorizado">É cobrança → responder "já autorizado"</button></div>`;
+    return `<div class="al ${a.nivel} ${a.nivel === 'alerta' && alertaResolvido(a) ? 'resolvido' : ''}"><span class="nv">${nomes[a.nivel]}</span>${esc(a.texto)}${extra}</div>`;
+  }).join('') || '<div class="al info">Nenhum alerta.</div>';
+}
+function renderPedido(alvo) {
+  const e = S.email, p = S.pedido, A = avaliar(), st = situacao(A), cl = clinicaAtual();
+  const cartClasse = cartValida(S.carteiraUsada) ? 'ok' : 'bad';
+  alvo.innerHTML = `
+  <div class="grid2">
+    <div>
+      <div class="card">
+        <h2>E-mail recebido</h2>
+        <dl class="email-meta">
+          <dt>De</dt><dd>${esc(e.remetente.nome)} <span class="mono">&lt;${esc(e.remetente.email)}&gt;</span> ${cl ? `<span class="tag ok">${esc(cl.nome)}</span>` : '<span class="tag bad">não cadastrado</span>'}</dd>
+          <dt>Recebido</dt><dd>${fmtDH(e.data)}</dd>
+          <dt>Assunto</dt><dd>${esc(e.assunto)}</dd>
+          ${e.anexos.length ? `<dt>Anexos</dt><dd>${esc(e.anexos.join(', '))}</dd>` : ''}
+        </dl>
+        <pre class="original">${realceEmail()}</pre>
+        <p class="dica" style="margin-top:8px"><mark class="m-ok">verde</mark> código lido como item · <mark class="m-warn">laranja</mark> 8 dígitos não usados · <mark class="m-cart">azul</mark> carteira</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Dados do pedido</h2>
+        <div class="campos">
+          <label>Beneficiário</label><input type="text" data-campo="beneficiario" value="${esc(p.beneficiario)}">
+          <label>Carteira informada</label><div class="mono">${esc(p.carteiraBruta || '—')}</div>
+          <label>Carteira usada no sistema</label>
+          <div class="cart-box"><input type="text" id="cartUsada" value="${esc(S.carteiraUsada)}" maxlength="30" placeholder="17 caracteres"><span class="tag ${cartClasse}">${cartValida(S.carteiraUsada) ? '17 ok' : 'inválida'}</span><button class="btn copiar" data-act="copiar" data-txt="${esc(S.carteiraUsada)}" ${cartValida(S.carteiraUsada) ? '' : 'disabled'}>copiar</button></div>
+          <label>Médico</label><input type="text" data-campo="medico" value="${esc(p.medico.bruto)}">
+          <label>CID</label><input type="text" data-campo="cid" value="${esc(p.cid)}">
+          <label>Emissão</label><input type="text" data-campo="emissao" value="${esc(p.emissao.bruto)}" placeholder="dd/mm/aaaa ou SEM DATA">
+          <label>Local de emissão</label><input type="text" data-campo="local" value="${esc(p.local)}">
+          ${p.obs ? `<label>Observações</label><div>${esc(p.obs)}</div>` : ''}
+        </div>
+        <h3>Itens do pedido (${p.itens.length}) <button class="btn peq" data-act="editarItens">${S.editandoItens ? 'Cancelar edição' : 'Corrigir leitura dos itens'}</button></h3>
+        ${S.editandoItens ? htmlEditarItens() : `
+        <table><thead><tr><th>#</th><th>Código</th><th>Descrição (e-mail)</th><th class="num">Qtd</th></tr></thead><tbody>
+        ${p.itens.map((it, i) => `<tr><td>${i + 1}</td><td><span class="mono">${it.codigo}</span></td><td>${esc(it.desc)}</td><td class="num"><span class="qtd">${it.qtd ?? '<span class="tag bad">?</span>'}</span></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Nenhum item lido.</td></tr>'}
+        </tbody></table>`}
+      </div>
+      <div class="card painel-al">
+        <h2>Alertas ${st.bloqueios.length ? `<span class="tag bad">${st.bloqueios.length} bloqueio(s)</span>` : ''} ${st.pend.length ? `<span class="tag warn">${st.pend.length} a confirmar</span>` : ''} ${st.pode ? '<span class="tag ok">liberado</span>' : ''}</h2>
+        <div class="alertas" id="alertas">${htmlAlertas(A)}</div>
+      </div>
+      ${S.semGuia ? htmlSemGuia() : ''}
+      <div class="acoes">
+        <button class="btn pri" data-act="irGuia" ${st.pode ? '' : 'disabled'}>Seguir para a guia →</button>
+        <button class="btn" data-act="semGuia" data-modelo="${st.bloqueios.length ? 'pendencia' : (A.find(a => a.dup) ? 'ja_autorizado' : 'pendencia')}">Responder sem gerar guia</button>
+        <span class="esp"></span>
+        <button class="btn" data-act="devolver">Devolver à caixa</button>
+        <button class="btn perigo" data-act="descartar">Descartar</button>
+      </div>
+      ${!st.pode ? `<p class="dica" style="margin-top:8px">${st.bloqueios.length ? 'Há bloqueio: responda à clínica cobrando o dado, ou corrija a leitura se o erro for da página.' : st.cart ? 'Informe a carteira usada no sistema.' : 'Confirme os alertas em amarelo para seguir.'}</p>` : ''}
+    </div>
+  </div>`;
+}
+function htmlEditarItens() {
+  const p = S.pedido;
+  const linhas = p.itens.length ? p.itens : [{ codigo: '', desc: '', qtd: '' }];
+  return `<table id="tabEdit"><thead><tr><th>Código (8)</th><th>Descrição</th><th class="num">Qtd</th><th></th></tr></thead><tbody>
+  ${linhas.map((it, i) => `<tr><td><input type="text" class="mono" data-ei="codigo" value="${esc(it.codigo)}" maxlength="12"></td><td><input type="text" data-ei="desc" value="${esc(it.desc)}"></td><td><input type="text" data-ei="qtd" value="${esc(it.qtd ?? '')}" maxlength="2" style="width:60px;text-align:center"></td><td><button class="btn peq perigo" data-act="remItem" data-i="${i}">remover</button></td></tr>`).join('')}
+  </tbody></table>
+  <div class="acoes"><button class="btn peq" data-act="addItem">+ item</button><button class="btn peq pri" data-act="salvarItens">Salvar itens</button></div>`;
+}
+function lerTabelaEdicao() {
+  return $$('#tabEdit tbody tr').map(tr => ({ codigo: $('[data-ei=codigo]', tr).value.replace(/\D/g, ''), desc: $('[data-ei=desc]', tr).value.trim(), qtd: $('[data-ei=qtd]', tr).value.trim() }));
+}
+function htmlSemGuia() {
+  const m = S.semGuia;
+  const texto = S.semGuiaTexto ?? textoSemGuia(m);
+  return `<div class="card" style="border-color:var(--warn-line)">
+    <h2>Responder sem gerar guia</h2>
+    <div class="linha-flex"><label>Modelo</label><select id="selSemGuia">${MODELOS_SEM_GUIA.map(k => `<option value="${k}" ${k === m ? 'selected' : ''}>${esc((cfg.modelos[k] || {}).nome || k)}</option>`).join('')}</select>
+    <button class="btn copiar ${S.copiados.semGuia ? 'copiado' : ''}" data-act="copiarSemGuia">copiar resposta</button></div>
+    <textarea id="txtSemGuia" rows="12" style="margin-top:8px">${esc(texto)}</textarea>
+    <label class="chk"><input type="checkbox" data-check="sgEnviei" ${S.checks.sgEnviei ? 'checked' : ''}> Enviei a resposta à clínica (Responder no e-mail original)</label>
+    <div class="acoes"><button class="btn pri" data-act="salvarAguardando">Salvar como "Aguardando clínica"</button><button class="btn" data-act="fecharSemGuia">Fechar</button></div>
+    <p class="dica">O e-mail continua na sua pasta de pendências até a clínica responder.</p>
+  </div>`;
+}
+
+function renderGuia(alvo) {
+  const p = S.pedido, cl = clinicaAtual(), em = p.emissao;
+  const cab = [
+    ['executante', 'Credenciado executante', cl ? (cl.executante || cl.nome) : '(remetente não cadastrado — confira no sistema)'],
+    ['local', 'Local do pedido', p.local || '—'],
+    ['data', 'Data do pedido médico', em.estado === 'valida' ? fmtData(em.data) : em.estado === 'sem_data' ? 'SEM DATA' : (em.bruto || '— (não informada)')],
+    ['carteira', 'Carteira / beneficiário', `<span class="mono">${esc(fmtCart(S.carteiraUsada))}</span> <button class="btn copiar" data-act="copiar" data-txt="${esc(S.carteiraUsada)}">copiar</button><br>${esc(p.beneficiario)}`, true],
+    ['cid', 'CID', p.cid || '—'],
+    ['medico', 'Médico', esc(p.medico.nome || '—') + (p.medico.crm ? ` · ${esc(p.medico.conselho || 'CRM')} ${esc(p.medico.crm)}` : ''), true]
+  ];
+  const cabOk = cab.every(([k]) => S.cab[k]);
+  const ambig = ambiguos();
+  alvo.innerHTML = `
+  <div class="card">
+    <h2>1. Cabeçalho da guia <span class="tag ${cabOk ? 'ok' : 'warn'}">${cab.filter(([k]) => S.cab[k]).length}/${cab.length}</span></h2>
+    <p class="dica">Se você copiou a última guia do paciente, o cabeçalho veio da guia antiga. Confira cada campo na tela e marque.</p>
+    <table class="cab-tab"><tbody>
+    ${cab.map(([k, rot, val, html]) => `<tr><td>${rot}</td><td>${html ? val : esc(val)}</td><td style="width:190px"><div class="seg"><button class="igual ${S.cab[k] === 'igual' ? 'on' : ''}" data-act="cab" data-k="${k}" data-v="igual">Igual na tela</button><button class="corrigi ${S.cab[k] === 'corrigi' ? 'on' : ''}" data-act="cab" data-k="${k}" data-v="corrigi">Corrigi</button></div></td></tr>`).join('')}
+    </tbody></table>
+  </div>
+  <div class="card">
+    <h2>2. Itens para lançar na grade</h2>
+    ${!S.cega.iniciada ? `
+    <p class="dica">Use os botões para copiar cada código e colar no campo "Código Serviço" do sistema. Guia TISS 02 · Classificação 31.</p>
+    <table><thead><tr><th>#</th><th>Código</th><th>Descrição (e-mail)</th><th class="num">Qtd</th></tr></thead><tbody>
+    ${p.itens.map((it, i) => `<tr><td>${i + 1}</td><td><button class="btn copiar ${S.copiados['c' + it.codigo] ? 'copiado' : ''}" data-act="copiar" data-txt="${it.codigo}" data-marca="c${it.codigo}">${it.codigo}</button></td><td>${esc(it.desc)}</td><td class="num"><span class="qtd">${it.qtd}</span></td></tr>`).join('')}
+    </tbody></table>
+    <div class="acoes"><button class="btn pri" data-act="iniciarCega">Lancei todos os itens → conferência cega</button></div>` :
+    `<p class="muted">Lista oculta durante a conferência cega. <button class="btn peq" data-act="verItens">Ver itens de novo (reinicia a conferência)</button></p>`}
+  </div>
+  ${S.cega.iniciada ? `
+  <div class="card">
+    <h2>3. Conferência cega ${S.cega.ok ? '<span class="tag ok">conferido</span>' : ''} ${S.cega.tentativas > 1 ? `<span class="tag warn">tentativa ${S.cega.tentativas}</span>` : ''}</h2>
+    <div class="cega">
+      <p style="margin:0 0 8px"><b>Olhe só para a grade do sistema</b> e informe o que está lá, linha por linha.</p>
+      <div class="linha-flex"><label for="cegaN">Quantas linhas preenchidas a grade tem?</label><input type="number" id="cegaN" min="0" max="20" value="${esc(S.cega.linhas)}" style="width:90px;font-size:17px;text-align:center" ${S.cega.ok ? 'disabled' : ''}></div>
+      <div id="cegaLinhas">${htmlLinhasCega()}</div>
+      ${ambig.length ? `<p class="dica">Os códigos terminados em ${ambig.join(', ')} se repetem neste pedido: para eles, digite os 8 dígitos.</p>` : ''}
+      ${S.cega.resultado ? htmlResultadoCega(S.cega.resultado) : ''}
+      <div class="acoes">${S.cega.ok ? '' : (S.cega.resultado && !S.cega.resultado.ok ? `<button class="btn pri" data-act="refazerCega">Corrigi no sistema — conferir de novo</button>` : `<button class="btn pri" data-act="conferir">Conferir</button>`)}</div>
+    </div>
+  </div>` : ''}
+  <div class="acoes">
+    <button class="btn" data-act="voltar2">← Voltar ao pedido</button>
+    <button class="btn pri" data-act="irFinal" ${cabOk && S.cega.ok ? '' : 'disabled'}>Seguir para finalizar →</button>
+    <span class="esp"></span>
+    <button class="btn" data-act="devolver">Devolver à caixa</button>
+  </div>
+  ${!(cabOk && S.cega.ok) ? `<p class="dica" style="margin-top:8px">Para seguir: marque os ${cab.length} campos do cabeçalho e conclua a conferência cega sem divergências.</p>` : ''}`;
+}
+function ambiguos() {
+  const fins = {}; S.pedido.itens.forEach(i => { const f = i.codigo.slice(-4); fins[f] = (fins[f] || 0) + 1; });
+  return Object.keys(fins).filter(f => fins[f] > 1);
+}
+function htmlLinhasCega() {
+  const n = Math.min(20, Math.max(0, parseInt(S.cega.linhas, 10) || 0));
+  if (!n) return '';
+  let h = '<div class="cega-linhas"><span class="h">Linha</span><span class="h">Final do código</span><span class="h">Qtd</span>';
+  for (let i = 0; i < n; i++) {
+    const v = S.cega.entradas[i] || {};
+    h += `<span class="mono">${i + 1}</span><input type="text" inputmode="numeric" maxlength="8" placeholder="4 últimos" data-cega="fim" data-i="${i}" value="${esc(v.fim || '')}" ${S.cega.ok ? 'disabled' : ''}><input type="text" inputmode="numeric" maxlength="1" data-cega="qtd" data-i="${i}" value="${esc(v.qtd || '')}" ${S.cega.ok ? 'disabled' : ''}>`;
+  }
+  return h + '</div>';
+}
+function compararCega(itens, n, entradas) {
+  const res = { ok: true, erros: [], porItem: [], extras: [], n, m: itens.length };
+  const lin = [];
+  for (let i = 0; i < n; i++) {
+    const e = entradas[i] || {}; const fim = String(e.fim || '').replace(/\D/g, ''); const qtd = String(e.qtd || '').replace(/\D/g, '');
+    if (fim.length < 4 || qtd === '') res.erros.push(`Linha ${i + 1}: preencha pelo menos 4 dígitos do código e a quantidade.`);
+    const cands = fim.length >= 4 ? itens.filter(it => it.codigo.endsWith(fim)) : [];
+    lin.push({ i, fim, qtd, match: cands.length === 1 ? cands[0] : null, ambig: cands.length > 1 });
+  }
+  if (res.erros.length) { res.ok = false; res.incompleto = true; return res; }
+  if (n !== itens.length) res.erros.push(`A grade tem ${n} linha(s) e o pedido tem ${itens.length} item(ns).`);
+  for (const it of itens) {
+    const ls = lin.filter(l => l.match === it);
+    if (!ls.length) res.porItem.push({ it, st: 'omitido' });
+    else if (ls.length > 1) res.porItem.push({ it, st: 'duplicado', linhas: ls.map(l => l.i + 1) });
+    else if (Number(ls[0].qtd) !== Number(it.qtd)) res.porItem.push({ it, st: 'qtd', informado: ls[0].qtd, linha: ls[0].i + 1 });
+    else res.porItem.push({ it, st: 'ok', linha: ls[0].i + 1 });
+  }
+  lin.filter(l => !l.match).forEach(l => res.extras.push({ linha: l.i + 1, fim: l.fim, ambig: l.ambig }));
+  res.ok = !res.erros.length && !res.extras.length && res.porItem.every(x => x.st === 'ok');
+  return res;
+}
+function htmlResultadoCega(r) {
+  if (r.ok) return `<div class="res-ok" style="margin-top:12px">✔ Grade confere com o pedido: ${r.m} item(ns), códigos e quantidades corretos.</div>`;
+  const li = [];
+  r.erros.forEach(e => li.push(e));
+  if (!r.incompleto) {
+    r.porItem.forEach(x => {
+      if (x.st === 'omitido') li.push(`<b>Omitido:</b> ${x.it.codigo} (${esc(x.it.desc)}) não está na grade.`);
+      if (x.st === 'duplicado') li.push(`<b>Duplicado na grade:</b> ${x.it.codigo} aparece nas linhas ${x.linhas.join(' e ')}.`);
+      if (x.st === 'qtd') li.push(`<b>Quantidade divergente:</b> ${x.it.codigo} está com ${x.informado} na linha ${x.linha}; o pedido pede <b>${x.it.qtd}</b>.`);
+    });
+    r.extras.forEach(x => li.push(x.ambig ? `<b>Linha ${x.linha}:</b> final "${x.fim}" combina com mais de um código; digite os 8 dígitos.` : `<b>Inclusão indevida:</b> a linha ${x.linha} (final ${x.fim}) não está no pedido.`));
+  }
+  return `<div class="res-bad" style="margin-top:12px"><b>${r.incompleto ? 'Conferência incompleta' : 'A grade não confere com o pedido'}</b><ul>${li.map(x => `<li>${x}</li>`).join('')}</ul></div>`;
+}
+
+function renderFinal(alvo) {
+  const guiaOk = /^T\d{8}$/.test(S.guia);
+  const outra = guiaOk ? Reg.cache.find(r => !r.tipo && r.guia === S.guia && r.id !== S.registroId) : null;
+  const obs = preencher('observacao');
+  const resp = S.respostaEditada ?? preencher(S.modeloResposta);
+  const pronto = guiaOk && S.checks.obs && S.checks.resp && S.checks.movido;
+  alvo.innerHTML = `
+  <div class="grid2">
+    <div class="card">
+      <h2>Número da guia</h2>
+      <p class="dica">Gere a guia no sistema, clique em enviar e digite aqui o número (T + 8 dígitos).</p>
+      <div class="linha-flex"><input type="text" id="guia" value="${esc(S.guia)}" maxlength="10" placeholder="T00000000" style="width:200px;font-family:var(--mono);font-size:20px;letter-spacing:1px"> <span class="tag ${guiaOk ? 'ok' : 'bad'}">${guiaOk ? 'formato ok' : 'T + 8 dígitos'}</span></div>
+      ${outra ? `<div class="al alerta" style="margin-top:10px"><span class="nv">Alerta</span>Esta guia já foi registrada por ${esc(outra.operador)} em ${fmtDH(outra.atualizadoEm)} (${esc(outra.clinica || '')}). Confira o número.</div>` : ''}
+      <h3>Observação da guia</h3>
+      <p class="dica">Cole no campo de observação da guia (remetente + pedido original).</p>
+      <textarea rows="10" readonly>${esc(obs)}</textarea>
+      <div class="acoes"><button class="btn copiar ${S.copiados.obs ? 'copiado' : ''}" data-act="copiarObs">copiar observação</button></div>
+    </div>
+    <div class="card">
+      <h2>Resposta à clínica</h2>
+      <div class="linha-flex"><label>Modelo</label><select id="selModeloResp">${MODELOS_RESPOSTA_GUIA.map(k => `<option value="${k}" ${k === S.modeloResposta ? 'selected' : ''}>${esc(cfg.modelos[k].nome)}</option>`).join('')}</select></div>
+      <textarea id="txtResp" rows="16" style="margin-top:8px">${esc(resp)}</textarea>
+      <div class="acoes"><button class="btn copiar ${S.copiados.resp ? 'copiado' : ''}" data-act="copiarResp" ${guiaOk ? '' : 'disabled'}>copiar resposta</button>${S.respostaEditada != null ? '<button class="btn peq" data-act="resetResp">refazer do modelo</button>' : ''}</div>
+      <h3>Checklist de conclusão</h3>
+      <label class="chk"><input type="checkbox" data-check="obs" ${S.checks.obs ? 'checked' : ''}> Colei a observação na guia</label>
+      <label class="chk"><input type="checkbox" data-check="resp" ${S.checks.resp ? 'checked' : ''}> Enviei a resposta à clínica (Responder no e-mail original)</label>
+      <label class="chk"><input type="checkbox" data-check="movido" ${S.checks.movido ? 'checked' : ''}> Movi o e-mail para a pasta da clínica</label>
+      <div class="acoes"><button class="btn" data-act="voltar3">← Voltar</button><span class="esp"></span><button class="btn pri" data-act="concluir" ${pronto ? '' : 'disabled'}>Concluir pedido</button></div>
+    </div>
+  </div>`;
+}
+
+/* ====================================================================
+   Painel do dia
+   ==================================================================== */
+let painelDia = isoDia(new Date());
+let conc = null;    // resultado da conciliação
+let amostra = null;
+async function renderPainel(app) {
+  app.innerHTML = '<p class="muted">Carregando registros…</p>';
+  const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5);
+  await Reg.carregar(Math.max(0, dif - (cfg.parametros.diasHistorico || 30)) + 1);
+  const regs = Reg.doDia(painelDia).filter(r => !r.tipo).sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1));
+  const corr = Reg.cache.filter(r => r.tipo === 'correcao');
+  const n = s => regs.filter(r => r.status === s).length;
+  const concl = regs.filter(r => r.status === 'concluido');
+  const pegos = concl.filter(r => (r.conferencia?.divergencias || []).length).length;
+  const ops = [...new Set(concl.map(r => r.operador))];
+  const tempo = ops.map(o => { const rs = concl.filter(r => r.operador === o); return `${o}: ${(rs.reduce((s, r) => s + (r.duracaoSeg || 0), 0) / rs.length / 60).toFixed(1)} min (${rs.length})`; }).join(' · ');
+  app.innerHTML = `
+  <div class="linha-flex" style="margin-bottom:14px"><label>Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"><button class="btn" data-act="atualizarPainel">Atualizar</button><span class="esp" style="flex:1"></span><button class="btn apoio" data-act="exportarCsv">Exportar CSV do dia</button></div>
+  <div class="kpis">
+    <div class="kpi"><b>${concl.length}</b><span>Concluídos</span></div>
+    <div class="kpi"><b>${n('aguardando_clinica')}</b><span>Aguardando clínica</span></div>
+    <div class="kpi"><b>${n('em_andamento')}</b><span>Em andamento</span></div>
+    <div class="kpi"><b>${n('devolvido')}</b><span>Devolvidos à caixa</span></div>
+    <div class="kpi"><b>${pegos}</b><span>Erros pegos na conferência cega</span></div>
+    <div class="kpi"><b>${corr.filter(c => c.dia === painelDia).length}</b><span>Correções registradas no dia</span></div>
+  </div>
+  ${tempo ? `<p class="dica">Tempo médio por guia — ${esc(tempo)}</p>` : ''}
+  <div class="card">
+    <h2>Pedidos do dia (${regs.length})</h2>
+    <div class="tabela-scroll"><table><thead><tr><th>Abertura</th><th>Operador</th><th>Clínica</th><th>Carteira</th><th>Itens</th><th>Guia</th><th>Status</th><th>Conf. cega</th><th></th></tr></thead><tbody>
+    ${regs.map(r => {
+      const cs = corr.filter(c => c.ref === r.id);
+      return `<tr><td>${fmtHora(r.abertoEm)}</td><td>${esc(r.operador)}</td><td>${esc(r.clinica || r.remetente || '')}</td><td class="mono">${esc(r.carteira || '')}</td><td class="mono" style="font-size:12px">${(r.itens || []).map(i => i.c + '×' + (i.q ?? '?')).join('<br>')}</td><td class="mono">${esc(r.guia || '')}</td>
+      <td><span class="tag ${r.status === 'concluido' ? 'ok' : r.status === 'aguardando_clinica' ? 'warn' : ''}">${STATUS[r.status] || r.status}</span>${cs.length ? `<br><span class="tag bad">${cs.length} correção(ões)</span>` : ''}</td>
+      <td>${r.conferencia ? (r.conferencia.divergencias || []).length ? `<span class="tag warn">${r.conferencia.divergencias.length} divergência(s)</span>` : r.status === 'concluido' ? '<span class="tag ok">ok</span>' : '' : ''}</td>
+      <td>${r.status === 'concluido' ? `<button class="btn peq" data-act="abrirCorrecao" data-id="${r.id}">Registrar correção</button>` : ''}</td></tr>
+      <tr class="oculto" id="corr-${r.id}"><td colspan="9">${htmlFormCorrecao(r)}</td></tr>`;
+    }).join('') || '<tr><td colspan="9" class="muted">Nenhum registro neste dia.</td></tr>'}
+    </tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Amostragem do apoio</h2>
+    <p class="dica">Sorteia até 10 guias concluídas no dia (prioriza as com 4 ou mais itens) para conferir no sistema.</p>
+    <div class="acoes"><button class="btn" data-act="sortear">Sortear amostra</button></div>
+    ${amostra ? `<table style="margin-top:10px"><thead><tr><th>Guia</th><th>Operador</th><th>Carteira</th><th>Itens (código × qtd)</th></tr></thead><tbody>${amostra.map(r => `<tr><td class="mono">${esc(r.guia)}</td><td>${esc(r.operador)}</td><td class="mono">${esc(r.carteira)}</td><td class="mono">${r.itens.map(i => i.c + ' × ' + i.q).join(' · ')}</td></tr>`).join('')}</tbody></table>` : ''}
+  </div>
+  <div class="card">
+    <h2>Conciliação de fim de dia</h2>
+    <div class="grid2">
+      <div>
+        <h3>E-mails recebidos × registros</h3>
+        <p class="dica">No SmarterMail, selecione os e-mails do dia (caixa e pastas das clínicas), baixe o ZIP e solte aqui. Também aceita vários .eml.</p>
+        <input type="file" id="arqConc" accept=".zip,.eml" multiple>
+      </div>
+      <div>
+        <h3>Relatório de guias do sistema × registros</h3>
+        <p class="dica">Cole aqui o conteúdo do relatório de guias geradas no dia (a página pega todos os números T + 8 dígitos).</p>
+        <textarea id="txtRelatorio" rows="5"></textarea>
+        <div class="acoes"><button class="btn" data-act="conciliarGuias">Comparar guias</button></div>
+      </div>
+    </div>
+    <div id="resConc">${conc || ''}</div>
+  </div>`;
+}
+function htmlFormCorrecao(r) {
+  return `<div class="linha-flex" style="padding:6px 0">
+    <select data-cf="motivo">${MOTIVOS_CORRECAO.map(m => `<option>${m}</option>`).join('')}</select>
+    <select data-cf="detectado">${DETECTADO_POR.map(m => `<option>${m}</option>`).join('')}</select>
+    <input type="text" data-cf="obs" placeholder="Detalhe (opcional)" style="flex:1;min-width:200px">
+    <button class="btn peq pri" data-act="salvarCorrecao" data-id="${r.id}">Salvar correção</button></div>`;
+}
+function csvDia(regs) {
+  const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const cab = ['dia', 'abertura', 'conclusao', 'operador', 'clinica', 'remetente', 'carteira', 'itens', 'guia', 'status', 'tentativas_conferencia', 'divergencias_conferencia', 'cabecalho_corrigido', 'alertas_confirmados', 'editado_a_mao', 'duracao_min'];
+  const linhas = regs.map(r => [r.dia, fmtHora(r.abertoEm), r.concluidoEm ? fmtHora(r.concluidoEm) : '', r.operador, r.clinica, r.remetente, r.carteira, (r.itens || []).map(i => i.c + 'x' + (i.q ?? '?')).join(' '), r.guia, STATUS[r.status] || r.status,
+    r.conferencia?.tentativas ?? '', (r.conferencia?.divergencias || []).map(d => d.join ? d.join('; ') : d).join(' | '), (r.cabecalhoCorrigido || []).join(' '), (r.alertas || []).map(a => a.t + (a.m ? ' [' + a.m + ']' : '')).join(' | '), r.editadoAMao ? 'sim' : '', ((r.duracaoSeg || 0) / 60).toFixed(1)].map(c).join(';'));
+  return '﻿' + [cab.join(';'), ...linhas].join('\r\n');
+}
+async function conciliarEmails(files) {
+  const emails = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) { for (const x of await lerZip(await f.arrayBuffer())) if (/\.eml$/i.test(x.nome)) { try { emails.push(lerEml(x.dados)); } catch (e) { } } }
+    else if (/\.eml$/i.test(f.name)) { try { emails.push(lerEml(await f.arrayBuffer())); } catch (e) { } }
+  }
+  emails.sort((a, b) => (a.data || '') < (b.data || '') ? -1 : 1);
+  await Reg.carregar(7);
+  const porMsg = {}; Reg.cache.filter(r => !r.tipo).forEach(r => (porMsg[r.messageId] = porMsg[r.messageId] || []).push(r));
+  const semReg = [], naoConcl = [], varias = [];
+  for (const e of emails) {
+    const todos = porMsg[e.messageId] || [];
+    const rs = todos.filter(r => r.status !== 'descartado');
+    if (!todos.length) semReg.push(e);
+    else if (!rs.length) continue;
+    else if (!rs.some(r => ['concluido', 'aguardando_clinica'].includes(r.status))) naoConcl.push([e, rs]);
+    if (rs.filter(r => r.status === 'concluido').length > 1) varias.push([e, rs.filter(r => r.status === 'concluido')]);
+  }
+  const ehResposta = e => /^\s*(re|res)\s*:/i.test(e.assunto);
+  const lin = (e, x) => `<li><b>${fmtHora(e.data)}</b> · ${esc(e.remetente.email)} · ${esc(e.assunto)}${x ? ' — ' + x : ''}</li>`;
+  conc = `<h3>Resultado: ${emails.length} e-mail(s) lido(s)</h3>
+  <p><span class="tag ${semReg.length ? 'bad' : 'ok'}">${semReg.length} sem nenhum registro</span> <span class="tag ${naoConcl.length ? 'warn' : 'ok'}">${naoConcl.length} sem conclusão</span> <span class="tag ${varias.length ? 'bad' : 'ok'}">${varias.length} com mais de uma guia</span></p>
+  ${semReg.length ? `<p class="dica">Sem registro: não passaram pela página (podem ser respostas, evoluções ou pedidos esquecidos).</p><ul>${semReg.map(e => lin(e, ehResposta(e) ? 'resposta' : '')).join('')}</ul>` : ''}
+  ${naoConcl.length ? `<p class="dica">Abertos mas não concluídos:</p><ul>${naoConcl.map(([e, rs]) => lin(e, rs.map(r => r.operador + ': ' + STATUS[r.status]).join(', '))).join('')}</ul>` : ''}
+  ${varias.length ? `<p class="dica">Mesmo e-mail concluído mais de uma vez:</p><ul>${varias.map(([e, rs]) => lin(e, rs.map(r => r.guia + ' (' + r.operador + ')').join(', '))).join('')}</ul>` : ''}`;
+  $('#resConc').innerHTML = conc;
+}
+function conciliarGuias() {
+  const txt = $('#txtRelatorio').value.toUpperCase();
+  const doRel = new Set([...txt.matchAll(/T\s?(\d{8})/g)].map(m => 'T' + m[1]));
+  const regs = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
+  const daPag = new Set(regs.map(r => r.guia));
+  const soRel = [...doRel].filter(g => !daPag.has(g)), soPag = regs.filter(r => !doRel.has(r.guia));
+  conc = `<h3>Guias: ${doRel.size} no relatório · ${daPag.size} na página</h3>
+  <p><span class="tag ${soRel.length ? 'bad' : 'ok'}">${soRel.length} só no relatório</span> <span class="tag ${soPag.length ? 'bad' : 'ok'}">${soPag.length} só na página</span></p>
+  ${soRel.length ? `<p class="dica">Guias geradas no sistema sem conferência registrada na página:</p><p class="mono">${soRel.join(' · ')}</p>` : ''}
+  ${soPag.length ? `<p class="dica">Registradas na página mas ausentes no relatório (número digitado errado?):</p><ul>${soPag.map(r => `<li class="mono">${esc(r.guia)} — ${esc(r.operador)} · ${esc(r.clinica || '')} · ${esc(r.carteira)}</li>`).join('')}</ul>` : ''}`;
+  $('#resConc').innerHTML = conc;
+}
+
+/* ====================================================================
+   Configurações
+   ==================================================================== */
+let cfgEdit = null;
+function renderConfig(app) {
+  if (!cfgEdit) cfgEdit = JSON.parse(JSON.stringify(cfg));
+  const c = cfgEdit;
+  app.innerHTML = `
+  <div class="card">
+    <h2>Pasta compartilhada</h2>
+    <p>${!Pasta.suportado ? 'Este navegador não permite acesso a pastas. Use o Google Chrome.' : Pasta.ok ? `Conectada: <b>${esc(Pasta.handle.name)}</b>. O config.json e os registros ficam nela.` : Pasta.handle ? 'Pasta lembrada, mas precisa de autorização.' : 'Nenhuma pasta conectada.'}</p>
+    <div class="acoes"><button class="btn" data-act="pasta">${Pasta.ok ? 'Trocar pasta' : Pasta.handle ? 'Reautorizar' : 'Conectar pasta'}</button></div>
+  </div>
+  <div class="card">
+    <h2>Operadores</h2>
+    <p class="dica">Um nome por linha.</p>
+    <textarea id="cfgOps" rows="4" style="font-family:inherit">${esc(c.operadores.join('\n'))}</textarea>
+  </div>
+  <div class="card">
+    <h2>Clínicas (${c.clinicas.length})</h2>
+    <p class="dica">"Executante" é o nome como aparece no sistema. E-mails separados por vírgula. "Apelidos" ajudam a reconhecer a clínica no assunto.</p>
+    <div class="tabela-scroll"><table class="cfg-cl"><thead><tr><th>Nome</th><th>Cidade</th><th>Executante no sistema</th><th>E-mails</th><th>Apelidos</th><th>Códigos</th><th></th></tr></thead><tbody>
+    ${c.clinicas.map((cl, i) => `<tr data-cl="${i}"><td><input type="text" data-f="nome" value="${esc(cl.nome)}"></td><td><input type="text" data-f="cidade" value="${esc(cl.cidade || '')}"></td><td><input type="text" data-f="executante" value="${esc(cl.executante || '')}"></td><td><input type="text" data-f="emails" value="${esc((cl.emails || []).join(', '))}"></td><td><input type="text" data-f="apelidos" value="${esc(cl.apelidos || '')}"></td><td><button class="btn peq" data-act="verCodigos" data-i="${i}">${Object.keys(cl.codigos || {}).length}</button></td><td><button class="btn peq perigo" data-act="remClinica" data-i="${i}">×</button></td></tr>
+    <tr class="oculto" id="cod-${i}"><td colspan="7"><textarea data-codigos="${i}" rows="5" placeholder="80000001 - CONSULTA / SESSAO DE FONOAUDIOLOGIA">${esc(Object.entries(cl.codigos || {}).map(([k, v]) => k + ' - ' + v).join('\n'))}</textarea></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="acoes"><button class="btn peq" data-act="addClinica">+ clínica</button><button class="btn peq" data-act="aprenderCodigos">Aprender códigos dos pedidos concluídos</button></div>
+  </div>
+  <div class="card">
+    <h2>Modelos de texto</h2>
+    <p class="dica">Campos disponíveis: {GUIA} {SAUDACAO} {BENEFICIARIO} {CARTEIRA} {CARTEIRA_INFORMADA} {ITENS} {CLINICA} {PROBLEMAS} {GUIA_ANTERIOR} {DATA_ANTERIOR} {ITENS_ANTERIOR} {REMETENTE} {DATA_EMAIL} {ASSUNTO} {TEXTO_ORIGINAL} {MODELO_PEDIDO}</p>
+    ${Object.entries(c.modelos).map(([k, m]) => `<h3>${esc(m.nome)} <span class="muted mono" style="font-weight:400;font-size:12px">${k}</span></h3><textarea data-modelo="${k}" rows="${Math.min(14, m.texto.split('\n').length + 1)}">${esc(m.texto)}</textarea>`).join('')}
+  </div>
+  <div class="card">
+    <h2>Parâmetros</h2>
+    <div class="campos">
+      <label>Dias para alerta de cobrança/duplicidade</label><input type="number" id="pDup" value="${c.parametros.diasDuplicidade}" style="width:100px">
+      <label>Meses para alertar emissão antiga</label><input type="number" id="pEm" value="${c.parametros.mesesEmissaoAntiga}" style="width:100px">
+      <label>Dias de histórico lidos</label><input type="number" id="pHist" value="${c.parametros.diasHistorico}" style="width:100px">
+    </div>
+  </div>
+  <div class="acoes" style="position:sticky;bottom:0;background:var(--bg);padding:10px 0">
+    <button class="btn pri" data-act="salvarCfg">Salvar configurações</button>
+    <button class="btn" data-act="descartarCfg">Descartar alterações</button>
+    <span class="esp"></span>
+    <button class="btn" data-act="exportarCfg">Baixar config.json</button>
+    <label class="btn">Importar config.json<input type="file" id="impCfg" accept=".json" class="oculto"></label>
+    <button class="btn perigo" data-act="limparAntigos">Apagar registros com mais de 180 dias</button>
+  </div>`;
+}
+function lerFormConfig() {
+  const c = cfgEdit;
+  c.operadores = $('#cfgOps').value.split('\n').map(s => s.trim()).filter(Boolean);
+  $$('tr[data-cl]').forEach(tr => {
+    const cl = c.clinicas[+tr.dataset.cl];
+    cl.nome = $('[data-f=nome]', tr).value.trim(); cl.cidade = $('[data-f=cidade]', tr).value.trim(); cl.executante = $('[data-f=executante]', tr).value.trim();
+    cl.emails = $('[data-f=emails]', tr).value.split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+    cl.apelidos = $('[data-f=apelidos]', tr).value.trim();
+    cl.id = cl.id || slug(cl.nome);
+  });
+  $$('textarea[data-codigos]').forEach(t => {
+    const cod = {}; t.value.split('\n').forEach(l => { const m = l.match(/(\d{8})\s*[-–:]?\s*(.*)/); if (m) cod[m[1]] = m[2].trim(); });
+    c.clinicas[+t.dataset.codigos].codigos = cod;
+  });
+  $$('textarea[data-modelo]').forEach(t => { c.modelos[t.dataset.modelo].texto = t.value; });
+  c.parametros.diasDuplicidade = +$('#pDup').value || 7; c.parametros.mesesEmissaoAntiga = +$('#pEm').value || 6; c.parametros.diasHistorico = +$('#pHist').value || 30;
+  c.clinicas = c.clinicas.filter(cl => cl.nome);
+}
+
+/* ====================================================================
+   Ações
+   ==================================================================== */
+const acoes = {
+  aba(b) { if (aba === 'config' && cfgEdit) lerFormConfig(); aba = b.dataset.aba; if (aba !== 'config') cfgEdit = null; render(); },
+  async pasta() {
+    if (!Pasta.suportado) { toast('Use o Google Chrome para acessar a pasta compartilhada.', 'bad'); return; }
+    try {
+      if (Pasta.handle && !Pasta.ok) await Pasta.reautorizar(); else await Pasta.conectar();
+      await carregarConfig(); preencherOperadores(); await Reg.carregar(); cfgEdit = null; render();
+      toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
+    } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
+  },
+  escolherEml() { $('#arquivoEml').click(); },
+  async usarColado() {
+    const t = $('#coladoTxt').value; if (!t.trim()) { toast('Cole o texto do e-mail.', 'bad'); return; }
+    if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
+    await iniciar(emailDeTexto(t, $('#coladoDe').value));
+  },
+  async copiar(b) { await copiar(b.dataset.txt); if (b.dataset.marca) { S.copiados[b.dataset.marca] = true; b.classList.add('copiado'); persistir(); } toast('Copiado: ' + b.dataset.txt); },
+  editarItens() { S.editandoItens = !S.editandoItens; persistir(); render(); },
+  addItem() { const it = lerTabelaEdicao(); it.push({ codigo: '', desc: '', qtd: '' }); S.pedido.itens = it.map(x => ({ ...x })); render(); },
+  remItem(b) { const it = lerTabelaEdicao(); it.splice(+b.dataset.i, 1); S.pedido.itens = it; render(); },
+  salvarItens() {
+    const it = lerTabelaEdicao().filter(x => x.codigo);
+    S.pedido.invalidos = it.filter(x => x.codigo.length !== 8).map(x => x.codigo);
+    S.pedido.itens = it.filter(x => x.codigo.length === 8).map(x => ({ codigo: x.codigo, desc: x.desc, qtd: /^\d+$/.test(x.qtd) ? Number(x.qtd) : null, origemQtd: 'manual' }));
+    const usados = new Set(S.pedido.itens.map(i => i.codigo)); S.pedido.soltos = S.pedido.soltos.filter(c => !usados.has(c));
+    S.pedido.semRotulo = false; S.pedido.qtdUnicaAplicada = false;
+    S.itensEditados = true; S.editandoItens = false; delete S.conf.editado; persistir(); render();
+  },
+  async vincularClinica() {
+    const id = $('#selClinica').value; if (!id) { toast('Escolha a clínica.', 'bad'); return; }
+    const email = S.email.remetente.email;
+    await alterarConfig(c => { const cl = c.clinicas.find(x => x.id === id); if (cl && email && !cl.emails.includes(email)) cl.emails.push(email); });
+    S.clinicaId = id; S.clinicaComo = 'email'; persistir(); render(); toast('E-mail vinculado à clínica.');
+  },
+  clinicaSoAgora() { const id = $('#selClinica').value; if (!id) { toast('Escolha a clínica.', 'bad'); return; } S.clinicaId = id; S.clinicaComo = 'manual'; persistir(); render(); },
+  semGuia(b) { S.semGuia = b.dataset.modelo; S.semGuiaTexto = null; persistir(); render(); setTimeout(() => $('#txtSemGuia')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); },
+  fecharSemGuia() { S.semGuia = null; persistir(); render(); },
+  async copiarSemGuia(b) { await copiar($('#txtSemGuia').value); S.copiados.semGuia = true; b.classList.add('copiado'); persistir(); toast('Resposta copiada.'); },
+  async salvarAguardando() {
+    if (!S.checks.sgEnviei) { toast('Marque que enviou a resposta à clínica.', 'bad'); return; }
+    await gravarStatus('aguardando_clinica', { modeloResposta: S.semGuia });
+    finalizarAtendimento(`Aguardando clínica — ${S.pedido.beneficiario || S.email.remetente.email} (${cfg.modelos[S.semGuia]?.nome || S.semGuia})`);
+  },
+  irGuia() { const st = situacao(avaliar()); if (!st.pode) return; S.etapa = 3; gravarStatus('em_andamento'); persistir(); render(); window.scrollTo(0, 0); },
+  voltar2() { S.etapa = 2; persistir(); render(); },
+  voltar3() { S.etapa = 3; persistir(); render(); },
+  cab(b) { S.cab[b.dataset.k] = b.dataset.v; persistir(); render(); },
+  iniciarCega() { S.cega.iniciada = true; S.cega.tentativas = Math.max(1, S.cega.tentativas); persistir(); render(); setTimeout(() => $('#cegaN')?.focus(), 30); },
+  verItens() { S.cega = { ...S.cega, iniciada: false, linhas: '', entradas: [], resultado: null, ok: false }; persistir(); render(); },
+  conferir() {
+    const n = parseInt(S.cega.linhas, 10);
+    if (!(n >= 0)) { toast('Informe quantas linhas a grade tem.', 'bad'); return; }
+    const r = compararCega(S.pedido.itens, n, S.cega.entradas);
+    S.cega.resultado = r; S.cega.ok = r.ok;
+    if (!r.ok && !r.incompleto) S.cega.historico.push([...r.erros, ...r.porItem.filter(x => x.st !== 'ok').map(x => `${x.st}:${x.it.codigo}${x.informado ? '=' + x.informado : ''}`), ...r.extras.map(x => 'indevida:' + x.fim)]);
+    persistir(); render();
+  },
+  refazerCega() { S.cega.tentativas++; S.cega.resultado = null; S.cega.entradas = []; S.cega.linhas = ''; persistir(); render(); setTimeout(() => $('#cegaN')?.focus(), 30); },
+  irFinal() { S.etapa = 4; persistir(); render(); window.scrollTo(0, 0); setTimeout(() => $('#guia')?.focus(), 30); },
+  async copiarObs(b) { await copiar(preencher('observacao')); S.copiados.obs = true; b.classList.add('copiado'); persistir(); toast('Observação copiada.'); },
+  async copiarResp(b) { await copiar($('#txtResp').value); S.copiados.resp = true; b.classList.add('copiado'); persistir(); toast('Resposta copiada.'); },
+  resetResp() { S.respostaEditada = null; persistir(); render(); },
+  async concluir() {
+    if (!/^T\d{8}$/.test(S.guia)) return;
+    await gravarStatus('concluido', { modeloResposta: S.modeloResposta });
+    finalizarAtendimento(`${S.guia} — ${S.pedido.itens.length} item(ns), ${clinicaAtual()?.nome || S.email.remetente.email}`);
+  },
+  async devolver() {
+    if (!confirm('Devolver este e-mail à caixa de entrada? Outro operador poderá começar do zero.')) return;
+    await gravarStatus('devolvido'); finalizarAtendimento('Devolvido à caixa — ' + (S.pedido.beneficiario || S.email.remetente.email));
+  },
+  async descartar() {
+    if (!confirm('Descartar este atendimento? Use para e-mails que não são pedidos (evoluções, avisos, arquivo errado).')) return;
+    await gravarStatus('descartado'); finalizarAtendimento('Descartado — ' + S.email.assunto);
+  },
+  atualizarPainel() { painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
+  exportarCsv() { baixar(`Conferidor_Guias_Registros_${painelDia.split('-').reverse().join('-')}.csv`, csvDia(Reg.doDia(painelDia).filter(r => !r.tipo)), 'text/csv;charset=utf-8'); },
+  abrirCorrecao(b) { $('#corr-' + b.dataset.id).classList.toggle('oculto'); },
+  async salvarCorrecao(b) {
+    const tr = $('#corr-' + b.dataset.id); const ref = Reg.cache.find(r => r.id === b.dataset.id);
+    const reg = { id: uid(), tipo: 'correcao', ref: ref.id, guia: ref.guia, operadorOriginal: ref.operador, motivo: $('[data-cf=motivo]', tr).value, detectadoPor: $('[data-cf=detectado]', tr).value, obs: $('[data-cf=obs]', tr).value.trim(), operador: operador() || 'Apoio', dia: isoDia(new Date()), registradoEm: agora() };
+    await Reg.salvar(reg); toast('Correção registrada.'); render();
+  },
+  sortear() {
+    const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
+    const emb = a => a.map(x => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map(x => x[1]);
+    const grandes = emb(c.filter(r => r.itens.length >= 4)), outros = emb(c.filter(r => r.itens.length < 4));
+    amostra = [...grandes, ...outros].slice(0, 10); render();
+  },
+  conciliarGuias() { conciliarGuias(); },
+  verCodigos(b) { $('#cod-' + b.dataset.i).classList.toggle('oculto'); },
+  addClinica() { lerFormConfig(); cfgEdit.clinicas.push({ id: 'nova-' + Date.now(), nome: 'Nova clínica', cidade: '', executante: '', emails: [], apelidos: '', codigos: {} }); render(); },
+  remClinica(b) { if (!confirm('Remover esta clínica do cadastro?')) return; lerFormConfig(); cfgEdit.clinicas.splice(+b.dataset.i, 1); render(); },
+  async aprenderCodigos() {
+    lerFormConfig(); await Reg.carregar(60); let n = 0;
+    Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.clinicaId).forEach(r => {
+      const cl = cfgEdit.clinicas.find(c => c.id === r.clinicaId); if (!cl) return; cl.codigos = cl.codigos || {};
+      r.itens.forEach(i => { if (!cl.codigos[i.c]) { cl.codigos[i.c] = i.d || ''; n++; } });
+    });
+    render(); toast(n + ' código(s) novos adicionados. Salve para gravar.');
+  },
+  async salvarCfg() {
+    lerFormConfig();
+    try { await salvarConfig(cfgEdit); cfgEdit = null; preencherOperadores(); render(); toast('Configurações salvas' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.')); }
+    catch (e) { toast('Erro ao salvar: ' + e.message, 'bad'); }
+  },
+  descartarCfg() { cfgEdit = null; render(); },
+  exportarCfg() { lerFormConfig(); baixar('config.json', JSON.stringify(configParaSalvar(cfgEdit), null, 2), 'application/json'); },
+  async limparAntigos() {
+    if (!confirm('Apagar registros com mais de 180 dias (pasta compartilhada e este computador)?')) return;
+    const lim = isoDia(addDias(new Date(), -180)); let n = 0;
+    for (const k of LS.chaves('reg.')) if (k.slice(4, 14) < lim) { LS.del(k); n++; }
+    if (Pasta.ok) for (const [m] of await Pasta.listar(['registros'])) for (const [f] of await Pasta.listar(['registros', m])) if (f.slice(0, 10) < lim && await Pasta.apagar(['registros', m], f)) n++;
+    toast(n + ' arquivo(s) apagado(s).');
+  }
+};
+function finalizarAtendimento(texto) {
+  ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido);
+  S = null; persistir(); render(); window.scrollTo(0, 0); toast('Registrado.');
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const f = acoes[b.dataset.act]; if (f) { e.preventDefault(); Promise.resolve(f(b, e)).catch(err => { console.error(err); toast('Erro: ' + err.message, 'bad'); }); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (!S) return;
+  if (t.dataset.motivo) { S.conf[t.dataset.motivo] = { ...(S.conf[t.dataset.motivo] || {}), motivo: t.value }; persistir(); return; }
+  if (t.dataset.cega) {
+    const i = +t.dataset.i; S.cega.entradas[i] = { ...(S.cega.entradas[i] || {}), [t.dataset.cega]: t.value.replace(/\D/g, '') };
+    if (t.value !== t.value.replace(/\D/g, '')) t.value = t.value.replace(/\D/g, '');
+    S.cega.resultado = null; persistir();
+    if (t.dataset.cega === 'qtd' && t.value) { const prox = $(`[data-cega=fim][data-i="${i + 1}"]`); if (prox) prox.focus(); }
+    return;
+  }
+  if (t.id === 'cegaN') { S.cega.linhas = t.value; S.cega.resultado = null; $('#cegaLinhas').innerHTML = htmlLinhasCega(); persistir(); return; }
+  if (t.id === 'guia') {
+    let v = t.value.toUpperCase().replace(/\s/g, ''); if (/^\d{8}$/.test(v)) v = 'T' + v;
+    S.guia = v; persistir();
+    clearTimeout(window._tg); window._tg = setTimeout(() => { const pos = t.selectionStart; render(); const g = $('#guia'); g.focus(); g.setSelectionRange(pos, pos); }, 350);
+    return;
+  }
+  if (t.id === 'txtResp') { S.respostaEditada = t.value; persistir(); return; }
+  if (t.id === 'txtSemGuia') { S.semGuiaTexto = t.value; persistir(); return; }
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'operador') { LS.set('operador', t.value); render(); return; }
+  if (t.id === 'arquivoEml') { const f = t.files[0]; t.value = ''; if (f) abrirArquivo(f); return; }
+  if (t.id === 'arqConc') { try { await conciliarEmails([...t.files]); } catch (err) { toast('Erro ao ler: ' + err.message, 'bad'); } return; }
+  if (t.id === 'painelDia') { acoes.atualizarPainel(); return; }
+  if (t.id === 'impCfg') { const f = t.files[0]; if (!f) return; try { cfgEdit = mesclarConfig(CONFIG_PADRAO, JSON.parse(await f.text())); render(); toast('Importado. Confira e clique em Salvar.'); } catch (err) { toast('Arquivo inválido.', 'bad'); } return; }
+  if (!S) return;
+  if (t.dataset.conf) { S.conf[t.dataset.conf] = { ...(S.conf[t.dataset.conf] || {}), ok: t.checked }; persistir(); render(); return; }
+  if (t.dataset.motivo) { render(); return; }
+  if (t.dataset.check) { S.checks[t.dataset.check] = t.checked; persistir(); if (S.etapa === 4) render(); return; }
+  if (t.id === 'cartUsada') { S.carteiraUsada = normCart(t.value); persistir(); render(); return; }
+  if (t.dataset.campo) {
+    const k = t.dataset.campo, v = t.value.trim(), p = S.pedido;
+    if (k === 'medico') p.medico = lerMedico(v); else if (k === 'emissao') p.emissao = lerEmissao(v, S.email.data); else if (k === 'cid') p.cid = v.toUpperCase(); else p[k] = v;
+    if (k === 'beneficiario') p.beneficiarios = v ? [v] : [];
+    S.itensEditados = true; delete S.conf.editado; persistir(); render(); return;
+  }
+  if (t.id === 'selSemGuia') { S.semGuia = t.value; S.semGuiaTexto = null; persistir(); render(); return; }
+  if (t.id === 'selModeloResp') { S.modeloResposta = t.value; S.respostaEditada = null; persistir(); render(); return; }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('[data-cega], #cegaN')) {
+    e.preventDefault();
+    const campos = $$('#cegaN, [data-cega]'); const i = campos.indexOf(e.target);
+    if (i >= 0 && i < campos.length - 1) campos[i + 1].focus(); else acoes.conferir();
+  }
+});
+document.addEventListener('dragover', e => { if (aba === 'atend' && !S) e.preventDefault(); });
+document.addEventListener('drop', e => { if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
+
+function preencherOperadores() {
+  const sel = $('#operador'), atual = LS.get('operador', '');
+  sel.innerHTML = '<option value="">— escolha —</option>' + cfg.operadores.map(o => `<option ${o === atual ? 'selected' : ''}>${esc(o)}</option>`).join('');
+}
+async function init() {
+  $('#versao').textContent = 'v' + VERSAO;
+  const hoje = new Date(), hojeFmt = fmtData(hoje);
+  $('#chipData').textContent = hojeFmt; $('#printData').textContent = 'Emitido em ' + hojeFmt + ', ' + fmtHora(hoje) + ' · Criado por Alexandre Neves'; $('#anoRodape').textContent = hoje.getFullYear();
+  await Pasta.init();
+  await carregarConfig();
+  preencherOperadores();
+  await Reg.carregar();
+  S = LS.get('atual', null);
+  if (S && S.versaoEstado !== VERSAO && !S.pedido) S = null;
+  render();
+}
+init();
+</script>
+</body>
+</html>
