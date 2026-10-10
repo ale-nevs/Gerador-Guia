@@ -282,6 +282,8 @@ mark.lacuna{background:var(--warn-bg);color:var(--warn-fg);outline:1px dashed va
 .al.bloqueio{background:var(--bad-bg);border-color:var(--bad-br);border-left-color:var(--bad-solid);color:var(--bad-fg)}
 .al.obs{background:var(--obs-bg);border-color:var(--obs-br);border-left-color:var(--obs-solid);color:var(--obs-fg)}
 .al.atencao{background:var(--warn-bg);border-color:var(--warn-br);border-left-color:var(--warn-solid);color:var(--warn-fg)}
+.al.atencao.conferido{background:var(--ok-bg);border-color:var(--ok-br);border-left-color:var(--ok-solid);color:var(--ok-fg)}
+.al.atencao.conferido .tag{opacity:.75}
 .al.info{background:var(--surface-2);border-color:var(--border);border-left-color:var(--text-3);color:var(--text-2)}
 .al .acoes-al{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;color:var(--text)}
 .al .acoes-al select{width:auto;min-width:220px;min-height:var(--h-sm);padding:2px 8px;font-size:var(--fs-xs)}
@@ -1362,6 +1364,18 @@ CID:
 Emissão: (dd/mm/aaaa ou SEM DATA)
 Local de emissão:
 Observações:` },
+  personalizado_1: { nome: 'Modelo personalizado 1', texto:
+`{SAUDACAO}!
+
+Escreva aqui o texto deste modelo.
+
+Permanecemos à disposição.` },
+  personalizado_2: { nome: 'Modelo personalizado 2', texto:
+`{SAUDACAO}!
+
+Escreva aqui o texto deste modelo.
+
+Permanecemos à disposição.` },
   observacao: { nome: 'Observação da guia', texto:
 `Solicitante: {REMETENTE}
 Recebido em: {DATA_EMAIL}
@@ -1389,6 +1403,8 @@ const MODELOS_META = {
   outra_clinica: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Já atende em outra clínica", na etapa Finalizar (guia já gerada).' },
   excluido_carencia: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Excluído ou com carência", na etapa Finalizar (guia já gerada).' },
   sem_direito_local: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Sem direito no local ou prestador", na etapa Finalizar (guia já gerada).' },
+  personalizado_1: { grupo: 'Modelos personalizados', destino: 'email', uso: 'Descreva aqui quando usar este modelo.', custom: true },
+  personalizado_2: { grupo: 'Modelos personalizados', destino: 'email', uso: 'Descreva aqui quando usar este modelo.', custom: true },
   resposta_multipla: { grupo: 'E-mail com várias guias', destino: 'email', uso: 'Resposta única que reúne o resultado de todas as guias do mesmo e-mail (botão "Resposta do e-mail").' },
   modelo_pedido: { grupo: 'Modelo de pedido para as clínicas', destino: 'email', uso: 'Inserido na resposta de pendência, para mostrar à clínica como enviar o pedido.' },
   observacao: { grupo: 'Observação da guia', destino: 'texto', uso: 'Texto base do campo de observação da guia no sistema oficial (remetente e pedido original).' },
@@ -1396,9 +1412,12 @@ const MODELOS_META = {
   parametrizacao: { grupo: 'Parametrização', destino: 'texto', uso: 'Formato do texto estruturado gerado no botão "Parametrizar".' },
   parametrizacao_linha: { grupo: 'Parametrização', destino: 'texto', uso: 'Formato de cada linha de terapia dentro do texto da parametrização.' }
 };
-const MODELOS_RESPOSTA_ORDEM = ['autorizada', 'parcial', 'nao_autorizada', 'correcao', 'pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'resposta_multipla', 'modelo_pedido'];
+const MODELOS_RESPOSTA_ORDEM = ['autorizada', 'parcial', 'nao_autorizada', 'correcao', 'pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2', 'resposta_multipla', 'modelo_pedido'];
 const MODELOS_SEM_GUIA = ['pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira'];
 const MODELOS_SITUACAO = ['outra_clinica', 'excluido_carencia', 'sem_direito_local'];
+const MODELOS_PERSONALIZADOS = ['personalizado_1', 'personalizado_2'];
+const nomeModelo = k => ((cfg.modelos[k] && cfg.modelos[k].nome) || (MODELOS_PADRAO[k] || {}).nome || k);
+const usoModelo = k => ((cfg.modelos[k] && cfg.modelos[k].uso) || (MODELOS_META[k] || {}).uso || '');
 const BOTOES_SITUACAO = { outra_clinica: 'Já atende em outra clínica', excluido_carencia: 'Excluído ou com carência', sem_direito_local: 'Sem direito no local ou prestador' };
 
 /* ---------- Campos dinâmicos (organizados por categoria) ---------- */
@@ -1576,7 +1595,7 @@ function configPadrao() {
       { id: 'apoio', nome: 'Apoio', icone: 'headphones', cor: 'idc-5' }
     ],
     clinicas: [],
-    modelos: Object.fromEntries(Object.entries(MODELOS_PADRAO).map(([k, m]) => [k, { nome: m.nome, html: padraoHtml(m.texto) }])),
+    modelos: Object.fromEntries(Object.entries(MODELOS_PADRAO).map(([k, m]) => [k, { nome: m.nome, html: padraoHtml(m.texto), uso: (MODELOS_META[k] || {}).custom ? MODELOS_META[k].uso : undefined }])),
     alertas: Object.fromEntries(Object.entries(ALERTAS).map(([k, a]) => [k, { modo: a.modo, dest: 'guia', texto: '' }])),
     motivos: clonar(MOTIVOS_PADRAO),
     preferencias: { ...PREFS_PADRAO }
@@ -1600,6 +1619,7 @@ function mesclarConfig(base, c) {
     const s = c.modelos[k] || {};
     const html = s.html ? sanitizar(s.html) : (s.texto != null ? textoParaHtml(s.texto) : null);
     if (html) r.modelos[k].html = html;
+    if (MODELOS_META[k].custom) { if (typeof s.nome === 'string' && s.nome.trim()) r.modelos[k].nome = s.nome.trim(); if (typeof s.uso === 'string') r.modelos[k].uso = s.uso; }
   }
   if (c.alertas) for (const k in r.alertas) {
     const s = c.alertas[k]; if (!s) continue;
@@ -1627,7 +1647,7 @@ function configParaSalvar(c) {
     versao: VERSAO, atualizadoEm: agora(), atualizadoPor: operador(),
     operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, cor: o.cor })),
     clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', codigos: cl.codigos || {} })),
-    modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html) }])),
+    modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
     alertas: c.alertas, motivos: c.motivos, preferencias: c.preferencias
   };
 }
@@ -1768,7 +1788,7 @@ function novaGuia(bloco, idx, st) {
     resultado: { situacao: null, motivoId: '', motivoTxt: '', naoAut: {}, obsAdicionais: '', emailPrestador: (e.responderPara && e.responderPara.email) || e.remetente.email || '' },
     usarCorrecao: /^\s*(re|res)\s*:/i.test(e.assunto),
     respEdit: null, respExtras: [], respInc: [], obsEdit: null, obsExtras: [], obsInc: [],
-    param: null, semGuia: null, semGuiaCopiado: false
+    param: null, semGuia: null, semGuiaCopiado: false, conf: {}
   };
 }
 function novoEstado(email) {
@@ -1931,6 +1951,9 @@ function situacaoGuia(g) {
   const bloqueios = A.filter(a => a.modo === 'bloqueio');
   return { A, bloqueios, obs: A.filter(a => a.modo === 'obs'), atencao: A.filter(a => a.modo === 'atencao'), pode: !bloqueios.length };
 }
+/* avisos de atenção que pedem o "Conferi" (os meramente informativos não) */
+const pedeConferi = a => a.modo === 'atencao' && a.nivel !== 'info';
+const atencaoPendente = (g, st) => st.A.filter(a => pedeConferi(a) && !(g.conf && g.conf[a.key]));
 const cegaExigida = () => !!cfg.preferencias.conferenciaCega;
 const podeFinal = (g, st) => st.pode && (!cegaExigida() || g.cega.ok);
 const guiasAtivas = () => S.guias.filter(x => x.status !== 'descartado');
@@ -1975,7 +1998,7 @@ function montarRegistro(g, status, extra = {}) {
     itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' ? !neg.includes(i.codigo) : null })),
     guia: g.numero || null, resultado: status === 'concluido' ? resultadoParaRegistro(g) : null,
     parametrizado: g.param ? { id: g.param.id, origem: g.param.origem } : null,
-    alertas: A.filter(a => a.modo !== 'bloqueio').map(a => ({ k: a.tipo, m: a.modo, t: a.texto })),
+    alertas: A.filter(a => a.modo !== 'bloqueio').map(a => ({ k: a.tipo, m: a.modo, t: a.texto, c: !!(g.conf && g.conf[a.key]) })),
     bloqueios: A.filter(a => a.modo === 'bloqueio').map(a => a.texto),
     conferencia: { tentativas: g.cega.tentativas, divergencias: g.cega.historico },
     editadoAMao: g.itensEditados, obsIncluidas: g.obsInc.length + g.respInc.length, duracaoSeg: Math.round((Date.now() - new Date(g.abertoEm)) / 1000), ...extra
@@ -2100,8 +2123,10 @@ function htmlAlertas(g, st) {
     if (a.vincular) extra += `<div class="acoes-al"><select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button></div>`;
     if (a.acaoCarteira) extra += `<div class="acoes-al"><button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button></div>`;
     if (a.modo === 'obs') extra += `<div class="acoes-al"><span class="muted" style="font-size:var(--fs-xs)">Texto disponível em “Incluir observação” (etapa Finalizar), para ${a.dest === 'prestador' ? 'a resposta ao prestador' : 'a observação da guia'}.</span></div>`;
+    const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
+    if (pedeConferi(a)) extra += `<div class="acoes-al"><label class="chk" style="font-size:var(--fs-sm);font-weight:600"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label></div>`;
     const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
-    return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo}"><span>${ic(ico)}</span><div class="tx"><div style="margin-bottom:2px">${tagModo(a.modo, a.nivel)}</div>${esc(a.texto)}</div>${extra}</div>`;
+    return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico)}</span><div class="tx"><div style="margin-bottom:2px">${tagModo(a.modo, a.nivel)}</div>${esc(a.texto)}</div>${extra}</div>`;
   }).join('');
   return lista || `<div class="al info"><span>${ic('check')}</span><div class="tx">Nenhum alerta para esta guia.</div></div>`;
 }
@@ -2110,7 +2135,7 @@ function htmlPainelAlertas(g, st) {
     <div class="al-h">${ic(st.bloqueios.length ? 'ban' : 'bell', 'lg')}<h2>Alertas e ocorrências</h2>
       ${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : '<span class="tag ok">' + ic('check', 'sm') + 'Sem bloqueios</span>'}
       ${st.obs.length ? `<span class="tag obs">${ic('message', 'sm')}${st.obs.length} com observação</span>` : ''}
-      ${st.atencao.length ? `<span class="tag warn">${ic('alert', 'sm')}${st.atencao.length} de atenção</span>` : ''}</div>
+      ${(() => { const tot = st.A.filter(pedeConferi).length, pend = atencaoPendente(g, st).length; return tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} de atenção a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Atenção conferida</span>`) : ''; })()}</div>
     <div class="al-corpo"><div class="alertas" id="alertas">${htmlAlertas(g, st)}</div></div></section>`;
 }
 
@@ -2209,7 +2234,7 @@ function renderVisao(alvo) {
     ${S.guias.map((g, i) => { const st = situacaoGuia(g); return `<tr><td class="c"><span class="sq idc idc-${i % 10}">${i + 1}</span></td><td class="pri">${esc(nomeGuia(g))}</td><td class="num">${esc(g.carteiraUsada || g.pedido.carteiraBruta || '—')}</td>
       <td class="num">${g.pedido.itens.map(it => `${it.codigo} × ${it.qtd ?? '?'}`).join('<br>') || '—'}</td>
       <td>${g.status === 'concluido' ? tagResultado(g.resultado.situacao) + ' <span class="num">' + esc(g.numero) + '</span>' : tagStatus(g.status)} ${tagParam(g.param)}</td>
-      <td>${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : ''} ${st.obs.length + st.atencao.filter(a => a.nivel !== 'info').length ? `<span class="tag warn">${ic('alert', 'sm')}${st.obs.length + st.atencao.filter(a => a.nivel !== 'info').length}</span>` : ''}</td>
+      <td>${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : ''} ${st.obs.length + atencaoPendente(g, st).length ? `<span class="tag warn">${ic('alert', 'sm')}${st.obs.length + atencaoPendente(g, st).length}</span>` : ''}</td>
       <td class="c"><button class="btn sm pri" data-act="selGuia" data-i="${i}">${g.status === 'concluido' ? 'Ver guia' : 'Abrir guia'}${ic('right', 'sm')}</button></td></tr>`; }).join('')}
     </tbody></table></div>
     ${todas ? `<div class="ultimo" style="margin-top:12px">${ic('check')}<div>Todas as guias deste e-mail foram processadas.</div></div>` : ''}
@@ -2288,7 +2313,7 @@ function renderPedido(alvo, g) {
       <div class="card">
         <div class="card-h"><h2>Responder sem gerar guia</h2></div>
         <p class="dica">Use quando o pedido não puder virar guia. A resposta é montada para você revisar; nada é enviado automaticamente.</p>
-        <div class="linha-flex">${MODELOS_SEM_GUIA.map(k => `<button class="btn line" data-act="respSemGuia" data-modelo="${k}">${ic('mail')}${esc(cfg.modelos[k] ? MODELOS_PADRAO[k].nome : k)}</button>`).join('')}</div>
+        <div class="linha-flex">${MODELOS_SEM_GUIA.map(k => `<button class="btn line" data-act="respSemGuia" data-modelo="${k}">${ic('mail')}${esc(nomeModelo(k))}</button>`).join('')}</div>
         ${g.status === 'aguardando_clinica' ? `<div class="aviso" style="margin-top:12px">${ic('mail')}<div>Esta guia está marcada como <b>Aguardando clínica</b>.</div></div>` : ''}
       </div>
     </div>
@@ -2496,7 +2521,7 @@ function renderFinal(alvo, g) {
     </div>
     ${showResp ? `<div class="stack">
       <div class="card">
-        <div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(cfg.modelos[resp.modelo] ? MODELOS_PADRAO[resp.modelo].nome : resp.modelo)}</span>` : ''}<span class="esp"></span>
+        <div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
           ${!multi && r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
         ${!resp ? `<div class="aviso">${ic('info')}<div>Selecione a situação da autorização. O modelo da resposta é definido pelo resultado real da guia: autorizada, parcial ou não autorizada.</div></div>` : `
         ${resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Preencha-os acima ou edite o texto.</div></div>` : ''}
@@ -2510,7 +2535,7 @@ function renderFinal(alvo, g) {
       <div class="card">
         <div class="card-h"><h2>Situações recorrentes</h2></div>
         <p class="dica">Geram um texto completo para você revisar e copiar, usando os dados desta guia.</p>
-        <div class="linha-flex">${MODELOS_SITUACAO.map(k => `<button class="btn line" data-act="respSituacao" data-modelo="${k}">${ic('message')}${BOTOES_SITUACAO[k]}</button>`).join('')}</div>
+        <div class="linha-flex">${[...MODELOS_SITUACAO, ...MODELOS_PERSONALIZADOS].map(k => `<button class="btn line" data-act="respSituacao" data-modelo="${k}" title="${esc(usoModelo(k))}">${ic('message')}${esc(MODELOS_SITUACAO.includes(k) ? BOTOES_SITUACAO[k] : nomeModelo(k))}</button>`).join('')}</div>
       </div>
     </div>` : ''}
   </div>
@@ -2562,12 +2587,12 @@ function abrirRespSemGuia(modelo) {
   if (modelo === 'pendencia') extra.problemas = problemasDe(g);
   if (modelo === 'ja_autorizado') { const a = guiaAnterior(g); if (a) extra.anterior = a; }
   const r = renderModelo(modelo, ctxDe(g, extra), { marcar: true });
-  abrirModalResposta({ titulo: MODELOS_PADRAO[modelo].nome, sub: 'Responder sem gerar guia', html: r.html, modelo, semGuia: true, faltando: r.faltando });
+  abrirModalResposta({ titulo: nomeModelo(modelo), sub: 'Responder sem gerar guia', html: r.html, modelo, semGuia: true, faltando: r.faltando });
 }
 function abrirRespSituacao(modelo) {
   const g = guiaAtiva();
   const r = renderModelo(modelo, ctxDe(g), { marcar: true });
-  abrirModalResposta({ titulo: BOTOES_SITUACAO[modelo], sub: 'Texto gerado com os dados desta guia', html: r.html, modelo, faltando: r.faltando });
+  abrirModalResposta({ titulo: nomeModelo(modelo), sub: 'Texto gerado com os dados desta guia', html: r.html, modelo, faltando: r.faltando });
 }
 function abrirRespostaEmail() {
   const g = guiaAtiva() || S.guias[0], pend = S.guias.filter(x => !guiaTerminal(x)).length;
@@ -2855,9 +2880,10 @@ function validarCfg(c) {
     cl._lista.forEach(x => { if (!x.c.trim() && !x.d.trim()) return; if (!/^\d{8}$/.test(x.c.trim())) add('clinicas', `${rot}: código “${x.c}” não tem 8 dígitos.`); else if (cods.has(x.c.trim())) add('clinicas', `${rot}: código ${x.c} repetido.`); cods.add(x.c.trim()); });
   });
   Object.entries(c.modelos).forEach(([k, m]) => {
-    if (!htmlPlano(m.html).trim()) add(MODELOS_META[k].destino === 'texto' ? (k.startsWith('parametrizacao') ? 'param' : 'obs') : 'modelos', `Modelo “${MODELOS_PADRAO[k].nome}”: o texto não pode ficar vazio.`);
-    [...m.html.matchAll(/\{([A-Z_]+)\}/g)].forEach(x => { if (!CAMPO[x[1]]) add(MODELOS_META[k].destino === 'texto' ? 'obs' : 'modelos', `Modelo “${MODELOS_PADRAO[k].nome}”: campo desconhecido {${x[1]}}.`); });
+    if (!htmlPlano(m.html).trim()) add(MODELOS_META[k].destino === 'texto' ? (k.startsWith('parametrizacao') ? 'param' : 'obs') : 'modelos', `Modelo “${c.modelos[k].nome}”: o texto não pode ficar vazio.`);
+    [...m.html.matchAll(/\{([A-Z_]+)\}/g)].forEach(x => { if (!CAMPO[x[1]]) add(MODELOS_META[k].destino === 'texto' ? 'obs' : 'modelos', `Modelo “${c.modelos[k].nome}”: campo desconhecido {${x[1]}}.`); });
   });
+  MODELOS_PERSONALIZADOS.forEach(k => { if (!(c.modelos[k].nome || '').trim()) add('modelos', 'Modelo personalizado: informe o nome.'); });
   const mots = new Set();
   c.motivos.forEach((m, i) => { const n = norm(m.nome); if (!n) add('prefs', `Motivo ${i + 1}: informe o texto.`); else if (mots.has(n)) add('prefs', `Motivo repetido: “${m.nome}”.`); mots.add(n); });
   if (!Number.isInteger(c.preferencias.qtdMax) || c.preferencias.qtdMax < 1 || c.preferencias.qtdMax > 99) add('prefs', 'A quantidade máxima por serviço deve ser um número de 1 a 99.');
@@ -2909,16 +2935,14 @@ function cfgAparencia() {
   const op = (v, i, t, d) => `<button type="button" class="sit ${p === v ? 'on autorizada' : ''}" role="radio" aria-checked="${p === v}" data-act="setTema" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b><small>${d}</small></span></button>`;
   return `<div class="card">${cabSecao('Aparência', 'Vale para este computador e é lembrada ao reabrir o sistema. Também pode ser alternada pelo botão no topo da página.')}
     <div class="sit-opcoes" role="radiogroup" aria-label="Tema">${op('auto', 'settings', 'Automático', 'Acompanha o tema do Windows.')}${op('claro', 'sun', 'Modo claro', 'Fundo claro, ideal para ambientes iluminados.')}${op('escuro', 'moon', 'Modo escuro', 'Fundo escuro, reduz o brilho da tela.')}</div>
-    <h3>Pré-visualização</h3>
-    <div class="linha-flex"><span class="tag ok">${ic('check', 'sm')}Autorizada</span><span class="tag warn">${ic('halfcircle', 'sm')}Parcialmente autorizada</span><span class="tag bad">${ic('x', 'sm')}Não autorizada</span><span class="tag obs">${ic('message', 'sm')}Aviso com observação</span><span class="tag info">${ic('clip', 'sm')}Em andamento</span><span class="tag ac">${ic('layers', 'sm')}Parametrizado</span>
-      <button class="btn pri">Principal</button><button class="btn">Secundário</button><button class="btn cp">${ic('copy', 'sm')}Copiar</button><button class="btn dng">${ic('trash')}Excluir</button></div></div>`;
+</div>`;
 }
 
 /* ---------- 2. Perfil e identificação ---------- */
 function cfgPerfil() {
   return `<div class="card">${cabSecao('Perfil e identificação', 'Cada operador tem nome de exibição, ícone e cor. A identificação é só visual e de registro: não atribui atendimentos a ninguém, e qualquer operador pode continuar ou concluir o trabalho de outro.')}
-  ${cfgEdit.operadores.map((o, i) => `<div class="op-card"><div class="linha-flex" style="margin-bottom:10px">${htmlAvatar(o, true)}<b>${esc(o.nome || 'Novo operador')}</b><span class="tag id idc ${o.cor}">${ic(o.icone, 'sm')}${esc(o.nome || 'Prévia')}</span><span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}">${ic('trash', 'sm')}Remover</button></div>
-    <div class="form-grid"><div><label class="lbl" for="opn-${i}">Nome de exibição</label><input type="text" id="opn-${i}" data-cfg="operadores.${i}.nome" data-rr="1" value="${esc(o.nome)}"></div></div>
+  ${cfgEdit.operadores.map((o, i) => `<div class="op-card"><div class="linha-flex" style="margin-bottom:10px">${htmlAvatar(o, true)}<b data-eco="operadores.${i}.nome">${esc(o.nome || 'Novo operador')}</b><span class="tag id idc ${o.cor}">${ic(o.icone, 'sm')}${esc(o.nome || 'Prévia')}</span><span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}">${ic('trash', 'sm')}Remover</button></div>
+    <div class="form-grid"><div><label class="lbl" for="opn-${i}">Nome de exibição</label><input type="text" id="opn-${i}" data-cfg="operadores.${i}.nome" value="${esc(o.nome)}"></div></div>
     <div style="margin-top:12px"><span class="lbl">Ícone</span><div class="av-op" role="radiogroup" aria-label="Ícone">${AVATARES.map(a => `<button type="button" class="${o.icone === a ? 'on' : ''}" role="radio" aria-checked="${o.icone === a}" data-act="opIcone" data-i="${i}" data-v="${a}" title="${AVATAR_NOME[a]}" aria-label="${AVATAR_NOME[a]}">${ic(a)}</button>`).join('')}</div></div>
     <div style="margin-top:12px"><span class="lbl">Cor de identificação</span><div class="sw" role="radiogroup" aria-label="Cor">${CORES_ID.map(([c, n]) => `<button type="button" class="idc ${c} ${o.cor === c ? 'on' : ''}" role="radio" aria-checked="${o.cor === c}" data-act="opCor" data-i="${i}" data-v="${c}" title="${n}" aria-label="${n}">${o.cor === c ? ic('check', 'sm') : ''}</button>`).join('')}</div></div></div>`).join('')}
   <div class="acoes"><button class="btn line" data-act="opAdd">${ic('plus')}Adicionar operador</button></div></div>`;
@@ -2931,16 +2955,16 @@ function cfgClinicas() {
   return `<div class="card">${cabSecao(`Clínicas e cadastros (${cls.length})`, 'Informações usadas para reconhecer o remetente, preencher o credenciado executante e mostrar a descrição oficial de cada código. Campos sem informação ficam vazios: nada é preenchido por suposição.')}
   <div class="mestre"><div>
     <div class="linha-flex"><div class="busca" style="flex:1;min-width:150px"><span class="sr"><label for="buscaCl">Buscar clínica</label></span>${ic('search', 'sm')}<input type="search" id="buscaCl" placeholder="Nome, cidade, e-mail ou código" data-filtro="cl"></div><button class="btn sm pri" data-act="clNova">${ic('plus', 'sm')}Nova clínica</button></div>
-    <div class="lista-cl" id="listaCl">${cls.map((c, i) => `<button class="cl-item idc ${corClinica(c)} ${i === cfgClinicaSel ? 'ativa' : ''}" data-act="clSel" data-i="${i}" data-busca="${esc(norm([c.nome, c.cidade, c.emails.join(' '), Object.keys(c.codigos || {}).join(' '), c.apelidos].join(' ')))}"><span class="sq">${esc(iniciais(c.nome))}</span><span><span class="n">${esc(c.nome || 'Sem nome')}</span><br><span class="s">${esc(c.cidade || 'Cidade não informada')} · ${c.emails.length} e-mail(s) · ${c._lista.filter(x => x.c).length} código(s)</span></span></button>`).join('') || '<p class="muted">Nenhuma clínica cadastrada.</p>'}</div>
+    <div class="lista-cl" id="listaCl">${cls.map((c, i) => `<button class="cl-item idc ${corClinica(c)} ${i === cfgClinicaSel ? 'ativa' : ''}" data-act="clSel" data-i="${i}" data-busca="${esc(norm([c.nome, c.cidade, c.emails.join(' '), Object.keys(c.codigos || {}).join(' '), c.apelidos].join(' ')))}"><span class="sq">${esc(iniciais(c.nome))}</span><span><span class="n" data-eco="clinicas.${i}.nome">${esc(c.nome || 'Sem nome')}</span><br><span class="s">${esc(c.cidade || 'Cidade não informada')} · ${c.emails.length} e-mail(s) · ${c._lista.filter(x => x.c).length} código(s)</span></span></button>`).join('') || '<p class="muted">Nenhuma clínica cadastrada.</p>'}</div>
   </div>
   <div>${cl ? cfgClinicaDetalhe(cl, cfgClinicaSel) : '<div class="vazio"><h2>Nenhuma clínica selecionada</h2><p>Cadastre a primeira clínica para começar.</p><button class="btn pri" data-act="clNova">' + ic('plus') + 'Nova clínica</button></div>'}</div></div></div>`;
 }
 function cfgClinicaDetalhe(cl, i) {
   const P = `clinicas.${i}`;
-  return `<div class="card" style="box-shadow:none"><div class="card-h idc ${corClinica(cl)}"><span class="sq lg">${esc(iniciais(cl.nome))}</span><h2>${esc(cl.nome || 'Nova clínica')}</h2><span class="esp"></span><button class="btn sm dng" data-act="clRem" data-i="${i}">${ic('trash', 'sm')}Remover clínica</button></div>
+  return `<div class="card" style="box-shadow:none"><div class="card-h idc ${corClinica(cl)}"><span class="sq lg">${esc(iniciais(cl.nome))}</span><h2 data-eco="clinicas.${i}.nome">${esc(cl.nome || 'Nova clínica')}</h2><span class="esp"></span><button class="btn sm dng" data-act="clRem" data-i="${i}">${ic('trash', 'sm')}Remover clínica</button></div>
     <div class="form-grid">
-      <div><label class="lbl" for="cl-nome">Nome da clínica</label><input type="text" id="cl-nome" data-cfg="${P}.nome" data-rr="1" value="${esc(cl.nome)}"></div>
-      <div><label class="lbl" for="cl-cidade">Cidade</label><input type="text" id="cl-cidade" data-cfg="${P}.cidade" data-rr="1" value="${esc(cl.cidade)}"></div>
+      <div><label class="lbl" for="cl-nome">Nome da clínica</label><input type="text" id="cl-nome" data-cfg="${P}.nome" value="${esc(cl.nome)}"></div>
+      <div><label class="lbl" for="cl-cidade">Cidade</label><input type="text" id="cl-cidade" data-cfg="${P}.cidade" value="${esc(cl.cidade)}"></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-exec">Credenciado executante no sistema</label><input type="text" id="cl-exec" data-cfg="${P}.executante" value="${esc(cl.executante)}" placeholder="Não informado">
         <div class="campo-ajuda">Exatamente como aparece no campo “Credenciado executante” do sistema oficial. É o valor copiado na etapa Guia e conferência.</div></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-apel">Apelidos usados no assunto</label><input type="text" id="cl-apel" data-cfg="${P}.apelidos" value="${esc(cl.apelidos)}" placeholder="Ex.: Criar, MRA"><div class="campo-ajuda">Palavras que a clínica usa no assunto, se diferentes do nome.</div></div>
@@ -2964,14 +2988,15 @@ function cfgModelos(chave, filtro, titulo, desc) {
   if (!keys.includes(cfgModeloSel[chave])) cfgModeloSel[chave] = keys[0];
   const grupos = unicos(keys.map(k => MODELOS_META[k].grupo));
   return `<div class="card">${cabSecao(titulo, desc)}<div class="mestre" style="grid-template-columns:minmax(220px,280px) minmax(0,1fr)">
-    <div class="modelo-lista" role="listbox" aria-label="Modelos">${grupos.map(gr => `<div class="eyebrow" style="margin:10px 0 4px">${esc(gr)}</div>${keys.filter(k => MODELOS_META[k].grupo === gr).map(k => `<button class="modelo-item ${cfgModeloSel[chave] === k ? 'ativa' : ''}" role="option" aria-selected="${cfgModeloSel[chave] === k}" data-act="modeloSel" data-c="${chave}" data-k="${k}"><b>${esc(MODELOS_PADRAO[k].nome)}</b><small>${MODELOS_META[k].destino === 'email' ? 'E-mail com formatação' : 'Texto simples'}</small></button>`).join('')}`).join('')}</div>
+    <div class="modelo-lista" role="listbox" aria-label="Modelos">${grupos.map(gr => `<div class="eyebrow" style="margin:10px 0 4px">${esc(gr)}</div>${keys.filter(k => MODELOS_META[k].grupo === gr).map(k => `<button class="modelo-item ${cfgModeloSel[chave] === k ? 'ativa' : ''}" role="option" aria-selected="${cfgModeloSel[chave] === k}" data-act="modeloSel" data-c="${chave}" data-k="${k}"><b data-eco="modelos.${k}.nome">${esc(cfgEdit.modelos[k].nome)}</b><small>${MODELOS_META[k].destino === 'email' ? 'E-mail com formatação' : 'Texto simples'}</small></button>`).join('')}`).join('')}</div>
     <div id="modeloArea">${htmlModeloArea(cfgModeloSel[chave])}</div></div></div>`;
 }
 function htmlModeloArea(k) {
   const meta = MODELOS_META[k], m = cfgEdit.modelos[k], rico = meta.destino === 'email';
   return `<div class="stack">
-    <div class="card" style="box-shadow:none"><div class="card-h"><h2>${esc(MODELOS_PADRAO[k].nome)}</h2>${rico ? `<span class="tag ac">${ic('mail', 'sm')}E-mail com formatação</span>` : `<span class="tag info">${ic('info', 'sm')}Texto simples</span>`}<span class="esp"></span><button class="btn sm ghost" data-act="modeloRestaurar" data-k="${k}" title="Volta ao texto original do sistema">${ic('undo', 'sm')}Restaurar texto padrão</button></div>
-      <p class="dica"><b>Quando é usado:</b> ${esc(meta.uso)}</p>
+    <div class="card" style="box-shadow:none"><div class="card-h"><h2 data-eco="modelos.${k}.nome">${esc(m.nome)}</h2>${rico ? `<span class="tag ac">${ic('mail', 'sm')}E-mail com formatação</span>` : `<span class="tag info">${ic('info', 'sm')}Texto simples</span>`}<span class="esp"></span><button class="btn sm ghost" data-act="modeloRestaurar" data-k="${k}" title="Volta ao texto original do sistema">${ic('undo', 'sm')}Restaurar texto padrão</button></div>
+      ${meta.custom ? `<div class="form-grid" style="margin-bottom:12px"><div><label class="lbl" for="mdNome">Nome do modelo (aparece no botão)</label><input type="text" id="mdNome" data-cfg="modelos.${k}.nome" value="${esc(m.nome)}" maxlength="60"></div>
+        <div style="grid-column:1/-1"><label class="lbl" for="mdUso">Descrição (quando usar)</label><input type="text" id="mdUso" data-cfg="modelos.${k}.uso" value="${esc(m.uso || '')}" maxlength="200"><div class="campo-ajuda">Aparece como dica ao passar o mouse sobre o botão do modelo na etapa Finalizar e abaixo do título aqui.</div></div></div>` : `<p class="dica"><b>Quando é usado:</b> ${esc(meta.uso)}</p>`}
       ${rico ? '' : `<div class="aviso-simples" style="margin-bottom:10px">${ic('info')}<div>Este texto é copiado como <b>texto simples</b> (o campo de destino do sistema oficial não aceita formatação). Por isso o editor não oferece negrito, cor ou listas aqui.</div></div>`}
       ${htmlEditor({ id: 'edModelo', valor: htmlComEtiquetas(m.html), rico, minAltura: 220 })}
       <p class="dica" style="margin:6px 0 0">Use Enter para novo parágrafo e Shift+Enter para quebra de linha. Para inserir dados do atendimento, escolha um campo na lista ao lado.</p></div>
@@ -3354,7 +3379,7 @@ const acoes = {
     if (!M || !M.copiou) { toast('Copie a resposta antes de marcar como aguardando.', 'bad'); return; }
     const g = guiaAtiva(), modelo = M.modelo; fecharModal(true);
     await gravarGuia(g, 'aguardando_clinica', { modeloResposta: modelo });
-    await depoisDeGuiaTratada(g, `Aguardando clínica — ${g.pedido.beneficiario || S.email.remetente.email} (${MODELOS_PADRAO[modelo].nome})`);
+    await depoisDeGuiaTratada(g, `Aguardando clínica — ${g.pedido.beneficiario || S.email.remetente.email} (${nomeModelo(modelo)})`);
   },
 
   /* ---- painel do dia ---- */
@@ -3497,6 +3522,7 @@ function onEditorInput(ed) {
 function setCfg(t) {
   const v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? '' : Number(t.value)) : t.value;
   try { setPath(cfgEdit, t.dataset.cfg, v); } catch (e) { return; } marcarSujo();
+  if (typeof v === 'string') $$('[data-eco="' + t.dataset.cfg + '"]').forEach(e => { e.textContent = v || '(sem nome)'; });
 }
 let tFiltro;
 document.addEventListener('input', e => {
@@ -3564,6 +3590,7 @@ document.addEventListener('change', async e => {
   }
   if (!S) return;
   const g = guiaAtiva();
+  if (t.dataset.conf) { g.conf = g.conf || {}; g.conf[t.dataset.conf] = t.checked; persistir(); render(); return; }
   if (t.dataset.campo) {
     const k = t.dataset.campo, v = t.value.trim(), p = g.pedido;
     if (k === 'medico') p.medico = lerMedico(v); else if (k === 'emissao') p.emissao = lerEmissao(v, S.email.data); else if (k === 'cid') p.cid = v.toUpperCase(); else if (k === 'beneficiario') { p.beneficiario = v; p.beneficiarios = v ? [v] : []; } else p[k] = v;
