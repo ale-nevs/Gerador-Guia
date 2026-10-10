@@ -74,11 +74,11 @@ Arquivos na pasta compartilhada: `config.json` (configurações), `parametrizaco
 ## 5. Rotina do operador
 
 1. Baixe o **.eml** do e-mail no SmarterMail e arraste para a página. O sistema lê de 1 a 5 beneficiários; cada um vira uma **guia independente**. O mesmo beneficiário em mais de um bloco gera mais de uma guia, com aviso.
-2. **Etapa 2, pedido e alertas:** confira os dados, corrija a leitura se preciso (**Corrigir leitura** só altera este e-mail) e use **Parametrizar** para registrar médico, data e terapias como referência dos próximos atendimentos da clínica. Bloqueios impedem seguir; resolva ou use **Responder sem gerar guia**.
+2. **Etapa 2, pedido e alertas:** confira os dados, corrija a leitura se preciso (**Corrigir leitura** só altera este e-mail) e use **Parametrizar** para registrar médico, data e terapias como referência dos próximos atendimentos da clínica. Bloqueios impedem seguir; resolva ou use **Responder sem gerar guia** (pendência, já autorizado, carteira, outra clínica, excluído/carência, sem direito no local ou os 2 modelos personalizados). A guia vai direto à etapa final com o texto da resposta e é concluída **sem número**. Em e-mails com várias guias, o trecho de cada guia sem gerar entra na resposta única, no fim. Cada modelo tem um texto para guia única e outro para várias guias (Configurações › Modelos de e-mail).
 3. **Etapa 3, guia e conferência:** os dados aparecem na ordem do sistema oficial, cada um com seu botão **Copiar** (fica verde depois de copiado). Os serviços mostram código e quantidade lado a lado, a descrição cadastrada da clínica e a descrição do e-mail. Depois faça a conferência cega.
 4. **Etapa 4, finalizar:** informe o número real da guia (nunca invente), escolha **Autorizada**, **Parcialmente autorizada** (marque os itens negados) ou **Não autorizada** (com motivo) e use **Incluir observação** para a observação da guia. Em e-mail com uma só guia, a resposta ao prestador aparece nessa mesma tela. Em e-mail com **várias guias**, cada guia mostra só número, resultado e observação (etapa "Resultado e observação"); a **resposta ao prestador com todas as guias** aparece na **última guia**, junto com o botão para copiar o e-mail do prestador.
 5. **Concluir guia** registra aquela guia e leva à próxima. O e-mail só termina quando todas as guias foram tratadas.
-6. **Salvar e fechar** guarda o andamento. Outra pessoa retoma pelo **Painel do dia**, em **Abrir atendimento**, selecionando o mesmo .eml.
+6. O andamento é salvo sozinho a cada etapa. Outra pessoa retoma pelo **Painel do dia** ou pela aba **Ações**, em **Abrir**, selecionando o mesmo .eml.
 
 **Leitura do pedido:** o sistema reconhece rótulos variados (Paciente, Cartão, Procedimentos, Sessões…), campos na mesma linha separados por `|`, vários pacientes separados por traços ou por repetição de beneficiário/carteira, e vários pedidos do mesmo paciente quando médico ou data se repetem. Médico, CID, data e local escritos uma única vez no e-mail são aplicados às guias que não os têm, com aviso. Quantidades lidas do fim da linha também geram aviso.
 
@@ -86,7 +86,11 @@ Nada é enviado nem emitido automaticamente: toda resposta é revisada e copiada
 
 ---
 
-## 6. Painel do dia
+## 6. Aba Ações e Painel do dia
+
+A aba **Ações** mostra, em 3 colunas, onde está cada guia aberta hoje (paciente × clínica): **Lendo o pedido**, **Gerando guia** e **Anexando e-mail**. Ao abrir um e-mail, o sistema mostra a **última guia gerada** para a mesma carteira (de qualquer data) e, se for de outra clínica, o nome dela.
+
+### Painel do dia
 
 Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que ainda precisa ser feito em cada guia (com botão para abrir), guias por clínica e a tabela do dia com filtros (status, resultado, clínica, parametrização e busca). **Exportar CSV** respeita os filtros aplicados. Continuam disponíveis a amostragem do apoio, a conciliação de e-mails e de guias e o registro de correções.
 

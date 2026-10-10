@@ -284,6 +284,24 @@ mark.lacuna{background:var(--warn-bg);color:var(--warn-fg);outline:1px dashed va
 .al.bloqueio{background:var(--bad-bg);border-color:var(--bad-br);border-left-color:var(--bad-solid);color:var(--bad-fg)}
 .al.obs{background:var(--obs-bg);border-color:var(--obs-br);border-left-color:var(--obs-solid);color:var(--obs-fg)}
 .al.atencao{background:var(--warn-bg);border-color:var(--warn-br);border-left-color:var(--warn-solid);color:var(--warn-fg)}
+.ult-guia{display:flex;gap:10px;align-items:flex-start;background:var(--info-bg);color:var(--info-fg);border:1px solid var(--info-br);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:var(--fs-sm)}
+.ult-guia .eyebrow{color:var(--info-fg)}.ult-linha{margin-top:2px}
+.painel-al.compacto .al-h{padding:6px 12px}.painel-al.compacto .al-h h2{font-size:var(--fs-sm)}.painel-al.compacto .al-corpo{padding:8px 12px}
+.painel-al.compacto .alertas{gap:4px}
+.painel-al.compacto .al{padding:5px 9px;font-size:var(--fs-xs);grid-template-columns:auto 1fr;gap:2px 8px;line-height:1.35}
+.painel-al.compacto .al .tag{font-size:10.5px;padding:2px 6px}
+.painel-al.compacto .al .al-t{font-weight:700}
+.al .acoes-al{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.al .acoes-al .btn.sm{min-height:24px;font-size:11px;padding:0 8px}
+label.chk.conferi{font-size:var(--fs-xs);font-weight:650;align-items:center;gap:5px}
+.al-infos{margin-top:6px}.al-infos summary{font-size:var(--fs-xs);color:var(--text-2);font-weight:600}
+.al-infos .alertas{margin-top:4px}
+.quadro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+@media (max-width:900px){.quadro{grid-template-columns:1fr}}
+.col-q{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px}
+.col-q h3{margin:0 0 10px;display:flex;align-items:center;gap:8px;font-size:var(--fs-md)}
+.card-q{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;box-shadow:var(--shadow)}
+.card-q .t1{font-weight:650;font-size:var(--fs-sm)}
 .al.atencao.conferido{background:var(--ok-bg);border-color:var(--ok-br);border-left-color:var(--ok-solid);color:var(--ok-fg)}
 .al.atencao.conferido .tag{opacity:.75}
 .al.info{background:var(--surface-2);border-color:var(--border);border-left-color:var(--text-3);color:var(--text-2)}
@@ -709,6 +727,17 @@ function htmlPlano(html) {
 }
 function textoParaHtml(t) {
   return String(t || '').replace(/\r\n?/g, '\n').trim().split(/\n{2,}/).map(par => '<p>' + esc(par).replace(/\n/g, '<br>') + '</p>').join('');
+}
+/* Parágrafos com espaço entre eles ao colar em e-mail: cada <p> vira um bloco seguido de uma linha em branco */
+function htmlParaEmail(html) {
+  const d = document.createElement('div'); d.innerHTML = html; let out = '';
+  for (const n of [...d.childNodes]) {
+    if (n.nodeType === 3) { if (n.textContent.trim()) out += `<div>${esc(n.textContent)}</div><div><br></div>`; continue; }
+    if (n.tagName === 'P') out += `<div>${n.innerHTML}</div><div><br></div>`;
+    else if (n.tagName === 'UL' || n.tagName === 'OL') out += n.outerHTML + '<div><br></div>';
+    else out += n.outerHTML;
+  }
+  return out.replace(/(<div><br><\/div>)+$/, '');
 }
 const escH = s => esc(s).replace(/\n/g, '<br>');
 
@@ -1435,21 +1464,34 @@ Assunto: {ASSUNTO}
   parametrizacao_linha: { nome: 'Texto da parametrização (cada terapia)', texto:
 `Terapia: {TERAPIA_DESCRICAO} — Quantidade: {TERAPIA_QTD}` }
 };
+/* Trecho de cada guia na resposta única, quando o e-mail tem várias guias e esta não foi gerada */
+const MULTI_PADRAO = {
+  pendencia: 'Beneficiário: {BENEFICIARIO}\nNão foi possível gerar a guia pelo(s) motivo(s) abaixo:\n{PROBLEMAS}',
+  ja_autorizado: 'Beneficiário: {BENEFICIARIO}\nJá autorizado anteriormente na guia {GUIA_ANTERIOR}, em {DATA_ANTERIOR}, com os serviços:\n{ITENS_ANTERIOR}',
+  carteira_nao_localizada: 'Beneficiário: {BENEFICIARIO}\nNão localizado com a carteira informada ({CARTEIRA_INFORMADA}). Por gentileza, confirme o nome completo e a carteira Promédica.',
+  nome_carteira: 'Beneficiário: {BENEFICIARIO}\nA carteira informada ({CARTEIRA_INFORMADA}) não pertence ao beneficiário. Por gentileza, confirme o nome completo e a carteira Promédica.',
+  outra_clinica: 'Beneficiário: {BENEFICIARIO} (carteira {CARTEIRA})\nConsta atendimento em outra clínica para o(s) serviço(s) solicitado(s). A solicitação depende de análise e regularização, conforme o procedimento aplicável.\n{ITENS}',
+  excluido_carencia: 'Beneficiário: {BENEFICIARIO} (carteira {CARTEIRA})\nNão foi possível autorizar o(s) serviço(s) solicitado(s), devido à situação identificada na verificação (exclusão ou carência, conforme o resultado da consulta).\n{ITENS}',
+  sem_direito_local: 'Beneficiário: {BENEFICIARIO} (carteira {CARTEIRA})\nNão foi possível autorizar o(s) serviço(s) solicitado(s) no local ou prestador informado ({CLINICA}), de acordo com o resultado da verificação.\n{ITENS}',
+  personalizado_1: 'Beneficiário: {BENEFICIARIO}\nEscreva aqui o trecho deste modelo para e-mails com várias guias.',
+  personalizado_2: 'Beneficiário: {BENEFICIARIO}\nEscreva aqui o trecho deste modelo para e-mails com várias guias.'
+};
+Object.entries(MULTI_PADRAO).forEach(([k, t]) => { MODELOS_PADRAO[k + '_multi'] = { nome: MODELOS_PADRAO[k].nome + ' (várias guias)', texto: t }; });
 /* destino: 'email' (cola em e-mail, aceita formatação) | 'texto' (campo de texto simples do sistema oficial) */
 const MODELOS_META = {
   autorizada: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Autorizada.' },
   parcial: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Parcialmente autorizada. Lista os itens autorizados e os não autorizados.' },
   nao_autorizada: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Não autorizada. Inclui o motivo registrado.' },
   correcao: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, para guia autorizada que corrige um pedido anterior (assunto com RE:). Pode ser escolhido no lugar de "Guia autorizada".' },
-  pendencia: { grupo: 'Resposta sem gerar guia', destino: 'email', uso: 'Etapa Pedido e alertas: quando há bloqueio e a clínica precisa corrigir dados do pedido.' },
-  ja_autorizado: { grupo: 'Resposta sem gerar guia', destino: 'email', uso: 'Etapa Pedido e alertas: quando a clínica cobra um pedido já autorizado. Preenche a guia anterior mais recente da mesma carteira e código, se existir.' },
-  carteira_nao_localizada: { grupo: 'Resposta sem gerar guia', destino: 'email', uso: 'Etapa Pedido e alertas: quando o beneficiário não é localizado no sistema oficial pela carteira informada.' },
-  nome_carteira: { grupo: 'Resposta sem gerar guia', destino: 'email', uso: 'Etapa Pedido e alertas: quando nome e carteira não pertencem à mesma pessoa.' },
-  outra_clinica: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Já atende em outra clínica", na etapa Finalizar (guia já gerada).' },
-  excluido_carencia: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Excluído ou com carência", na etapa Finalizar (guia já gerada).' },
-  sem_direito_local: { grupo: 'Situações recorrentes', destino: 'email', uso: 'Botão "Sem direito no local ou prestador", na etapa Finalizar (guia já gerada).' },
-  personalizado_1: { grupo: 'Modelos personalizados', destino: 'email', uso: 'Descreva aqui quando usar este modelo.', custom: true },
-  personalizado_2: { grupo: 'Modelos personalizados', destino: 'email', uso: 'Descreva aqui quando usar este modelo.', custom: true },
+  pendencia: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando há bloqueio e a clínica precisa corrigir dados do pedido.' },
+  ja_autorizado: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando a clínica cobra um pedido já autorizado. Preenche a guia anterior mais recente da mesma carteira e código, se existir.' },
+  carteira_nao_localizada: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando o beneficiário não é localizado no sistema oficial pela carteira informada.' },
+  nome_carteira: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando nome e carteira não pertencem à mesma pessoa.' },
+  outra_clinica: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão "Já atende em outra clínica", em Responder sem gerar guia. A guia é concluída sem número, com este texto como resposta.' },
+  excluido_carencia: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão "Excluído ou com carência", em Responder sem gerar guia.' },
+  sem_direito_local: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão "Sem direito no local ou prestador", em Responder sem gerar guia.' },
+  personalizado_1: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Descreva aqui quando usar este modelo (aparece como botão em Responder sem gerar guia).', custom: true },
+  personalizado_2: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Descreva aqui quando usar este modelo (aparece como botão em Responder sem gerar guia).', custom: true },
   resposta_multipla: { grupo: 'E-mail com várias guias', destino: 'email', uso: 'Resposta única que reúne o resultado de todas as guias do mesmo e-mail (botão "Resposta do e-mail").' },
   modelo_pedido: { grupo: 'Modelo de pedido para as clínicas', destino: 'email', uso: 'Inserido na resposta de pendência, para mostrar à clínica como enviar o pedido.' },
   observacao: { grupo: 'Observação da guia', destino: 'texto', uso: 'Texto base do campo de observação da guia no sistema oficial (remetente e pedido original).' },
@@ -1457,38 +1499,39 @@ const MODELOS_META = {
   parametrizacao: { grupo: 'Parametrização', destino: 'texto', uso: 'Formato do texto estruturado gerado no botão "Parametrizar".' },
   parametrizacao_linha: { grupo: 'Parametrização', destino: 'texto', uso: 'Formato de cada linha de terapia dentro do texto da parametrização.' }
 };
+Object.keys(MULTI_PADRAO).forEach(k => { MODELOS_META[k + '_multi'] = { grupo: 'Sem gerar guia: várias guias', destino: 'email', uso: 'Trecho desta guia dentro da resposta única do e-mail, quando ele tem várias guias e esta guia ficou sem ser gerada. Os trechos de todas as guias entram no campo "Resumo de todas as guias" do modelo "Resposta com várias guias".' }; });
 const MODELOS_RESPOSTA_ORDEM = ['autorizada', 'parcial', 'nao_autorizada', 'correcao', 'pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2', 'resposta_multipla', 'modelo_pedido'];
-const MODELOS_SEM_GUIA = ['pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira'];
+const MODELOS_SEM_GUIA = ['pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2'];
 const MODELOS_SITUACAO = ['outra_clinica', 'excluido_carencia', 'sem_direito_local'];
 const MODELOS_PERSONALIZADOS = ['personalizado_1', 'personalizado_2'];
-const nomeModelo = k => ((cfg.modelos[k] && cfg.modelos[k].nome) || (MODELOS_PADRAO[k] || {}).nome || k);
-const usoModelo = k => ((cfg.modelos[k] && cfg.modelos[k].uso) || (MODELOS_META[k] || {}).uso || '');
+const nomeModelo = k => k.endsWith('_multi') ? nomeModelo(k.slice(0, -6)) + ' (várias guias)' : ((cfg.modelos[k] && cfg.modelos[k].nome) || (MODELOS_PADRAO[k] || {}).nome || k);
+const usoModelo = k => ((cfg.modelos[k.replace(/_multi$/, '')] && cfg.modelos[k.replace(/_multi$/, '')].uso) || (MODELOS_META[k] || {}).uso || '');
 const BOTOES_SITUACAO = { outra_clinica: 'Já atende em outra clínica', excluido_carencia: 'Excluído ou com carência', sem_direito_local: 'Sem direito no local ou prestador' };
 
 /* ---------- Campos dinâmicos (organizados por categoria) ---------- */
 const itensTxt = (its, dc) => its.map(i => `• ${i.codigo} – ${dc(i)} – quantidade: ${i.qtd ?? '?'}`).join('\n');
-const SIT_ROTULO = { autorizada: 'Autorizada', parcial: 'Parcialmente autorizada', nao: 'Não autorizada' };
+const SIT_ROTULO = { autorizada: 'Autorizada', parcial: 'Parcialmente autorizada', nao: 'Não autorizada', sem_guia: 'Sem guia gerada' };
 function motivoNome(id) { const m = (cfg.motivos || []).find(x => x.id === id); return m ? m.nome : ''; }
 function itensDaGuia(g) { return g.pedido.itens; }
 function descRef(g, it) { const cl = clinicaDe(S); return (cl && cl.codigos && cl.codigos[it.codigo]) || it.desc || 'serviço'; }
 function negadosDe(g) {
-  const r = g.resultado;
+  const r = g.resultado; if (g.semGuia) return [];
   if (r.situacao === 'nao') return itensDaGuia(g).map(i => ({ it: i, motivo: '' }));
   if (r.situacao === 'parcial') return itensDaGuia(g).filter(i => r.naoAut[i.codigo] != null).map(i => ({ it: i, motivo: motivoNome(r.naoAut[i.codigo]) }));
   return [];
 }
 function autorizadosDe(g) {
-  const r = g.resultado;
+  const r = g.resultado; if (g.semGuia) return [];
   if (r.situacao === 'nao') return [];
   if (r.situacao === 'parcial') return itensDaGuia(g).filter(i => r.naoAut[i.codigo] == null);
   return itensDaGuia(g);
 }
 function resumoGuiaTexto(g) {
   const r = g.resultado, L = [];
+  if (g.semGuia && g.status !== 'descartado') return renderModelo(g.semGuia + '_multi', ctxDe(g, extrasSemGuia(g, g.semGuia))).texto;
   L.push(`Beneficiário: ${g.pedido.beneficiario || '(não informado)'}`);
   if (g.status === 'descartado') return L.concat('Solicitação ignorada.').join('\n');
-  if (!r.situacao || (g.status !== 'concluido' && g.status !== 'aguardando_clinica' && !g.numero)) return L.concat('Guia ainda não processada.').join('\n');
-  if (g.status === 'aguardando_clinica') return L.concat('Aguardando retorno da clínica (guia não gerada).').join('\n');
+  if (!r.situacao || (g.status !== 'concluido' && !g.numero)) return L.concat('Guia ainda não processada.').join('\n');
   L.push(`Guia: ${g.numero} — Situação: ${SIT_ROTULO[r.situacao]}`);
   const a = autorizadosDe(g), n = negadosDe(g);
   if (a.length) L.push('Serviços autorizados:', itensTxt(a, i => descRef(g, i)));
@@ -1790,7 +1833,31 @@ const Reg = {
     docs.flatMap(d => d.registros || []).forEach(r => { const a = mapa.get(r.id); if (!a || (r.atualizadoEm || r.registradoEm || '') >= (a.atualizadoEm || a.registradoEm || '')) mapa.set(r.id, r); });
     this.cache = [...mapa.values()];
   },
-  doDia(dia) { return this.cache.filter(r => r.dia === dia); }
+  doDia(dia) { return this.cache.filter(r => r.dia === dia); },
+  /* Histórico completo (sem limite de dias): guia gerada mais recente de cada carteira */
+  hist: {}, histPronto: false,
+  mesclarHist(regs) {
+    regs.forEach(r => {
+      if (r.tipo || r.status !== 'concluido' || !r.guia || !r.carteira) return;
+      const lista = (this.hist[r.carteira] = this.hist[r.carteira] || []);
+      const i = lista.findIndex(x => x.id === r.id); if (i >= 0) lista[i] = r; else lista.push(r);
+    });
+  },
+  async carregarTudo() {
+    if (this.histPronto) { await this.carregar(); this.mesclarHist(this.cache); return; }
+    const docs = [];
+    if (Pasta.ok) for (const [m] of await Pasta.listar(['registros'])) for (const [n, h] of await Pasta.listar(['registros', m])) {
+      if (!n.endsWith('.json')) continue;
+      try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
+    }
+    for (const k of LS.chaves('reg.')) { const d = LS.get(k, null); if (d) docs.push(d); }
+    this.hist = {}; this.mesclarHist(docs.flatMap(d => d.registros || []));
+    await this.carregar(); this.mesclarHist(this.cache); this.histPronto = true;
+  },
+  ultimaGuia(carteira, atendId) {
+    const l = (this.hist[carteira] || []).filter(r => r.atendimentoId !== atendId).sort((a, b) => ((a.concluidoEm || '') < (b.concluidoEm || '') ? 1 : -1));
+    return l[0] || null;
+  }
 };
 
 /* ====================================================================
@@ -1872,6 +1939,7 @@ function restaurarDeRegistros(st) {
       g.resultado.situacao = rs.situacao === 'autorizada' ? 'autorizada' : rs.situacao;
       g.resultado.motivoId = rs.motivoId || ''; g.resultado.motivoTxt = rs.motivoTxt || ''; g.resultado.naoAut = rs.naoAut || {};
       g.cega.ok = true; g.vista = 4;
+      if (rs.situacao === 'sem_guia') { g.semGuia = rs.modelo || null; g.resultado.situacao = 'sem_guia'; }
     }
   });
   return n;
@@ -2030,7 +2098,7 @@ function aplicarParametrizacao(g) {
 }
 
 /* ---------- Registro gravado (sem nome, CID ou médico) ---------- */
-function resultadoParaRegistro(g) { const r = g.resultado; return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut }; }
+function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut }; }
 function montarRegistro(g, status, extra = {}) {
   const p = g.pedido, cl = clinicaDe(S), A = avaliar(g), op = operadorObj();
   const neg = negadosDe(g).map(x => x.it.codigo);
@@ -2038,10 +2106,10 @@ function montarRegistro(g, status, extra = {}) {
     id: g.id, atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.guias.length, versao: VERSAO,
     messageId: S.email.messageId, recebidoEm: S.email.data, assunto: S.email.assunto, remetente: S.email.remetente.email,
     clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: op ? op.nome : '', operadorId: op ? op.id : null, abertoPor: g.abertoPor || (op ? op.nome : ''), dia: S.dia,
-    abertoEm: g.abertoEm, atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
+    abertoEm: g.abertoEm, vista: g.vista, pacienteIni: iniciais(g.pedido.beneficiario || ''), atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
     carteira: g.carteiraUsada || p.carteira || null,
-    itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' ? !neg.includes(i.codigo) : null })),
-    guia: g.numero || null, resultado: status === 'concluido' ? resultadoParaRegistro(g) : null,
+    itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' && !g.semGuia ? !neg.includes(i.codigo) : null })),
+    guia: g.semGuia ? null : (g.numero || null), resultado: status === 'concluido' ? resultadoParaRegistro(g) : null,
     parametrizado: g.param ? { id: g.param.id, origem: g.param.origem } : null,
     alertas: A.filter(a => a.modo !== 'bloqueio').map(a => ({ k: a.tipo, m: a.modo, t: a.texto, c: !!(g.conf && g.conf[a.key]) })),
     bloqueios: A.filter(a => a.modo === 'bloqueio').map(a => a.texto),
@@ -2063,7 +2131,18 @@ function guiaAnterior(g) {
   if (!r) return null;
   return { guia: r.guia, data: fmtData(r.concluidoEm), itens: (r.itens || []).filter(i => meus.has(i.c)).map(i => `• ${i.c} – ${i.dc || i.d || 'serviço'} – quantidade: ${i.q}`).join('\n') };
 }
+function extrasSemGuia(g, modelo) {
+  const e = {};
+  if (modelo === 'pendencia') e.problemas = problemasDe(g);
+  if (modelo === 'ja_autorizado') { const a = guiaAnterior(g); if (a) e.anterior = a; }
+  return e;
+}
 function respostaDaGuia(g, marcar) {
+  if (g.semGuia && !usaConsolidada()) {
+    const r = renderModelo(g.semGuia, ctxDe(g, extrasSemGuia(g, g.semGuia)), { marcar });
+    let html = r.html; g.respExtras.forEach(x => { html += x.html; });
+    return { modelo: g.semGuia, html, texto: htmlPlano(html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')), faltando: r.faltando };
+  }
   const sit = g.resultado.situacao;
   const k = usaConsolidada() ? 'resposta_multipla' : sit === 'parcial' ? 'parcial' : sit === 'nao' ? 'nao_autorizada' : (g.usarCorrecao ? 'correcao' : 'autorizada');
   const r = renderModelo(k, ctxDe(g), { marcar });
@@ -2083,7 +2162,7 @@ const TAG_STATUS = {
   em_andamento: ['info', 'clip'], concluido: ['ok', 'check'], aguardando_clinica: ['warn', 'mail'], descartado: ['', 'x'], devolvido: ['', 'x']
 };
 const tagStatus = s => { const [c, i] = TAG_STATUS[s] || ['', 'info']; return `<span class="tag ${c}">${ic(i, 'sm')}${esc(STATUS[s] || s)}</span>`; };
-const TAG_RES = { autorizada: ['ok', 'check'], parcial: ['warn', 'halfcircle'], nao: ['bad', 'x'] };
+const TAG_RES = { autorizada: ['ok', 'check'], parcial: ['warn', 'halfcircle'], nao: ['bad', 'x'], sem_guia: ['obs', 'mail'] };
 const tagResultado = s => s ? `<span class="tag ${TAG_RES[s][0]}">${ic(TAG_RES[s][1], 'sm')}${SIT_ROTULO[s]}</span>` : '';
 const TAG_MODO = { bloqueio: ['bad', 'ban', 'Bloqueio'], obs: ['obs', 'message', 'Aviso com observação'], atencao: ['warn', 'alert', 'Atenção'], info: ['', 'info', 'Informativo'], desativado: ['', 'x', 'Desativado'] };
 const tagModo = (modo, nivel) => { const k = modo === 'atencao' && nivel === 'info' ? 'info' : modo; const [c, i, t] = TAG_MODO[k]; return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>`; };
@@ -2111,7 +2190,7 @@ function renderTopo() {
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}">${ic(pasta.i, 'sm')}${esc(pasta.t)}</button>
     <button class="chip tema" data-act="alternarTema" title="Alternar entre modo claro e escuro" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span>${escuro ? 'Claro' : 'Escuro'}</span></button>`;
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'layers', 'Ações'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
     .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}${t}</button>`).join('');
   $('#verRodape').textContent = 'v' + VERSAO;
   document.title = 'Conferidor de Guias · Promédica';
@@ -2161,26 +2240,31 @@ document.addEventListener('paste', e => {
 });
 
 /* ---------- Alertas (painel abaixo do conteúdo) ---------- */
+function htmlUmAlerta(a, g) {
+  let extra = '';
+  if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button>`;
+  if (a.acaoCarteira) extra += `<button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button>`;
+  const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
+  if (pedeConferi(a)) extra += `<label class="chk conferi"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label>`;
+  if (a.modo === 'obs') extra += `<span class="muted" style="font-size:var(--fs-xs)">Texto em “Incluir observação” (${a.dest === 'prestador' ? 'resposta ao prestador' : 'observação da guia'}).</span>`;
+  const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
+  return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico, 'sm')}</span><div class="tx"><b class="al-t">${a.modo === 'bloqueio' ? 'Bloqueio:' : a.modo === 'obs' ? 'Aviso com observação:' : a.nivel === 'info' ? 'Informativo:' : 'Atenção:'}</b> ${esc(a.texto)}</div>${extra ? `<div class="acoes-al">${extra}</div>` : ''}</div>`;
+}
 function htmlAlertas(g, st) {
-  const ordem = a => ({ bloqueio: 0, obs: 1, atencao: a.nivel === 'info' ? 3 : 2 }[a.modo]);
-  const lista = [...st.A].sort((a, b) => ordem(a) - ordem(b)).map(a => {
-    let extra = '';
-    if (a.vincular) extra += `<div class="acoes-al"><select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button></div>`;
-    if (a.acaoCarteira) extra += `<div class="acoes-al"><button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button></div>`;
-    if (a.modo === 'obs') extra += `<div class="acoes-al"><span class="muted" style="font-size:var(--fs-xs)">Texto disponível em “Incluir observação” (etapa Finalizar), para ${a.dest === 'prestador' ? 'a resposta ao prestador' : 'a observação da guia'}.</span></div>`;
-    const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
-    if (pedeConferi(a)) extra += `<div class="acoes-al"><label class="chk" style="font-size:var(--fs-sm);font-weight:600"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label></div>`;
-    const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
-    return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico)}</span><div class="tx"><div style="margin-bottom:2px">${tagModo(a.modo, a.nivel)}</div>${esc(a.texto)}</div>${extra}</div>`;
-  }).join('');
-  return lista || `<div class="al info"><span>${ic('check')}</span><div class="tx">Nenhum alerta para esta guia.</div></div>`;
+  const ordem = a => ({ bloqueio: 0, obs: 1, atencao: 2 }[a.modo]);
+  const principais = st.A.filter(a => !(a.modo === 'atencao' && a.nivel === 'info')).sort((a, b) => ordem(a) - ordem(b));
+  const infos = st.A.filter(a => a.modo === 'atencao' && a.nivel === 'info');
+  const l1 = principais.map(a => htmlUmAlerta(a, g)).join('');
+  const l2 = infos.length ? `<details class="al-infos"><summary>${infos.length} informativo(s)</summary><div class="alertas">${infos.map(a => htmlUmAlerta(a, g)).join('')}</div></details>` : '';
+  return (l1 || l2) ? l1 + l2 : `<div class="al info"><span>${ic('check', 'sm')}</span><div class="tx">Nenhum alerta para esta guia.</div></div>`;
 }
 function htmlPainelAlertas(g, st) {
-  return `<section class="card painel-al ${st.bloqueios.length ? 'tem-bloqueio' : ''}" aria-label="Alertas e ocorrências">
-    <div class="al-h">${ic(st.bloqueios.length ? 'ban' : 'bell', 'lg')}<h2>Alertas e ocorrências</h2>
+  const tot = st.A.filter(pedeConferi).length, pend = atencaoPendente(g, st).length;
+  return `<section class="card painel-al compacto ${st.bloqueios.length ? 'tem-bloqueio' : ''}" aria-label="Alertas e ocorrências">
+    <div class="al-h">${ic(st.bloqueios.length ? 'ban' : 'bell')}<h2>Alertas e ocorrências</h2>
       ${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : '<span class="tag ok">' + ic('check', 'sm') + 'Sem bloqueios</span>'}
       ${st.obs.length ? `<span class="tag obs">${ic('message', 'sm')}${st.obs.length} com observação</span>` : ''}
-      ${(() => { const tot = st.A.filter(pedeConferi).length, pend = atencaoPendente(g, st).length; return tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} de atenção a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Atenção conferida</span>`) : ''; })()}</div>
+      ${tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Conferido</span>`) : ''}</div>
     <div class="al-corpo"><div class="alertas" id="alertas">${htmlAlertas(g, st)}</div></div></section>`;
 }
 
@@ -2213,6 +2297,7 @@ function render() {
   renderTopo();
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
+  if (aba === 'quadro') return renderQuadro(app);
   if (aba === 'config') return renderConfig(app);
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
@@ -2257,9 +2342,19 @@ function realceEmail() {
   if (e.cortado && e.restante) html += `\n\n<span class="hist">${esc(e.restante)}</span>`;
   return html;
 }
+function htmlUltimaGuia() {
+  const cl = clinicaDe(S), linhas = [], vistos = new Set();
+  S.guias.forEach(g => {
+    const cart = g.carteiraUsada || g.pedido.carteira; if (!cart || vistos.has(cart)) return; vistos.add(cart);
+    const r = Reg.ultimaGuia(cart, S.atendId); if (!r) return;
+    const outra = r.clinicaId && cl && r.clinicaId !== cl.id || (!cl && r.clinica);
+    linhas.push(`<div class="ult-linha">${S.guias.length > 1 ? `<span class="muted">${esc(nomeGuia(g))}:</span> ` : ''}<b class="num">${esc(r.guia)}</b> <span class="muted">· ${fmtData(r.concluidoEm)}</span>${outra ? ` <span class="tag obs">${ic('building', 'sm')}${esc(r.clinica)}</span>` : ''}</div>`);
+  });
+  return linhas.length ? `<div class="ult-guia">${ic('clip')}<div><div class="eyebrow">Última guia gerada para ${vistos.size > 1 ? 'estes pacientes' : 'este paciente'}</div>${linhas.join('')}</div></div>` : '';
+}
 function htmlEmailCard() {
   const e = S.email, cl = clinicaDe(S);
-  return `<div class="card"><div class="card-h"><h2>E-mail recebido</h2></div>
+  return `${htmlUltimaGuia()}<div class="card"><div class="card-h"><h2>E-mail recebido</h2></div>
     <dl class="email-meta">
       <dt>De</dt><dd>${esc(e.remetente.nome)} <span class="num">&lt;${esc(e.remetente.email)}&gt;</span> ${cl ? htmlClinica(cl) : `<span class="tag obs">${ic('info', 'sm')}Remetente não cadastrado</span>`}</dd>
       <dt>Recebido</dt><dd>${fmtDH(e.data)}</dd>
@@ -2278,7 +2373,7 @@ function renderVisao(alvo) {
     <div class="tabela-scroll"><table class="t"><thead><tr><th>Guia</th><th>Beneficiário</th><th>Carteira</th><th>Serviços (código × qtd.)</th><th>Estado</th><th>Alertas</th><th></th></tr></thead><tbody>
     ${S.guias.map((g, i) => { const st = situacaoGuia(g); return `<tr><td class="c"><span class="sq idc idc-${i % 10}">${i + 1}</span></td><td class="pri">${esc(nomeGuia(g))}</td><td class="num">${esc(g.carteiraUsada || g.pedido.carteiraBruta || '—')}</td>
       <td class="num">${g.pedido.itens.map(it => `${it.codigo} × ${it.qtd ?? '?'}`).join('<br>') || '—'}</td>
-      <td>${g.status === 'concluido' ? tagResultado(g.resultado.situacao) + ' <span class="num">' + esc(g.numero) + '</span>' : tagStatus(g.status)} ${tagParam(g.param)}</td>
+      <td>${g.status === 'concluido' ? tagResultado(g.resultado.situacao) + (g.numero && !g.semGuia ? ' <span class="num">' + esc(g.numero) + '</span>' : '') : tagStatus(g.status)} ${tagParam(g.param)}</td>
       <td>${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : ''} ${st.obs.length + atencaoPendente(g, st).length ? `<span class="tag warn">${ic('alert', 'sm')}${st.obs.length + atencaoPendente(g, st).length}</span>` : ''}</td>
       <td class="c"><button class="btn sm pri" data-act="selGuia" data-i="${i}">${g.status === 'concluido' ? 'Ver guia' : 'Abrir guia'}${ic('right', 'sm')}</button></td></tr>`; }).join('')}
     </tbody></table></div>
@@ -2287,7 +2382,7 @@ function renderVisao(alvo) {
       ${!multi ? `<button class="btn pri" data-act="selGuia" data-i="0">Seguir para o pedido${ic('right')}</button>` : ''}
       ${multi ? `<button class="btn ${todas ? 'pri' : 'line'}" data-act="respostaEmail">${ic('mail')}Resposta do e-mail (todas as guias)</button>` : ''}
       <span class="esp"></span>
-      ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : `<button class="btn" data-act="salvarFechar">${ic('pause')}Salvar e fechar</button>`}
+      ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}
       <button class="btn dng" data-act="descartar">${ic('trash')}Descartar e-mail</button>
     </div></div></div>`;
 }
@@ -2357,9 +2452,8 @@ function renderPedido(alvo, g) {
       ${htmlBannerParam(g)}
       <div class="card">
         <div class="card-h"><h2>Responder sem gerar guia</h2></div>
-        <p class="dica">Use quando o pedido não puder virar guia. A resposta é montada para você revisar; nada é enviado automaticamente.</p>
+        <p class="dica">Use quando o pedido não puder virar guia. Escolha o motivo: a guia segue direto para a etapa final com o texto da resposta, e é concluída sem número. Em e-mails com várias guias, a pendência vai junto na resposta única, no fim. Nada é enviado automaticamente.</p>
         <div class="linha-flex">${MODELOS_SEM_GUIA.map(k => `<button class="btn line" data-act="respSemGuia" data-modelo="${k}">${ic('mail')}${esc(nomeModelo(k))}</button>`).join('')}</div>
-        ${g.status === 'aguardando_clinica' ? `<div class="aviso" style="margin-top:12px">${ic('mail')}<div>Esta guia está marcada como <b>Aguardando clínica</b>.</div></div>` : ''}
       </div>
     </div>
   </div>
@@ -2369,7 +2463,6 @@ function renderPedido(alvo, g) {
     <button class="btn pri" data-act="irVista" data-v="3" ${st.pode ? '' : 'disabled'} title="${st.pode ? '' : 'Resolva os bloqueios ou responda à clínica'}">Seguir para a guia${ic('right')}</button>
     <span class="esp"></span>
     ${S.guias.length > 1 ? `<button class="btn ghost" data-act="ignorarGuia">${ic('x')}Ignorar esta solicitação</button>` : ''}
-    <button class="btn" data-act="salvarFechar">${ic('pause')}Salvar e fechar</button>
     <button class="btn dng" data-act="descartar">${ic('trash')}Descartar e-mail</button>
   </div>
   ${!st.pode ? `<p class="dica">${ic('ban', 'sm')} Há bloqueio: corrija os dados, ou responda à clínica cobrando a informação.</p>` : ''}`;
@@ -2440,7 +2533,7 @@ function renderGuia(alvo, g) {
   <div class="acoes" style="margin-top:0">
     <button class="btn" data-act="irVista" data-v="2">${ic('left')}Pedido e alertas</button>
     <button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'} title="${podeSeguir ? '' : 'Conclua a conferência sem divergências'}">Seguir para finalizar${ic('right')}</button>
-    <span class="esp"></span><button class="btn" data-act="salvarFechar">${ic('pause')}Salvar e fechar</button>
+    <span class="esp"></span>
   </div>
   ${!podeSeguir ? `<p class="dica">${cegaExigida() ? 'Para seguir: conclua a conferência da grade sem divergências.' : 'Resolva os bloqueios para seguir.'}</p>` : ''}
   </div>`;
@@ -2501,6 +2594,7 @@ function htmlResultadoCega(r) {
    ==================================================================== */
 function pendenciasConclusao(g, st) {
   const P = [], r = g.resultado;
+  if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
   if (!/^T\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T + 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
   if (r.situacao === 'parcial') {
@@ -2540,6 +2634,7 @@ function htmlCardObs(g) {
       </div>`;
 }
 function renderFinal(alvo, g) {
+  if (g.semGuia) return renderFinalSemGuia(alvo, g);
   const r = g.resultado, st = situacaoGuia(g), guiaOk = /^T\d{8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
   const showResp = mostraResposta(g), multi = usaConsolidada(), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
@@ -2581,20 +2676,38 @@ function renderFinal(alvo, g) {
           ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>
         <p class="dica" style="margin:8px 0 0">“Com formatação” preserva negrito, cor e listas ao colar no e-mail. “Texto simples” copia sem nenhuma formatação.</p>`}
       </div>
-      <div class="card">
-        <div class="card-h"><h2>Situações recorrentes</h2></div>
-        <p class="dica">Geram um texto completo para você revisar e copiar, usando os dados desta guia.</p>
-        <div class="linha-flex">${[...MODELOS_SITUACAO, ...MODELOS_PERSONALIZADOS].map(k => `<button class="btn line" data-act="respSituacao" data-modelo="${k}" title="${esc(usoModelo(k))}">${ic('message')}${esc(MODELOS_SITUACAO.includes(k) ? BOTOES_SITUACAO[k] : nomeModelo(k))}</button>`).join('')}</div>
-      </div>
     </div>` : ''}
   </div>
   ${htmlPainelAlertas(g, st)}
   <div class="acoes" style="margin-top:0">
     <button class="btn" data-act="irVista" data-v="3">${ic('left')}Guia e conferência</button>
     <span class="esp"></span>
-    <button class="btn" data-act="salvarFechar">${ic('pause')}Salvar e fechar</button>
     <button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>
   </div>
+  ${pend.length ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+}
+function renderFinalSemGuia(alvo, g) {
+  const multi = usaConsolidada(), showResp = mostraResposta(g), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
+  const frag = renderModelo(g.semGuia + '_multi', ctxDe(g, extrasSemGuia(g, g.semGuia)), { marcar: true });
+  const resp = showResp ? respostaDaGuia(g, true) : null, r = g.resultado;
+  const html = g.respEdit != null ? g.respEdit : (resp ? resp.html : '');
+  const emailOk = r.emailPrestador && g.copiados.email === r.emailPrestador, pend = pendenciasConclusao(g, situacaoGuia(g));
+  alvo.innerHTML = `<div class="stack">
+  <div class="card"><div class="card-h"><h2>Responder sem gerar guia${multi ? ` — guia ${g.idx + 1}` : ''}</h2><span class="tag obs">${ic('mail', 'sm')}${esc(nomeModelo(g.semGuia))}</span><span class="esp"></span><button class="btn sm line" data-act="desfazerSemGuia">${ic('left', 'sm')}Voltar e gerar a guia</button></div>
+    <p class="dica" style="margin:0">Esta guia será concluída <b>sem número</b>. O motivo segue na resposta ao prestador${multi ? ', junto com as demais guias do e-mail' : ''}.</p>
+    ${multi && !showResp ? `<div class="aviso" style="margin-top:10px">${ic('info')}<div>A resposta única com todas as guias aparece na última guia (faltam ${faltam}). Abaixo, o trecho desta guia.</div></div>` : ''}
+    ${multi ? `<h3>Trecho desta guia na resposta única</h3><div class="previa"><div class="previa-c">${frag.html}</div></div>` : ''}
+  </div>
+  ${showResp ? `<div class="card"><div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2><span class="esp"></span></div>
+    <div class="cp-campo" style="margin-bottom:10px"><div class="wrapin"><label class="lbl" for="emailPrest">E-mail do prestador</label><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}"></div>
+      <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button></div>
+    ${resp && resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
+    ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
+    <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
+      ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div></div>` : ''}
+  </div>
+  <div class="acoes" style="margin-top:12px"><button class="btn" data-act="desfazerSemGuia">${ic('left')}Pedido e alertas</button><span class="esp"></span>
+    <button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button></div>
   ${pend.length ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
 }
 function renderConcluida(alvo, g) {
@@ -2602,13 +2715,13 @@ function renderConcluida(alvo, g) {
   const prox = S.guias.findIndex(x => !guiaTerminal(x)), todas = S.guias.every(guiaTerminal);
   alvo.innerHTML = `<div class="grid2"><div class="stack">
     <div class="card"><div class="card-h"><h2>Guia concluída${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagResultado(r.situacao)}${tagParam(g.param)}</div>
-      <dl class="kv"><dt>Número da guia</dt><dd class="num"><b>${esc(g.numero)}</b></dd><dt>Beneficiário</dt><dd>${esc(nomeGuia(g))}</dd><dt>Carteira</dt><dd class="num">${esc(g.carteiraUsada)}</dd>
+      <dl class="kv">${g.semGuia ? `<dt>Situação</dt><dd>Guia não gerada: ${esc(nomeModelo(g.semGuia))}</dd>` : `<dt>Número da guia</dt><dd class="num"><b>${esc(g.numero)}</b></dd>`}<dt>Beneficiário</dt><dd>${esc(nomeGuia(g))}</dd><dt>Carteira</dt><dd class="num">${esc(g.carteiraUsada)}</dd>
       ${a.length ? `<dt>Autorizados</dt><dd>${a.map(i => `<span class="num">${i.codigo}</span> × ${i.qtd ?? '?'}`).join('<br>')}</dd>` : ''}
       ${n.length ? `<dt>Não autorizados</dt><dd>${n.map(x => `<span class="num">${x.it.codigo}</span> × ${x.it.qtd ?? '?'}${x.motivo ? ' — ' + esc(x.motivo) : ''}`).join('<br>')}</dd>` : ''}
       ${r.situacao === 'nao' && (r.motivoId || r.motivoTxt) ? `<dt>Motivo</dt><dd>${esc([motivoNome(r.motivoId), r.motivoTxt].filter(Boolean).join(' — '))}</dd>` : ''}</dl>
       <div class="acoes"><button class="btn line" data-act="reabrirGuia">${ic('edit')}Reabrir para correção</button><span class="esp"></span>
         ${prox >= 0 ? `<button class="btn pri" data-act="selGuia" data-i="${prox}">Próxima guia pendente${ic('right')}</button>` : ''}
-        ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${htmlCardObs(g)}</div>
+        ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${g.semGuia ? '' : htmlCardObs(g)}</div>
     ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta ao prestador${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
       <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
@@ -2617,32 +2730,6 @@ function renderConcluida(alvo, g) {
 /* ====================================================================
    Modais: resposta rápida, resposta do e-mail, observação, parametrização
    ==================================================================== */
-function abrirModalResposta({ titulo, sub, html, modelo, semGuia, faltando }) {
-  M = { tipo: 'resp', modelo, semGuia: !!semGuia, copiou: false };
-  abrirModal({
-    titulo, sub, icone: 'mail', tamanho: 'g',
-    corpo: `${faltando && faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
-      ${htmlEditor({ id: 'edModal', valor: html, minAltura: 280 })}
-      <p class="dica" style="margin:8px 0 0">Revise e edite à vontade. “Com formatação” preserva negrito, cor e listas ao colar no e-mail; “texto simples” copia sem formatação. Nada é enviado automaticamente.</p>`,
-    rodape: `<span class="dica" id="modalEstado">${semGuia ? 'Depois de copiar e responder à clínica, marque a guia como aguardando retorno.' : ''}</span>
-      <button class="btn" data-act="fecharModal">Fechar</button>
-      <button class="btn line" data-act="copiarModalSimples">${ic('copy')}Copiar texto simples</button>
-      <button class="btn pri" data-act="copiarModalRico">${ic('copy')}Copiar com formatação</button>
-      ${semGuia ? `<button class="btn" id="btnAguardando" data-act="marcarAguardando" disabled title="Disponível depois de copiar a resposta">${ic('mail')}Marcar como aguardando clínica</button>` : ''}`
-  });
-}
-function abrirRespSemGuia(modelo) {
-  const g = guiaAtiva(); const extra = {};
-  if (modelo === 'pendencia') extra.problemas = problemasDe(g);
-  if (modelo === 'ja_autorizado') { const a = guiaAnterior(g); if (a) extra.anterior = a; }
-  const r = renderModelo(modelo, ctxDe(g, extra), { marcar: true });
-  abrirModalResposta({ titulo: nomeModelo(modelo), sub: 'Responder sem gerar guia', html: r.html, modelo, semGuia: true, faltando: r.faltando });
-}
-function abrirRespSituacao(modelo) {
-  const g = guiaAtiva();
-  const r = renderModelo(modelo, ctxDe(g), { marcar: true });
-  abrirModalResposta({ titulo: nomeModelo(modelo), sub: 'Texto gerado com os dados desta guia', html: r.html, modelo, faltando: r.faltando });
-}
 function abrirRespostaEmail() {
   const g = guiaAtiva() || S.guias[0], pend = S.guias.filter(x => !guiaTerminal(x)).length;
   const r = renderModelo('resposta_multipla', ctxDe(g), { marcar: true });
@@ -2730,7 +2817,6 @@ let conc = null;    // resultado da conciliação
 let amostra = null;
 const resultadoDe = r => (r.resultado && r.resultado.situacao) || (r.status === 'concluido' ? 'autorizada' : '');
 function proximoPasso(r) {
-  if (r.status === 'aguardando_clinica') return 'Aguardar a resposta da clínica';
   if (r.status !== 'em_andamento') return '';
   const e = r.etapa || 2;
   return e <= 2 ? 'Resolver alertas e confirmar os dados do pedido' : e === 3 ? 'Lançar no sistema e conferir a grade' : 'Informar número e resultado da guia';
@@ -2771,7 +2857,7 @@ async function renderPainel(app) {
   const emails = unicos(regs.map(r => r.atendimentoId || r.messageId)).length;
   const pegos = concl.filter(r => (r.conferencia?.divergencias || []).length).length;
   const tempo = concl.length ? (concl.reduce((s, r) => s + (r.duracaoSeg || 0), 0) / concl.length / 60).toFixed(1).replace('.', ',') + ' min' : '—';
-  const acao = regs.filter(r => r.status === 'em_andamento' || r.status === 'aguardando_clinica');
+  const acao = regs.filter(r => r.status === 'em_andamento');
   const porClinica = {}; regs.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
   const maxC = Math.max(1, ...Object.values(porClinica).map(x => x.n));
   const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean));
@@ -2784,7 +2870,7 @@ async function renderPainel(app) {
   <div class="kpis">${[
     ['info', emails, 'E-mails com atendimento', true], ['', regs.length, 'Guias no dia', true],
     ['ok', n(r => resultadoDe(r) === 'autorizada'), 'Autorizadas'], ['warn', n(r => resultadoDe(r) === 'parcial'), 'Parcialmente autorizadas'], ['bad', n(r => resultadoDe(r) === 'nao'), 'Não autorizadas'],
-    ['warn', n(r => r.status === 'aguardando_clinica'), 'Aguardando clínica'], ['info', n(r => r.status === 'em_andamento'), 'Em andamento'], ['ac', n(r => r.parametrizado), 'Parametrizadas'],
+    ['obs', n(r => resultadoDe(r) === 'sem_guia'), 'Sem guia gerada (pendência)'], ['info', n(r => r.status === 'em_andamento'), 'Em andamento'], ['ac', n(r => r.parametrizado), 'Parametrizadas'],
     ['', pegos, 'Divergências pegas na conferência'], ['', concl.length ? tempo : 0, 'Tempo médio por guia']
   ].filter(k => k[3] || (k[1] && k[1] !== 0)).map(([c, v, t]) => `<div class="kpi ${c}"><b>${v}</b><span>${t}</span></div>`).join('')}
   </div>
@@ -2800,7 +2886,7 @@ async function renderPainel(app) {
     <div class="card-h"><h2>Guias do dia (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
     <div class="filtros" style="margin-bottom:12px">
       <div><label class="lbl" for="fQ">Buscar</label><div class="busca">${ic('search', 'sm')}<input type="search" id="fQ" data-fp="q" value="${esc(painelFiltro.q)}" placeholder="Carteira, guia, clínica, código…"></div></div>
-      <div><label class="lbl" for="fS">Status</label><select id="fS" data-fp="status"><option value="">Todos</option>${['em_andamento', 'concluido', 'aguardando_clinica'].map(s => `<option value="${s}" ${painelFiltro.status === s ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select></div>
+      <div><label class="lbl" for="fS">Status</label><select id="fS" data-fp="status"><option value="">Todos</option>${['em_andamento', 'concluido'].map(s => `<option value="${s}" ${painelFiltro.status === s ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select></div>
       <div><label class="lbl" for="fR">Resultado</label><select id="fR" data-fp="res"><option value="">Todos</option>${Object.entries(SIT_ROTULO).map(([k, v]) => `<option value="${k}" ${painelFiltro.res === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div><label class="lbl" for="fC">Clínica</label><select id="fC" data-fp="clinica"><option value="">Todas</option>${clinicasDia.map(id => { const c = cfg.clinicas.find(x => x.id === id); return `<option value="${esc(id)}" ${painelFiltro.clinica === id ? 'selected' : ''}>${esc(c ? c.nome : id)}</option>`; }).join('')}</select></div>
       <div><label class="lbl" for="fP">Parametrização</label><select id="fP" data-fp="param"><option value="">Todas</option><option value="sim" ${painelFiltro.param === 'sim' ? 'selected' : ''}>Parametrizadas</option><option value="nao" ${painelFiltro.param === 'nao' ? 'selected' : ''}>Não parametrizadas</option></select></div>
@@ -2891,6 +2977,33 @@ function conciliarGuias() {
   ${soRel.length ? `<p class="dica">Guias geradas no sistema sem conferência registrada na página:</p><p class="num">${soRel.join(' · ')}</p>` : ''}
   ${soPag.length ? `<p class="dica">Registradas na página mas ausentes no relatório (número digitado errado?):</p><ul>${soPag.map(r => `<li class="num">${esc(r.guia)} — ${esc(r.operador)} · ${esc(r.clinica || '')} · ${esc(r.carteira)}</li>`).join('')}</ul>` : ''}`;
   $('#resConc').innerHTML = conc;
+}
+
+/* ====================================================================
+   Aba Ações: onde está cada guia (lendo o pedido, gerando guia, anexando e-mail)
+   ==================================================================== */
+async function renderQuadro(app) {
+  app.innerHTML = '<p class="muted">Carregando…</p>';
+  await Reg.carregar();
+  const hoje = isoDia(new Date());
+  const mapa = new Map();
+  Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento').forEach(r => mapa.set(r.id, r));
+  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => mapa.set(g.id, montarRegistro(g, 'em_andamento')));   // o que está aberto aqui vale mais que o arquivo
+  const lista = [...mapa.values()].sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
+  const cols = [
+    [2, 'Lendo o pedido', 'search', 'Pedido e alertas (etapas 1 e 2)'],
+    [3, 'Gerando guia', 'filecheck', 'Guia e conferência (etapa 3)'],
+    [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
+  ];
+  const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
+  app.innerHTML = `<div class="card"><div class="card-h"><h2>Ações em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? lista.length + ' guia(s)' : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar</button></div>
+    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está. O operador aparece só como contexto: qualquer pessoa pode abrir e continuar.</p></div>
+  <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
+    return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
+    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
+      return `<div class="card-q"><div class="t1">${esc(r.pacienteIni || 'Paciente')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
+      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${(r.itens || []).length} item(ns) · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
+      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}<span style="flex:1"></span><button class="btn sm pri" data-act="abrirReg" data-id="${r.id}">${ic('right', 'sm')}Abrir</button></div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }
 
 /* ====================================================================
@@ -3032,18 +3145,19 @@ function cfgClinicaDetalhe(cl, i) {
 }
 
 /* ---------- 4/5/6. Modelos ---------- */
+const nomeCfg = k => k.endsWith('_multi') ? nomeCfg(k.slice(0, -6)) + ' (várias guias)' : cfgEdit.modelos[k].nome;
 function cfgModelos(chave, filtro, titulo, desc) {
   const keys = Object.keys(MODELOS_PADRAO).filter(filtro);
   if (!keys.includes(cfgModeloSel[chave])) cfgModeloSel[chave] = keys[0];
   const grupos = unicos(keys.map(k => MODELOS_META[k].grupo));
   return `<div class="card">${cabSecao(titulo, desc)}<div class="mestre" style="grid-template-columns:minmax(220px,280px) minmax(0,1fr)">
-    <div class="modelo-lista" role="listbox" aria-label="Modelos">${grupos.map(gr => `<div class="eyebrow" style="margin:10px 0 4px">${esc(gr)}</div>${keys.filter(k => MODELOS_META[k].grupo === gr).map(k => `<button class="modelo-item ${cfgModeloSel[chave] === k ? 'ativa' : ''}" role="option" aria-selected="${cfgModeloSel[chave] === k}" data-act="modeloSel" data-c="${chave}" data-k="${k}"><b data-eco="modelos.${k}.nome">${esc(cfgEdit.modelos[k].nome)}</b><small>${MODELOS_META[k].destino === 'email' ? 'E-mail com formatação' : 'Texto simples'}</small></button>`).join('')}`).join('')}</div>
+    <div class="modelo-lista" role="listbox" aria-label="Modelos">${grupos.map(gr => `<div class="eyebrow" style="margin:10px 0 4px">${esc(gr)}</div>${keys.filter(k => MODELOS_META[k].grupo === gr).map(k => `<button class="modelo-item ${cfgModeloSel[chave] === k ? 'ativa' : ''}" role="option" aria-selected="${cfgModeloSel[chave] === k}" data-act="modeloSel" data-c="${chave}" data-k="${k}"><b ${k.endsWith('_multi') ? '' : `data-eco="modelos.${k}.nome"`}>${esc(nomeCfg(k))}</b><small>${MODELOS_META[k].destino === 'email' ? 'E-mail com formatação' : 'Texto simples'}</small></button>`).join('')}`).join('')}</div>
     <div id="modeloArea">${htmlModeloArea(cfgModeloSel[chave])}</div></div></div>`;
 }
 function htmlModeloArea(k) {
   const meta = MODELOS_META[k], m = cfgEdit.modelos[k], rico = meta.destino === 'email';
   return `<div class="stack">
-    <div class="card" style="box-shadow:none"><div class="card-h"><h2 data-eco="modelos.${k}.nome">${esc(m.nome)}</h2>${rico ? `<span class="tag ac">${ic('mail', 'sm')}E-mail com formatação</span>` : `<span class="tag info">${ic('info', 'sm')}Texto simples</span>`}<span class="esp"></span><button class="btn sm ghost" data-act="modeloRestaurar" data-k="${k}" title="Volta ao texto original do sistema">${ic('undo', 'sm')}Restaurar texto padrão</button></div>
+    <div class="card" style="box-shadow:none"><div class="card-h"><h2 ${k.endsWith('_multi') ? '' : `data-eco="modelos.${k}.nome"`}>${esc(nomeCfg(k))}</h2>${rico ? `<span class="tag ac">${ic('mail', 'sm')}E-mail com formatação</span>` : `<span class="tag info">${ic('info', 'sm')}Texto simples</span>`}<span class="esp"></span><button class="btn sm ghost" data-act="modeloRestaurar" data-k="${k}" title="Volta ao texto original do sistema">${ic('undo', 'sm')}Restaurar texto padrão</button></div>
       ${meta.custom ? `<div class="form-grid" style="margin-bottom:12px"><div><label class="lbl" for="mdNome">Nome do modelo (aparece no botão)</label><input type="text" id="mdNome" data-cfg="modelos.${k}.nome" value="${esc(m.nome)}" maxlength="60"></div>
         <div style="grid-column:1/-1"><label class="lbl" for="mdUso">Descrição (quando usar)</label><input type="text" id="mdUso" data-cfg="modelos.${k}.uso" value="${esc(m.uso || '')}" maxlength="200"><div class="campo-ajuda">Aparece como dica ao passar o mouse sobre o botão do modelo na etapa Finalizar e abaixo do título aqui.</div></div></div>` : `<p class="dica"><b>Quando é usado:</b> ${esc(meta.uso)}</p>`}
       ${rico ? '' : `<div class="aviso-simples" style="margin-bottom:10px">${ic('info')}<div>Este texto é copiado como <b>texto simples</b> (o campo de destino do sistema oficial não aceita formatação). Por isso o editor não oferece negrito, cor ou listas aqui.</div></div>`}
@@ -3154,7 +3268,7 @@ async function abrirArquivo(f) {
   } catch (e) { console.error(e); toast('Não consegui ler esse .eml: ' + e.message, 'bad'); }
 }
 async function iniciar(email, { idx } = {}) {
-  await Reg.carregar(); await Param.carregar();
+  await Reg.carregarTudo(); await Param.carregar();
   S = novoEstado(email);
   const restauradas = restaurarDeRegistros(S);
   const multi = S.guias.length > 1;
@@ -3170,7 +3284,7 @@ function finalizarAtendimento(texto) {
   if (texto) { ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido); }
   S = null; persistir(); render(); window.scrollTo(0, 0); toast('Registrado.');
 }
-function resumoUltimo(g) { const cl = clinicaDe(S); return `${g.numero || 'sem número'} — ${SIT_ROTULO[g.resultado.situacao] || STATUS[g.status]} · ${g.pedido.itens.length} item(ns), ${cl ? cl.nome : S.email.remetente.email}`; }
+function resumoUltimo(g) { const cl = clinicaDe(S); if (g.semGuia) return `Sem guia gerada (${nomeModelo(g.semGuia)}) · ${cl ? cl.nome : S.email.remetente.email}`; return `${g.numero || 'sem número'} — ${SIT_ROTULO[g.resultado.situacao] || STATUS[g.status]} · ${g.pedido.itens.length} item(ns), ${cl ? cl.nome : S.email.remetente.email}`; }
 async function depoisDeGuiaTratada(g, texto) {
   ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido);
   if (S.guias.length === 1) { finalizarAtendimento(texto); return; }
@@ -3181,7 +3295,7 @@ async function depoisDeGuiaTratada(g, texto) {
 }
 function mudarVista(v) {
   const g = guiaAtiva(); S.vista = v;
-  if (v >= 2) { g.vista = v; g.etapa = Math.max(g.etapa, v); }
+  if (v >= 2) { g.vista = v; g.etapa = Math.max(g.etapa, v); if (g.status === 'em_andamento') gravarGuia(g, 'em_andamento'); }
   persistir(); render(); window.scrollTo(0, 0);
 }
 const alterarCampoGuia = (g, campo, v) => {
@@ -3206,7 +3320,7 @@ const acoes = {
   /* ---- gerais ---- */
   aba(b) {
     if (aba === 'config' && cfgDirty && b.dataset.aba !== 'config' && !confirm('Há alterações não salvas nas configurações. Sair e descartá-las?')) return;
-    aba = b.dataset.aba; if (aba !== 'config') { cfgEdit = null; cfgDirty = false; cfgErros = []; } render();
+    aba = b.dataset.aba; if (aba === 'atend' && !S) { /* nada */ } if (aba !== 'config') { cfgEdit = null; cfgDirty = false; cfgErros = []; } render();
   },
   async pasta() {
     if (!Pasta.suportado) { toast('Use o Google Chrome ou o Edge para acessar a pasta compartilhada.', 'bad'); return; }
@@ -3235,14 +3349,11 @@ const acoes = {
   },
   irVista(b) {
     const v = +b.dataset.v, g = guiaAtiva(), st = situacaoGuia(g);
+    if (g.semGuia && g.status !== 'concluido' && v >= 2 && v !== 4) { acoes.desfazerSemGuia(); return; }
     if (v === 3 && !st.pode) { toast('Resolva os bloqueios antes de seguir.', 'bad'); return; }
     if (v === 4 && g.status !== 'concluido' && !podeFinal(g, st)) { toast('Conclua a conferência antes de finalizar.', 'bad'); return; }
     if (v >= 3 && g.status !== 'concluido') gravarGuia(g, g.status);
     mudarVista(v);
-  },
-  async salvarFechar() {
-    for (const g of S.guias) if (!guiaTerminal(g)) await gravarGuia(g, 'em_andamento');
-    finalizarAtendimento('Salvo para continuar depois — ' + (clinicaDe(S) ? clinicaDe(S).nome : S.email.remetente.email));
   },
   async descartar() {
     if (!confirm('Descartar este e-mail? Use para mensagens que não são pedidos (evoluções, avisos, arquivo errado). As guias já concluídas são mantidas.')) return;
@@ -3384,7 +3495,7 @@ const acoes = {
   async copiarResp() {
     const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
-    const r = await copiarRico(html, texto);
+    const r = await copiarRico(htmlParaEmail(html), texto);
     if (!r) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
   },
@@ -3395,25 +3506,29 @@ const acoes = {
     g.copiados.resp = true; persistir(); render(); toast('Resposta copiada como texto simples.');
   },
   resetResp() { const g = guiaAtiva(); g.respEdit = null; g.respExtras = []; g.respInc = []; persistir(); render(); },
-  async copiarRespConcluida() { const r = respostaDaGuia(guiaAtiva(), false); const ok = await copiarRico(r.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1'), r.texto); toast(ok ? 'Resposta copiada.' : 'Não foi possível copiar.', ok ? '' : 'bad'); },
+  async copiarRespConcluida() { const r = respostaDaGuia(guiaAtiva(), false); const ok = await copiarRico(htmlParaEmail(r.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')), r.texto); toast(ok ? 'Resposta copiada.' : 'Não foi possível copiar.', ok ? '' : 'bad'); },
   async concluirGuia() {
     const g = guiaAtiva(), st = situacaoGuia(g), pend = pendenciasConclusao(g, st);
     if (pend.length) { toast(pend[0], 'bad'); return; }
+    if (g.semGuia) { g.resultado.situacao = 'sem_guia'; g.numero = ''; }
     await gravarGuia(g, 'concluido'); g.vista = 4; g.etapa = 4;
     await depoisDeGuiaTratada(g, resumoUltimo(g));
   },
   async reabrirGuia() { const g = guiaAtiva(); g.status = 'em_andamento'; g.vista = 4; await gravarGuia(g, 'em_andamento'); mudarVista(4); toast('Guia reaberta para correção.'); },
 
   /* ---- respostas rápidas ---- */
-  respSemGuia(b) { abrirRespSemGuia(b.dataset.modelo); },
-  respSituacao(b) { abrirRespSituacao(b.dataset.modelo); },
+  respSemGuia(b) {
+    const g = guiaAtiva(); g.semGuia = b.dataset.modelo; g.respEdit = null; g.respExtras = []; g.respInc = []; g.resultado.situacao = null;
+    g.vista = 4; g.etapa = 4; gravarGuia(g, 'em_andamento'); mudarVista(4);
+  },
+  desfazerSemGuia() { const g = guiaAtiva(); g.semGuia = null; g.respEdit = null; g.respExtras = []; mudarVista(2); },
   respostaEmail() { abrirRespostaEmail(); },
   async copiarModalRico() {
     const html = serializarEditor($('#edModal')), texto = htmlPlano(html);
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
-    const r = await copiarRico(html, texto); if (!r) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
-    M.copiou = true; const bt = $('#btnAguardando'); if (bt) { bt.disabled = false; bt.removeAttribute('title'); }
+    const r = await copiarRico(htmlParaEmail(html), texto); if (!r) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} ${r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples (o navegador não permitiu formatação).'}`; toast(r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples.');
   },
   async copiarModalSimples() {
@@ -3421,17 +3536,11 @@ const acoes = {
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
     if (!(await copiar(texto))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
-    M.copiou = true; const bt = $('#btnAguardando'); if (bt) { bt.disabled = false; bt.removeAttribute('title'); }
+    M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} Copiado como texto simples.`; toast('Copiado como texto simples.');
   },
-  async marcarAguardando() {
-    if (!M || !M.copiou) { toast('Copie a resposta antes de marcar como aguardando.', 'bad'); return; }
-    const g = guiaAtiva(), modelo = M.modelo; fecharModal(true);
-    await gravarGuia(g, 'aguardando_clinica', { modeloResposta: modelo });
-    await depoisDeGuiaTratada(g, `Aguardando clínica — ${g.pedido.beneficiario || S.email.remetente.email} (${nomeModelo(modelo)})`);
-  },
-
   /* ---- painel do dia ---- */
+  atualizarQuadro() { render(); },
   atualizarPainel() { painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
   limparFiltros() { painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' }; render(); },
   exportarCsv() {
@@ -3454,7 +3563,7 @@ const acoes = {
   async abrirReg(b) {
     const r = Reg.cache.find(x => x.id === b.dataset.id); if (!r) return;
     if (S && S.atendId === r.atendimentoId) { const i = S.guias.findIndex(g => g.id === r.id); aba = 'atend'; if (i >= 0) { S.ativa = i; acoes.selGuia({ dataset: { i } }); return; } render(); return; }
-    if (S && !confirm('Há um atendimento aberto neste computador. Salvar e fechar para abrir outro?')) return;
+    if (S && !confirm('Há um atendimento aberto neste computador. O andamento já está salvo. Abrir outro mesmo assim?')) return;
     if (S) { for (const g of S.guias) if (!guiaTerminal(g)) await gravarGuia(g, 'em_andamento'); S = null; persistir(); }
     if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
     abrirPendente = { messageId: r.messageId, idxGuia: r.idxGuia || 0 };
