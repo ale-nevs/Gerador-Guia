@@ -120,7 +120,7 @@ button.chip:active{transform:translateY(1px)}
 :root[data-theme=dark] .chip.pasta.alerta{color:var(--warn-fg)}
 .chip.tema{padding:0 10px}
 .avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:50%;background:var(--c-bg,var(--surface-3));color:var(--c-fg,var(--text-2));border:1px solid var(--c-br,var(--border))}
-.avatar .ic{width:13px;height:13px}
+.avatar .emoji{font-size:13px;line-height:1}.avatar.lg .emoji{font-size:21px}.tag .emoji{font-size:12px;line-height:1}.av-op .emoji{font-size:20px;line-height:1}
 .avatar.lg{width:34px;height:34px}.avatar.lg .ic{width:19px;height:19px}
 .sq{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:6px;background:var(--c-bg);color:var(--c-fg);border:1px solid var(--c-br);font-size:10.5px;font-weight:750;letter-spacing:.02em}
 .sq.lg{width:34px;height:34px;font-size:13px;border-radius:9px}
@@ -134,7 +134,7 @@ nav.abas button.ativo{background:var(--primary);color:var(--on-primary)}
 nav.abas button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 main{width:100%;max-width:1600px;margin:0 auto;padding:12px 12px 28px;flex:1}
 @media (min-width:640px){main{padding:12px 24px 28px}}
-main > * + *{margin-top:12px}
+main > * + *{margin-top:10px}
 
 .guias-bar{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px}
 .guia-tab{display:flex;align-items:center;gap:9px;flex:none;min-width:190px;max-width:290px;text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:var(--r);padding:8px 12px;cursor:pointer;box-shadow:var(--shadow)}
@@ -162,20 +162,20 @@ main > * + *{margin-top:12px}
 .passo:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 
 /* ===== Cartões ===== */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow)}
-.card + .card{margin-top:12px}
-.card-h{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;box-shadow:var(--shadow)}
+.card + .card{margin-top:10px}
+.card-h{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-bottom:8px}
 .card-h h2{font-size:var(--fs-lg);font-weight:700;color:var(--soft-fg);letter-spacing:-.005em}
 .card-h .esp{flex:1}
-.card h3,.sec-t{font-size:var(--fs-md);font-weight:650;color:var(--soft-fg);margin:16px 0 8px}
+.card h3,.sec-t{font-size:var(--fs-md);font-weight:650;color:var(--soft-fg);margin:12px 0 6px}
 .eyebrow{font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
-.dica{color:var(--text-2);font-size:var(--fs-sm);margin:0 0 10px}
+.dica{color:var(--text-2);font-size:var(--fs-xs);margin:0 0 6px}
 .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:12px;align-items:start}
 .grid2 > div > .card + .card{margin-top:12px}
 @media (max-width:1000px){.grid2{grid-template-columns:1fr}}
-.stack > * + *{margin-top:12px}
+.stack > * + *{margin-top:10px}
 .linha-flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
 .acoes .esp{flex:1}
 
 /* ===== Botões ===== */
@@ -216,19 +216,19 @@ input:disabled,select:disabled,textarea:disabled{opacity:.6;cursor:not-allowed;b
 input.invalido,select.invalido{border-color:var(--bad-solid);box-shadow:0 0 0 1px var(--bad-solid)}
 input[type=checkbox],input[type=radio]{width:16px;height:16px;min-height:0;accent-color:var(--primary);margin:0;flex:none}
 label.chk{display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:var(--fs-md)}
-.lbl{display:block;font-size:var(--fs-sm);font-weight:600;color:var(--text-2);margin-bottom:4px}
+.lbl{display:block;font-size:var(--fs-xs);font-weight:600;color:var(--text-2);margin-bottom:3px}
 .campo-ajuda{font-size:var(--fs-xs);color:var(--text-2);margin-top:4px}
 .campo-erro{font-size:var(--fs-xs);color:var(--bad-fg);margin-top:4px;display:flex;gap:5px;align-items:center}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 16px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px}
 input[type=file]{font-size:var(--fs-sm);color:var(--text-2);max-width:100%}input[type=file]::file-selector-button{border:1px solid var(--soft-br);background:var(--soft);color:var(--soft-fg);border-radius:var(--r-sm);padding:6px 12px;margin-right:10px;font:inherit;font-weight:600;cursor:pointer}input[type=file]::file-selector-button:hover{background:var(--soft-2)}.busca{position:relative}
 .busca .ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);pointer-events:none}
 .busca input{padding-left:32px}
 
 /* Campos de cópia (dados do pedido) */
-.cp-grupo{border:1px solid var(--border);border-radius:var(--r);background:var(--surface-2);padding:12px 14px}
+.cp-grupo{border:1px solid var(--border);border-radius:var(--r);background:var(--surface-2);padding:8px 12px}
 .cp-grupo + .cp-grupo{margin-top:10px}
 .cp-grupo > .eyebrow{display:block;margin-bottom:8px}
-.cp-linha{display:grid;grid-template-columns:minmax(150px,200px) 1fr;gap:6px 14px;align-items:start;padding:7px 0}
+.cp-linha{display:grid;grid-template-columns:minmax(140px,180px) 1fr;gap:4px 12px;align-items:start;padding:4px 0}
 .cp-linha + .cp-linha{border-top:1px dashed var(--border)}
 @media (max-width:640px){.cp-linha{grid-template-columns:1fr}}
 .cp-linha > .rot{font-size:var(--fs-sm);font-weight:600;color:var(--text);padding-top:7px}
@@ -312,7 +312,7 @@ label.chk.conferi{font-size:var(--fs-xs);font-weight:650;align-items:center;gap:
 /* ===== Tabelas (cabeçalho azul, grade fina) ===== */
 .tabela-scroll{overflow:auto;max-height:64vh;border-radius:var(--r-sm)}
 table.t{border-collapse:collapse;width:100%}
-.t th,.t td{text-align:left;padding:6px 9px;border:1px solid var(--grid);vertical-align:middle;font-size:var(--fs-sm)}
+.t th,.t td{text-align:left;padding:4px 7px;border:1px solid var(--grid);vertical-align:middle;font-size:var(--fs-sm)}
 .t th{font-weight:700;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;background:var(--th);color:var(--on-th);text-align:center;position:sticky;top:0;z-index:1}
 .t td.pri{background:var(--soft);color:var(--soft-fg);font-weight:650}
 .t td.c,.t th.c{text-align:center}
@@ -331,8 +331,8 @@ table.t{border-collapse:collapse;width:100%}
 .res-bad ul{margin:6px 0 0;padding-left:20px;color:var(--text)}
 
 /* ===== Finalização ===== */
-.sit-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-.sit{position:relative;display:flex;gap:10px;align-items:flex-start;text-align:left;border:2px solid var(--border);background:var(--surface);border-radius:var(--r);padding:12px;cursor:pointer;color:var(--text)}
+.sit-opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.sit{position:relative;display:flex;gap:8px;align-items:center;text-align:left;border:2px solid var(--border);background:var(--surface);border-radius:var(--r);padding:8px 12px;cursor:pointer;color:var(--text)}
 .sit:hover{border-color:var(--border-strong);background:var(--surface-2)}
 .sit:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .sit b{display:block;font-size:var(--fs-md)}
@@ -417,11 +417,11 @@ pre.simples{white-space:pre-wrap;font-family:var(--font-sans);margin:0}
 .aviso-simples{display:flex;gap:8px;align-items:flex-start;background:var(--info-bg);color:var(--info-fg);border:1px solid var(--info-br);border-radius:var(--r-sm);padding:9px 12px;font-size:var(--fs-sm)}
 
 /* ===== Configurações ===== */
-.cfg{display:grid;grid-template-columns:230px minmax(0,1fr);gap:12px;align-items:start}
+.cfg{display:grid;grid-template-columns:250px minmax(0,1fr);gap:10px;align-items:start}
 @media (max-width:900px){.cfg{grid-template-columns:1fr}}
 .cfg-nav{position:sticky;top:76px;display:flex;flex-direction:column;gap:2px;padding:8px}
-@media (max-width:900px){.cfg-nav{position:static;flex-direction:row;overflow-x:auto}}
-.cfg-nav button{display:flex;align-items:center;gap:9px;border:0;background:transparent;border-radius:var(--r-sm);padding:9px 11px;font-size:var(--fs-sm);font-weight:600;color:var(--text-2);cursor:pointer;text-align:left;white-space:nowrap}
+@media (max-width:900px){.cfg-nav{position:static;flex-direction:row;overflow-x:auto}.cfg-nav button{white-space:nowrap}}
+.cfg-nav button{display:flex;align-items:center;gap:9px;border:0;background:transparent;border-radius:var(--r-sm);padding:8px 10px;font-size:var(--fs-sm);font-weight:600;line-height:1.25;color:var(--text-2);cursor:pointer;text-align:left;white-space:normal;overflow-wrap:anywhere}
 .cfg-nav button:hover{background:var(--surface-2);color:var(--text)}
 .cfg-nav button.ativo{background:var(--soft);color:var(--soft-fg)}
 .cfg-nav button:focus-visible{outline:2px solid var(--focus)}
@@ -625,8 +625,11 @@ const ICONES = {
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>'
 };
 const ic = (n, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n] || ''}</svg>`;
-const AVATARES = ['user', 'smile', 'star', 'heart', 'shield', 'briefcase', 'headphones', 'coffee', 'leaf', 'zap', 'anchor', 'sun'];
-const AVATAR_NOME = { user: 'Pessoa', smile: 'Sorriso', star: 'Estrela', heart: 'Coração', shield: 'Escudo', briefcase: 'Maleta', headphones: 'Fones', coffee: 'Café', leaf: 'Folha', zap: 'Raio', anchor: 'Âncora', sun: 'Sol' };
+const ANIMAIS = [['🐶', 'Cachorro'], ['🐱', 'Gato'], ['🦊', 'Raposa'], ['🐻', 'Urso'], ['🐼', 'Panda'], ['🐨', 'Coala'], ['🦁', 'Leão'], ['🐯', 'Tigre'], ['🐸', 'Sapo'], ['🐵', 'Macaco'], ['🦉', 'Coruja'], ['🐧', 'Pinguim'], ['🐢', 'Tartaruga'], ['🦄', 'Unicórnio'], ['🐙', 'Polvo'], ['🦋', 'Borboleta']];
+const AVATARES = ANIMAIS.map(a => a[0]);
+const AVATAR_NOME = Object.fromEntries(ANIMAIS);
+const animalAleatorio = () => AVATARES[Math.floor(Math.random() * AVATARES.length)];
+const glifo = e => `<span class="emoji" aria-hidden="true">${e}</span>`;
 const CORES_ID = [
   ['idc-0', 'Azul'], ['idc-1', 'Ciano'], ['idc-2', 'Verde-água'], ['idc-3', 'Verde'], ['idc-4', 'Oliva'],
   ['idc-5', 'Índigo'], ['idc-6', 'Violeta'], ['idc-7', 'Magenta'], ['idc-8', 'Rosa'], ['idc-9', 'Terra']
@@ -1560,7 +1563,7 @@ const CAMPOS = [
   { k: 'CID', cat: 'Dados do pedido médico', nome: 'CID', desc: 'Diagnóstico informado no pedido.', ex: 'F84', opc: true, fn: c => c.g.pedido.cid },
   { k: 'OBS_PEDIDO', cat: 'Dados do pedido médico', nome: 'Observações do pedido', desc: 'Texto do campo Observações do e-mail.', ex: 'Atendimento domiciliar', opc: true, fn: c => c.g.pedido.obs },
   // Guia
-  { k: 'GUIA', cat: 'Dados da guia', nome: 'Número da guia', desc: 'Número gerado pelo sistema oficial (T + 8 dígitos).', ex: 'T12345678', fn: c => c.g.numero },
+  { k: 'GUIA', cat: 'Dados da guia', nome: 'Número da guia', desc: 'Número gerado pelo sistema oficial (T ou S + 8 dígitos).', ex: 'T12345678', fn: c => c.g.numero },
   { k: 'GUIA_ANTERIOR', cat: 'Dados da guia', nome: 'Guia anterior', desc: 'Guia já autorizada para a mesma carteira e código (modelo "Já autorizado").', ex: 'T11112222', fn: c => (c.extra.anterior || {}).guia },
   { k: 'DATA_ANTERIOR', cat: 'Dados da guia', nome: 'Data da guia anterior', desc: 'Data em que a guia anterior foi concluída.', ex: '02/09/2026', fn: c => (c.extra.anterior || {}).data },
   { k: 'DATA_EMAIL', cat: 'Dados da guia', nome: 'Data do e-mail', desc: 'Data e hora de recebimento do pedido.', ex: '10/09/2026 08:15', fn: c => fmtDH(c.S.email.data) },
@@ -1596,10 +1599,10 @@ function dataPedidoTxt(p) { const em = p.emissao; return em.estado === 'valida' 
 /* ---------- Alertas: catálogo único. O comportamento real vem de cfg.alertas. ---------- */
 /* modos: bloqueio | obs (aviso com observação) | atencao (aviso de atenção) | desativado */
 const MODOS = {
-  bloqueio: { nome: 'Bloqueio', icone: 'ban', desc: 'Impede seguir e concluir a guia enquanto a condição não for resolvida (ou tratada respondendo à clínica sem gerar guia).' },
-  obs: { nome: 'Aviso com observação', icone: 'message', desc: 'Permite continuar, mas oferece o texto para incluir na observação da guia ou na resposta ao prestador.' },
-  atencao: { nome: 'Aviso de atenção', icone: 'alert', desc: 'Só mostra uma indicação ao operador. Não insere texto e não impede a conclusão.' },
-  desativado: { nome: 'Desativado', icone: 'x', desc: 'O alerta deixa de ser verificado.' }
+  bloqueio: { nome: 'Bloqueio', icone: 'ban', desc: 'Impede seguir até resolver.' },
+  obs: { nome: 'Aviso com observação', icone: 'message', desc: 'Continua, e oferece texto para a observação.' },
+  atencao: { nome: 'Aviso de atenção', icone: 'alert', desc: 'Só avisa. Não impede nada.' },
+  desativado: { nome: 'Desativado', icone: 'x', desc: 'Não é verificado.' }
 };
 const ALERTAS = {
   'falta-benef': { grupo: 'Identificação', nome: 'Beneficiário não informado', desc: 'O pedido não traz o nome do beneficiário.', modo: 'bloqueio' },
@@ -1677,10 +1680,10 @@ const ctxDe = (g, extra = {}) => ({ S, g, extra });
 function configPadrao() {
   return {
     operadores: [
-      { id: 'alipio', nome: 'Alípio', icone: 'user', cor: 'idc-0' },
-      { id: 'rafael', nome: 'Rafael', icone: 'user', cor: 'idc-1' },
-      { id: 'thiago', nome: 'Thiago', icone: 'user', cor: 'idc-2' },
-      { id: 'apoio', nome: 'Apoio', icone: 'headphones', cor: 'idc-5' }
+      { id: 'alipio', nome: 'Alípio', icone: '🦊', cor: 'idc-0' },
+      { id: 'rafael', nome: 'Rafael', icone: '🐻', cor: 'idc-1' },
+      { id: 'thiago', nome: 'Thiago', icone: '🦉', cor: 'idc-2' },
+      { id: 'apoio', nome: 'Apoio', icone: '🐧', cor: 'idc-5' }
     ],
     clinicas: [],
     modelos: Object.fromEntries(Object.entries(MODELOS_PADRAO).map(([k, m]) => [k, { nome: m.nome, html: padraoHtml(m.texto), uso: (MODELOS_META[k] || {}).custom ? MODELOS_META[k].uso : undefined }])),
@@ -1693,7 +1696,7 @@ function normOperadores(lista) {
   const ids = new Set();
   return (lista || []).map(o => typeof o === 'string' ? { nome: o } : o).filter(o => o && String(o.nome || '').trim()).map((o, i) => {
     let id = o.id || slug(o.nome); while (ids.has(id)) id += '-' + i; ids.add(id);
-    return { id, nome: String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : 'user', cor: corClasse(o.cor || 'idc-' + (i % 10)) };
+    return { id, nome: String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : AVATARES[(i * 3 + 2) % AVATARES.length], cor: corClasse(o.cor || 'idc-' + (i % 10)) };
   });
 }
 function mesclarConfig(base, c) {
@@ -1760,10 +1763,10 @@ function operadorObj() {
 }
 const operador = () => (operadorObj() || {}).nome || '';
 const operadorPorNomeOuId = (nome, id) => cfg.operadores.find(o => o.id === id) || cfg.operadores.find(o => o.nome === nome) || null;
-function htmlAvatar(o, lg) { return o ? `<span class="avatar idc ${corClasse(o.cor)} ${lg ? 'lg' : ''}" title="${esc(o.nome)}">${ic(o.icone)}</span>` : `<span class="avatar ${lg ? 'lg' : ''}">${ic('user')}</span>`; }
+function htmlAvatar(o, lg) { return o ? `<span class="avatar idc ${corClasse(o.cor)} ${lg ? 'lg' : ''}" title="${esc(o.nome)}">${glifo(o.icone)}</span>` : `<span class="avatar ${lg ? 'lg' : ''}">${ic('user')}</span>`; }
 function htmlOperador(nome, id) {
   const o = operadorPorNomeOuId(nome, id);
-  return o ? `<span class="tag id idc ${corClasse(o.cor)}">${ic(o.icone, 'sm')}${esc(o.nome)}</span>` : (nome ? `<span class="tag">${ic('user', 'sm')}${esc(nome)}</span>` : '');
+  return o ? `<span class="tag id idc ${corClasse(o.cor)}">${glifo(o.icone)}${esc(o.nome)}</span>` : (nome ? `<span class="tag">${ic('user', 'sm')}${esc(nome)}</span>` : '');
 }
 const iniciais = nome => (String(nome).trim().split(/\s+/).filter(w => w.length > 2 || /^[A-ZÀ-Ý]/.test(w)).slice(0, 2).map(w => w[0]).join('') || '?').toUpperCase();
 const corClinica = cl => cl ? corPorTexto(cl.id) : '';
@@ -1919,32 +1922,6 @@ function novoEstado(email) {
   st.guias = lp.blocos.map((b, i) => novaGuia(b, i, st));
   return st;
 }
-/* Retoma um atendimento já registrado (mesmo e-mail): reaproveita ids e o resultado das guias já concluídas */
-function restaurarDeRegistros(st) {
-  const regs = Reg.cache.filter(r => !r.tipo && r.messageId === st.email.messageId && r.status !== 'descartado');
-  if (!regs.length) return 0;
-  st.atendId = regs[0].atendimentoId || st.atendId;
-  let n = 0;
-  st.guias.forEach(g => {
-    const r = regs.filter(x => x.idxGuia === g.idx).sort((a, b) => (a.atualizadoEm < b.atualizadoEm ? 1 : -1))[0];
-    if (!r) return;
-    n++; g._rest = true; g.id = r.id; g.abertoPor = r.abertoPor || r.operador || g.abertoPor; g.abertoEm = r.abertoEm || g.abertoEm;
-    if (r.carteira && !g.carteiraUsada) g.carteiraUsada = r.carteira;
-    g.param = r.parametrizado || null;
-    g.status = r.status === 'concluido' || r.status === 'aguardando_clinica' ? r.status : 'em_andamento';
-    g.etapa = r.etapa || 2; g.vista = Math.min(4, Math.max(2, r.etapa || 2));
-    if (r.status === 'concluido') {
-      g.numero = r.guia || '';
-      const rs = r.resultado || { situacao: 'autorizada' };
-      g.resultado.situacao = rs.situacao === 'autorizada' ? 'autorizada' : rs.situacao;
-      g.resultado.motivoId = rs.motivoId || ''; g.resultado.motivoTxt = rs.motivoTxt || ''; g.resultado.naoAut = rs.naoAut || {};
-      g.cega.ok = true; g.vista = 4;
-      if (rs.situacao === 'sem_guia') { g.semGuia = rs.modelo || null; g.resultado.situacao = 'sem_guia'; }
-    }
-  });
-  return n;
-}
-
 /* ---------- Serviços: descrição de referência e estado de cadastro ---------- */
 function descCadastro(cl, codigo) { return cl && cl.codigos ? cl.codigos[codigo] : undefined; }
 function divergeDesc(cad, desc) {
@@ -2028,8 +2005,8 @@ function avaliar(g) {
   if (e.origem === 'colado') add('colado', 'Texto colado: remetente informado à mão, sem verificação pelo cabeçalho do e-mail.');
   /* duplicidade */
   Reg.cache.filter(r => !r.tipo && r.messageId === e.messageId && r.atendimentoId !== S.atendId && r.status !== 'descartado').slice(0, 1).forEach(r =>
-    add('mesmo-email', `Este e-mail já tem registro de outro atendimento: ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)} (${STATUS[r.status] || r.status}). Você pode continuar normalmente.`));
-  if (/^T\d{8}$/.test(g.numero)) {
+    add('mesmo-email', `Este e-mail já tem registro de outro atendimento: ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)} (${STATUS[r.status] || r.status}).`));
+  if (/^[TS]\d{8}$/.test(g.numero)) {
     const o = Reg.cache.find(r => !r.tipo && r.guia === g.numero && r.id !== g.id);
     if (o) add('guia-repetida', `A guia ${g.numero} já foi registrada por ${o.operador || 'operador'} em ${fmtDH(o.atualizadoEm)} (${o.clinica || 'sem clínica'}). Confira o número.`);
   }
@@ -2310,7 +2287,7 @@ function render() {
 function renderEntrada(app) {
   const semOp = !operador();
   app.innerHTML = `
-  ${semOp ? `<div class="aviso">${ic('user')}<div>Escolha seu nome em <b>Operador</b>, no topo, antes de começar. O operador identifica quem registrou o atendimento; qualquer pessoa pode continuar o trabalho de outra.</div></div>` : ''}
+  ${semOp ? `<div class="aviso">${ic('user')}<div>Escolha seu nome em <b>Operador</b>, no topo, antes de começar.</div></div>` : ''}
   ${!Pasta.ok ? `<div class="aviso">${ic('folderx')}<div>${Pasta.handle ? 'A pasta compartilhada precisa ser reautorizada (um clique por dia).' : 'A pasta compartilhada não está conectada: os registros ficam só neste computador e não há visão conjunta entre operadores.'}</div><span class="acoes"><button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${Pasta.handle ? 'Reautorizar pasta' : 'Conectar pasta'}</button></span></div>` : ''}
   ${ultimoConcluido ? `<div class="ultimo">${ic('check')}<div>Último registrado: <b>${esc(ultimoConcluido.texto)}</b> às ${fmtHora(ultimoConcluido.em)}.</div></div>` : ''}
   <div class="vazio" id="zona">
@@ -2322,7 +2299,6 @@ function renderEntrada(app) {
   <div class="card">
     <details>
       <summary>Sem o arquivo? Colar o texto do e-mail</summary>
-      <p class="dica" style="margin-top:8px">Use só se não for possível baixar o .eml. O remetente não é verificado.</p>
       <div class="form-grid">
         <div><label class="lbl" for="coladoDe">E-mail do remetente</label><input type="text" id="coladoDe" placeholder="contato@clinica.com.br"></div>
         <div style="grid-column:1/-1"><label class="lbl" for="coladoTxt">Corpo do e-mail</label><textarea id="coladoTxt" rows="9"></textarea></div>
@@ -2369,7 +2345,7 @@ function renderVisao(alvo) {
   alvo.innerHTML = `<div class="stack">
   ${htmlEmailCard()}
   <div class="card"><div class="card-h"><h2>${multi ? `Guias deste e-mail (${S.guias.length})` : 'Solicitação deste e-mail'}</h2><span class="esp"></span>${multi ? `<span class="tag ${S.guias.filter(g => g.pedido && chaveBenef(g.pedido)).length ? 'ac' : ''}">${ic('user', 'sm')}${unicos(S.guias.map(g => g.chave)).length} beneficiário(s) diferente(s)</span>` : ''}</div>
-    ${multi ? `<p class="dica">Cada beneficiário (ou cada solicitação) gera uma guia independente, com seus próprios dados, serviços e resultado. Conclua uma e continue nas demais.</p>` : ''}
+    
     <div class="tabela-scroll"><table class="t"><thead><tr><th>Guia</th><th>Beneficiário</th><th>Carteira</th><th>Serviços (código × qtd.)</th><th>Estado</th><th>Alertas</th><th></th></tr></thead><tbody>
     ${S.guias.map((g, i) => { const st = situacaoGuia(g); return `<tr><td class="c"><span class="sq idc idc-${i % 10}">${i + 1}</span></td><td class="pri">${esc(nomeGuia(g))}</td><td class="num">${esc(g.carteiraUsada || g.pedido.carteiraBruta || '—')}</td>
       <td class="num">${g.pedido.itens.map(it => `${it.codigo} × ${it.qtd ?? '?'}`).join('<br>') || '—'}</td>
@@ -2408,7 +2384,7 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
 }
 function htmlEditarItens(g) {
   const linhas = g._edit || g.pedido.itens.map(i => ({ codigo: i.codigo, desc: i.desc, qtd: i.qtd ?? '' }));
-  return `<p class="dica">Corrige a leitura <b>deste e-mail</b>. Não altera cadastros de clínica nem parametrizações.</p>
+  return `<p class="dica">Corrige só a leitura deste e-mail.</p>
   <div class="tabela-scroll"><table class="t" id="tabEdicao"><thead><tr><th>Código (8 dígitos)</th><th>Descrição do e-mail</th><th>Qtd.</th><th></th></tr></thead><tbody>
   ${linhas.map((it, i) => `<tr><td><input type="text" inputmode="numeric" data-ei="codigo" value="${esc(it.codigo)}" maxlength="12" aria-label="Código"></td><td><input type="text" data-ei="desc" value="${esc(it.desc)}" aria-label="Descrição do e-mail"></td><td style="width:90px"><input type="text" inputmode="numeric" data-ei="qtd" value="${esc(it.qtd)}" maxlength="3" aria-label="Quantidade"></td><td class="c"><button class="btn sm ghost ico" data-act="remItem" data-i="${i}" aria-label="Remover linha" title="Remover linha">${ic('trash', 'sm')}</button></td></tr>`).join('')}
   </tbody></table></div>
@@ -2452,7 +2428,6 @@ function renderPedido(alvo, g) {
       ${htmlBannerParam(g)}
       <div class="card">
         <div class="card-h"><h2>Responder sem gerar guia</h2></div>
-        <p class="dica">Use quando o pedido não puder virar guia. Escolha o motivo: a guia segue direto para a etapa final com o texto da resposta, e é concluída sem número. Em e-mails com várias guias, a pendência vai junto na resposta única, no fim. Nada é enviado automaticamente.</p>
         <div class="linha-flex">${MODELOS_SEM_GUIA.map(k => `<button class="btn line" data-act="respSemGuia" data-modelo="${k}">${ic('mail')}${esc(nomeModelo(k))}</button>`).join('')}</div>
       </div>
     </div>
@@ -2493,12 +2468,11 @@ function renderGuia(alvo, g) {
   <div class="stack">
   <div class="card">
     <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
-    <p class="dica">Preenchido a partir do pedido e do cadastro. Corrija qualquer campo se a leitura estiver errada. Cada botão copia só o valor do seu campo e fica verde depois de copiado.</p>
     <div class="cp-grupo"><span class="eyebrow">Prestador e solicitação</span>
-      <div class="cp-linha"><div class="rot">1. Credenciado executante${!exec ? '<small>Sem executante cadastrado para esta clínica. Informe aqui ou cadastre em Configurações.</small>' : '<small>Nome como aparece no sistema oficial</small>'}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
+      <div class="cp-linha"><div class="rot">1. Credenciado executante${!exec ? '<small>Não cadastrado: informe aqui</small>' : ''}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
       <div class="cp-linha"><div class="rot">2. Médico</div><div class="cp-campos">${campoCopia(g, { campo: 'medico_nome', rot: 'Nome do médico', sub: 'Nome' })}${campoCopia(g, { campo: 'medico_crm', rot: 'CRM do médico', sub: p.medico.conselho || 'CRM', curto: true, mono: true })}</div></div>
       <div class="cp-linha"><div class="rot">3. Local do pedido</div><div class="cp-campos">${campoCopia(g, { campo: 'local', rot: 'Local do pedido' })}</div></div>
-      <div class="cp-linha"><div class="rot">4. Data do pedido médico<small>dd/mm/aaaa</small></div><div class="cp-campos">${campoCopia(g, { campo: 'data', rot: 'Data do pedido médico', ph: 'dd/mm/aaaa', curto: true, mono: true })}</div></div>
+      <div class="cp-linha"><div class="rot">4. Data do pedido médico</div><div class="cp-campos">${campoCopia(g, { campo: 'data', rot: 'Data do pedido médico', ph: 'dd/mm/aaaa', curto: true, mono: true })}</div></div>
     </div>
     <div class="cp-grupo"><span class="eyebrow">Beneficiário</span>
       <div class="cp-linha"><div class="rot">5. Carteira / beneficiário</div><div class="cp-campos">${campoCopia(g, { campo: 'carteira', rot: 'Carteira', sub: 'Carteira', mono: true, mid: true })}${campoCopia(g, { campo: 'benef', rot: 'Nome do beneficiário', sub: 'Beneficiário' })}</div></div>
@@ -2512,7 +2486,6 @@ function renderGuia(alvo, g) {
       <button class="btn sm line" data-act="editarItens3" title="Corrige a leitura deste e-mail, sem alterar cadastros">${ic('edit', 'sm')}${g.editandoItens ? 'Cancelar correção' : 'Corrigir leitura'}</button>
       <button class="btn sm" data-act="parametrizar">${ic('layers', 'sm')}Parametrizar</button></div>
     ${g.editandoItens ? htmlEditarItens(g) : !g.cega.iniciada ? `
-    <p class="dica">Cole cada código e quantidade no sistema oficial (Guia TISS 02 · Classificação 31). A descrição cadastrada da clínica prevalece; a do e-mail fica ao lado para comparação.</p>
     ${htmlTabelaItens(g, { copiar: true })}
     <div class="acoes">${cegaExigida() ? `<button class="btn pri" data-act="iniciarCega" ${p.itens.length ? '' : 'disabled'}>${ic('eye')}Lancei todos os itens: conferir a grade</button>` : ''}</div>` :
       `<p class="muted">Lista oculta durante a conferência cega. <button class="btn sm line" data-act="verItens">${ic('refresh', 'sm')}Ver itens de novo (reinicia a conferência)</button></p>`}
@@ -2595,7 +2568,7 @@ function htmlResultadoCega(r) {
 function pendenciasConclusao(g, st) {
   const P = [], r = g.resultado;
   if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
-  if (!/^T\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T + 8 dígitos).');
+  if (!/^[TS]\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
   if (r.situacao === 'parcial') {
     const n = Object.keys(r.naoAut).length;
@@ -2610,10 +2583,10 @@ function pendenciasConclusao(g, st) {
 function optsMotivos(sel) { return `<option value="">Selecione o motivo…</option>` + cfg.motivos.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(m.nome)}</option>`).join(''); }
 function htmlSituacao(g) {
   const r = g.resultado;
-  const op = (v, i, t, d) => `<button type="button" class="sit ${v === 'nao' ? 'nao' : v} ${r.situacao === v ? 'on' : ''}" role="radio" aria-checked="${r.situacao === v}" data-act="setSit" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b><small>${d}</small></span></button>`;
+  const op = (v, i, t, d) => `<button type="button" class="sit ${v === 'nao' ? 'nao' : v} ${r.situacao === v ? 'on' : ''}" role="radio" aria-checked="${r.situacao === v}" data-act="setSit" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b></span></button>`;
   let extra = '';
   if (r.situacao === 'parcial') {
-    extra = `<p class="dica" style="margin-top:12px">Marque os itens <b>não autorizados</b>. Os demais são considerados autorizados.</p><div class="negados">${g.pedido.itens.map(it => { const neg = r.naoAut[it.codigo] != null; const ref = descRefItem(g, it); return `<div class="negado ${neg ? 'on' : ''}"><input type="checkbox" id="neg-${it.codigo}" data-neg="${it.codigo}" ${neg ? 'checked' : ''}><label for="neg-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label><select data-negmot="${it.codigo}" ${neg ? '' : 'disabled'} aria-label="Motivo da não autorização de ${it.codigo}">${optsMotivos(r.naoAut[it.codigo])}</select></div>`; }).join('')}</div>`;
+    extra = `<div class="negados">${g.pedido.itens.map(it => { const neg = r.naoAut[it.codigo] != null; const ref = descRefItem(g, it); return `<div class="negado ${neg ? 'on' : ''}"><input type="checkbox" id="neg-${it.codigo}" data-neg="${it.codigo}" ${neg ? 'checked' : ''}><label for="neg-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label><select data-negmot="${it.codigo}" ${neg ? '' : 'disabled'} aria-label="Motivo da não autorização de ${it.codigo}">${optsMotivos(r.naoAut[it.codigo])}</select></div>`; }).join('')}</div>`;
   }
   if (r.situacao === 'nao') {
     extra = `<div class="form-grid" style="margin-top:12px"><div><label class="lbl" for="rMotivo">Motivo da não autorização</label><select id="rMotivo" data-resf="motivoId">${optsMotivos(r.motivoId)}</select></div><div><label class="lbl" for="rMotivoTxt">Detalhe do motivo (opcional)</label><input type="text" id="rMotivoTxt" data-resf="motivoTxt" value="${esc(r.motivoTxt)}"></div></div>`;
@@ -2628,14 +2601,13 @@ function htmlCardObs(g) {
   return `<div class="card">
   <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
     <button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div>
-  <p class="dica">Observação interna da guia no sistema oficial. É diferente da mensagem ao prestador, ao lado.</p>
   <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
   <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
 }
 function renderFinal(alvo, g) {
   if (g.semGuia) return renderFinalSemGuia(alvo, g);
-  const r = g.resultado, st = situacaoGuia(g), guiaOk = /^T\d{8}$/.test(g.numero);
+  const r = g.resultado, st = situacaoGuia(g), guiaOk = /^[TS]\d{8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
   const showResp = mostraResposta(g), multi = usaConsolidada(), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
   const resp = showResp && (r.situacao || multi) ? respostaDaGuia(g, true) : null;
@@ -2650,12 +2622,12 @@ function renderFinal(alvo, g) {
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
         <div class="form-grid">
-          <div><label class="lbl" for="guia">Número da guia</label><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000" autocomplete="off" aria-describedby="guiaAjuda">
-            <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato esperado: T + 8 dígitos.' : 'Número gerado pelo sistema oficial. Nunca preencha um número que não foi gerado.'}</div></div>
+          <div><label class="lbl" for="guia">Número da guia</label><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
+            <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 8 dígitos.' : ''}</div></div>
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
               <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button></div>
-            <div class="campo-ajuda">Copia somente o endereço (sem assunto, nome ou histórico).</div></div>` : ''}
+            </div>` : ''}
         </div>
         <h3>Situação da autorização</h3>
         ${htmlSituacao(g)}
@@ -2673,8 +2645,7 @@ function renderFinal(alvo, g) {
         <div class="acoes"><button class="btn pri" data-act="copiarResp" ${guiaOk ? '' : 'disabled'} title="${guiaOk ? 'Copia texto formatado, para colar no e-mail' : 'Informe o número da guia'}">${ic('copy')}Copiar com formatação</button>
           <button class="btn line" data-act="copiarRespSimples" ${guiaOk ? '' : 'disabled'}>${ic('copy')}Copiar texto simples</button>
           ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}
-          ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>
-        <p class="dica" style="margin:8px 0 0">“Com formatação” preserva negrito, cor e listas ao colar no e-mail. “Texto simples” copia sem nenhuma formatação.</p>`}
+          ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>`}
       </div>
     </div>` : ''}
   </div>
@@ -2694,7 +2665,6 @@ function renderFinalSemGuia(alvo, g) {
   const emailOk = r.emailPrestador && g.copiados.email === r.emailPrestador, pend = pendenciasConclusao(g, situacaoGuia(g));
   alvo.innerHTML = `<div class="stack">
   <div class="card"><div class="card-h"><h2>Responder sem gerar guia${multi ? ` — guia ${g.idx + 1}` : ''}</h2><span class="tag obs">${ic('mail', 'sm')}${esc(nomeModelo(g.semGuia))}</span><span class="esp"></span><button class="btn sm line" data-act="desfazerSemGuia">${ic('left', 'sm')}Voltar e gerar a guia</button></div>
-    <p class="dica" style="margin:0">Esta guia será concluída <b>sem número</b>. O motivo segue na resposta ao prestador${multi ? ', junto com as demais guias do e-mail' : ''}.</p>
     ${multi && !showResp ? `<div class="aviso" style="margin-top:10px">${ic('info')}<div>A resposta única com todas as guias aparece na última guia (faltam ${faltam}). Abaixo, o trecho desta guia.</div></div>` : ''}
     ${multi ? `<h3>Trecho desta guia na resposta única</h3><div class="previa"><div class="previa-c">${frag.html}</div></div>` : ''}
   </div>
@@ -2857,7 +2827,6 @@ async function renderPainel(app) {
   const emails = unicos(regs.map(r => r.atendimentoId || r.messageId)).length;
   const pegos = concl.filter(r => (r.conferencia?.divergencias || []).length).length;
   const tempo = concl.length ? (concl.reduce((s, r) => s + (r.duracaoSeg || 0), 0) / concl.length / 60).toFixed(1).replace('.', ',') + ' min' : '—';
-  const acao = regs.filter(r => r.status === 'em_andamento');
   const porClinica = {}; regs.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
   const maxC = Math.max(1, ...Object.values(porClinica).map(x => x.n));
   const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean));
@@ -2874,14 +2843,8 @@ async function renderPainel(app) {
     ['', pegos, 'Divergências pegas na conferência'], ['', concl.length ? tempo : 0, 'Tempo médio por guia']
   ].filter(k => k[3] || (k[1] && k[1] !== 0)).map(([c, v, t]) => `<div class="kpi ${c}"><b>${v}</b><span>${t}</span></div>`).join('')}
   </div>
-  <div class="grid2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)">
-  <div class="card"><div class="card-h"><h2>O que ainda precisa ser feito</h2><span class="tag ${acao.length ? 'warn' : 'ok'}">${acao.length ? ic('clip', 'sm') + acao.length + ' guia(s)' : ic('check', 'sm') + 'Nada pendente'}</span></div>
-    ${acao.length ? acao.map(r => `<div class="linha-flex" style="padding:8px 0;border-top:1px solid var(--border)"><div style="flex:1;min-width:220px"><div>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)} ${tagStatus(r.status)} ${tagParam(r.parametrizado)}</div>
-      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}Carteira <span class="num">${esc(r.carteira || '—')}</span> — <b>${esc(proximoPasso(r))}</b></div></div>
-      <button class="btn sm pri" data-act="abrirReg" data-id="${r.id}">${ic('right', 'sm')}Abrir atendimento</button></div>`).join('') : '<p class="muted">Todas as guias do dia estão concluídas.</p>'}</div>
   <div class="card"><div class="card-h"><h2>Guias por clínica</h2></div>
     ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste dia.</p>'}</div>
-  </div>
   <div class="card">
     <div class="card-h"><h2>Guias do dia (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
     <div class="filtros" style="margin-bottom:12px">
@@ -2901,14 +2864,13 @@ async function renderPainel(app) {
       <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}${cs.length ? `<br><span class="tag bad">${ic('alert', 'sm')}${cs.length} correção(ões)</span>` : ''}</td>
       <td>${tagResultado(resultadoDe(r))}</td>
       <td>${tagParam(r.parametrizado)} ${(r.conferencia?.divergencias || []).length ? `<span class="tag warn">${ic('alert', 'sm')}${r.conferencia.divergencias.length} divergência(s)</span>` : ''} ${(r.alertas || []).some(a => a.m === 'obs') ? `<span class="tag obs">${ic('message', 'sm')}Aviso c/ obs.</span>` : ''}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:nowrap"><button class="btn sm" data-act="abrirReg" data-id="${r.id}">${r.status === 'concluido' ? 'Ver' : 'Abrir'}</button>${r.status === 'concluido' ? `<button class="btn sm line" data-act="abrirCorrecao" data-id="${r.id}">Registrar correção</button>` : ''}</div></td></tr>
+      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:nowrap">${r.status === 'concluido' ? `<button class="btn sm line" data-act="abrirCorrecao" data-id="${r.id}">Registrar correção</button>` : ''}</div></td></tr>
       <tr class="oculto" id="corr-${r.id}"><td colspan="10">${htmlFormCorrecao(r)}</td></tr>`;
     }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste dia.'}</td></tr>`}
     </tbody></table></div>
   </div>
   <div class="card">
     <div class="card-h"><h2>Amostragem do apoio</h2></div>
-    <p class="dica">Sorteia até 10 guias concluídas no dia (prioriza as com 4 ou mais itens) para conferir no sistema.</p>
     <div class="acoes" style="margin-top:0"><button class="btn" data-act="sortear">${ic('refresh')}Sortear amostra</button></div>
     ${amostra ? `<div class="tabela-scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Guia</th><th>Resultado</th><th>Carteira</th><th>Itens (código × qtd.)</th></tr></thead><tbody>${amostra.map(r => `<tr><td class="num">${esc(r.guia)}</td><td>${tagResultado(resultadoDe(r))}</td><td class="num">${esc(r.carteira)}</td><td class="num">${r.itens.map(i => i.c + ' × ' + i.q).join(' · ')}</td></tr>`).join('')}</tbody></table></div>` : ''}
   </div>
@@ -2917,12 +2879,12 @@ async function renderPainel(app) {
     <div class="grid2">
       <div>
         <h3 style="margin-top:0">E-mails recebidos × registros</h3>
-        <p class="dica">No SmarterMail, selecione os e-mails do dia (caixa e pastas das clínicas), baixe o ZIP e solte aqui. Também aceita vários .eml.</p>
+        <p class="dica">ZIP do SmarterMail ou vários .eml.</p>
         <input type="file" id="arqConc" accept=".zip,.eml" multiple>
       </div>
       <div>
         <h3 style="margin-top:0">Relatório de guias do sistema × registros</h3>
-        <p class="dica">Cole aqui o conteúdo do relatório de guias geradas no dia (a página pega todos os números T + 8 dígitos).</p>
+        <p class="dica">Cole o relatório de guias do dia.</p>
         <textarea id="txtRelatorio" rows="5"></textarea>
         <div class="acoes"><button class="btn" data-act="conciliarGuias">${ic('check')}Comparar guias</button></div>
       </div>
@@ -2968,7 +2930,7 @@ async function conciliarEmails(files) {
 }
 function conciliarGuias() {
   const txt = $('#txtRelatorio').value.toUpperCase();
-  const doRel = new Set([...txt.matchAll(/T\s?(\d{8})/g)].map(m => 'T' + m[1]));
+  const doRel = new Set([...txt.matchAll(/([TS])\s?(\d{8})/g)].map(m => m[1] + m[2]));
   const regs = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
   const daPag = new Set(regs.map(r => r.guia));
   const soRel = [...doRel].filter(g => !daPag.has(g)), soPag = regs.filter(r => !doRel.has(r.guia));
@@ -2997,13 +2959,13 @@ async function renderQuadro(app) {
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
   app.innerHTML = `<div class="card"><div class="card-h"><h2>Ações em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? lista.length + ' guia(s)' : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar</button></div>
-    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está. O operador aparece só como contexto: qualquer pessoa pode abrir e continuar.</p></div>
+    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está.</p></div>
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
     ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
       return `<div class="card-q"><div class="t1">${esc(r.pacienteIni || 'Paciente')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
       <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${(r.itens || []).length} item(ns) · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
-      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}<span style="flex:1"></span><button class="btn sm pri" data-act="abrirReg" data-id="${r.id}">${ic('right', 'sm')}Abrir</button></div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
+      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }
 
 /* ====================================================================
@@ -3089,12 +3051,12 @@ function htmlCfgSecao() {
   }
   return '';
 }
-const cabSecao = (t, d) => `<div class="card-h"><h2>${t}</h2></div>${d ? `<p class="dica">${d}</p>` : ''}`;
+const cabSecao = (t, d) => `<div class="card-h"><h2>${t}</h2></div>`;
 
 /* ---------- 1. Aparência ---------- */
 function cfgAparencia() {
   const p = Tema.pref();
-  const op = (v, i, t, d) => `<button type="button" class="sit ${p === v ? 'on autorizada' : ''}" role="radio" aria-checked="${p === v}" data-act="setTema" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b><small>${d}</small></span></button>`;
+  const op = (v, i, t, d) => `<button type="button" class="sit ${p === v ? 'on autorizada' : ''}" role="radio" aria-checked="${p === v}" data-act="setTema" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b></span></button>`;
   return `<div class="card">${cabSecao('Aparência', 'Vale para este computador e é lembrada ao reabrir o sistema. Também pode ser alternada pelo botão no topo da página.')}
     <div class="sit-opcoes" role="radiogroup" aria-label="Tema">${op('auto', 'settings', 'Automático', 'Acompanha o tema do Windows.')}${op('claro', 'sun', 'Modo claro', 'Fundo claro, ideal para ambientes iluminados.')}${op('escuro', 'moon', 'Modo escuro', 'Fundo escuro, reduz o brilho da tela.')}</div>
 </div>`;
@@ -3103,9 +3065,9 @@ function cfgAparencia() {
 /* ---------- 2. Perfil e identificação ---------- */
 function cfgPerfil() {
   return `<div class="card">${cabSecao('Perfil e identificação', 'Cada operador tem nome de exibição, ícone e cor. A identificação é só visual e de registro: não atribui atendimentos a ninguém, e qualquer operador pode continuar ou concluir o trabalho de outro.')}
-  ${cfgEdit.operadores.map((o, i) => `<div class="op-card"><div class="linha-flex" style="margin-bottom:10px">${htmlAvatar(o, true)}<b data-eco="operadores.${i}.nome">${esc(o.nome || 'Novo operador')}</b><span class="tag id idc ${o.cor}">${ic(o.icone, 'sm')}${esc(o.nome || 'Prévia')}</span><span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}">${ic('trash', 'sm')}Remover</button></div>
+  ${cfgEdit.operadores.map((o, i) => `<div class="op-card"><div class="linha-flex" style="margin-bottom:10px">${htmlAvatar(o, true)}<b data-eco="operadores.${i}.nome">${esc(o.nome || 'Novo operador')}</b><span class="tag id idc ${o.cor}">${glifo(o.icone)}${esc(o.nome || 'Prévia')}</span><span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}">${ic('trash', 'sm')}Remover</button></div>
     <div class="form-grid"><div><label class="lbl" for="opn-${i}">Nome de exibição</label><input type="text" id="opn-${i}" data-cfg="operadores.${i}.nome" value="${esc(o.nome)}"></div></div>
-    <div style="margin-top:12px"><span class="lbl">Ícone</span><div class="av-op" role="radiogroup" aria-label="Ícone">${AVATARES.map(a => `<button type="button" class="${o.icone === a ? 'on' : ''}" role="radio" aria-checked="${o.icone === a}" data-act="opIcone" data-i="${i}" data-v="${a}" title="${AVATAR_NOME[a]}" aria-label="${AVATAR_NOME[a]}">${ic(a)}</button>`).join('')}</div></div>
+    <div style="margin-top:12px"><span class="lbl">Animal</span><div class="av-op" role="radiogroup" aria-label="Ícone">${AVATARES.map(a => `<button type="button" class="${o.icone === a ? 'on' : ''}" role="radio" aria-checked="${o.icone === a}" data-act="opIcone" data-i="${i}" data-v="${a}" title="${AVATAR_NOME[a]}" aria-label="${AVATAR_NOME[a]}">${glifo(a)}</button>`).join('')}</div></div>
     <div style="margin-top:12px"><span class="lbl">Cor de identificação</span><div class="sw" role="radiogroup" aria-label="Cor">${CORES_ID.map(([c, n]) => `<button type="button" class="idc ${c} ${o.cor === c ? 'on' : ''}" role="radio" aria-checked="${o.cor === c}" data-act="opCor" data-i="${i}" data-v="${c}" title="${n}" aria-label="${n}">${o.cor === c ? ic('check', 'sm') : ''}</button>`).join('')}</div></div></div>`).join('')}
   <div class="acoes"><button class="btn line" data-act="opAdd">${ic('plus')}Adicionar operador</button></div></div>`;
 }
@@ -3127,16 +3089,14 @@ function cfgClinicaDetalhe(cl, i) {
     <div class="form-grid">
       <div><label class="lbl" for="cl-nome">Nome da clínica</label><input type="text" id="cl-nome" data-cfg="${P}.nome" value="${esc(cl.nome)}"></div>
       <div><label class="lbl" for="cl-cidade">Cidade</label><input type="text" id="cl-cidade" data-cfg="${P}.cidade" value="${esc(cl.cidade)}"></div>
-      <div style="grid-column:1/-1"><label class="lbl" for="cl-exec">Credenciado executante no sistema</label><input type="text" id="cl-exec" data-cfg="${P}.executante" value="${esc(cl.executante)}" placeholder="Não informado">
-        <div class="campo-ajuda">Exatamente como aparece no campo “Credenciado executante” do sistema oficial. É o valor copiado na etapa Guia e conferência.</div></div>
-      <div style="grid-column:1/-1"><label class="lbl" for="cl-apel">Apelidos usados no assunto</label><input type="text" id="cl-apel" data-cfg="${P}.apelidos" value="${esc(cl.apelidos)}" placeholder="Ex.: Criar, MRA"><div class="campo-ajuda">Palavras que a clínica usa no assunto, se diferentes do nome.</div></div>
+      <div style="grid-column:1/-1"><label class="lbl" for="cl-exec">Credenciado executante no sistema</label><input type="text" id="cl-exec" data-cfg="${P}.executante" value="${esc(cl.executante)}" placeholder="Não informado"></div>
+      <div style="grid-column:1/-1"><label class="lbl" for="cl-apel">Apelidos usados no assunto</label><input type="text" id="cl-apel" data-cfg="${P}.apelidos" value="${esc(cl.apelidos)}" placeholder="Ex.: Criar, MRA"></div>
     </div>
     <h3>E-mails do remetente</h3>
     <div class="chips-e">${cl.emails.map((e, j) => `<span class="chip-e">${esc(e)}<button data-act="clRemEmail" data-i="${i}" data-j="${j}" aria-label="Remover ${esc(e)}" title="Remover">${ic('x', 'sm')}</button></span>`).join('') || '<span class="muted" style="font-size:var(--fs-sm)">Nenhum e-mail cadastrado. Ao receber um pedido de remetente desconhecido, é possível vincular o e-mail à clínica na hora.</span>'}</div>
     <div class="linha-flex"><input type="email" id="novoEmail" placeholder="contato@clinica.com.br" style="flex:1;min-width:200px;width:auto" aria-label="Novo e-mail" data-enter="clAddEmail" data-i="${i}"><button class="btn line" data-act="clAddEmail" data-i="${i}">${ic('plus', 'sm')}Adicionar e-mail</button></div>
     <div class="card-h" style="margin-top:20px"><h3 style="margin:0">Códigos e descrições (${cl._lista.filter(x => x.c).length})</h3><span class="esp"></span>
       <button class="btn sm line" data-act="codImportar" data-i="${i}">${ic('upload', 'sm')}Colar lista</button><button class="btn sm line" data-act="codSugerir" data-i="${i}" title="Lista códigos de atendimentos concluídos que ainda não estão no cadastro, para você escolher quais adicionar">${ic('search', 'sm')}Sugerir a partir de atendimentos</button><button class="btn sm pri" data-act="codAdd" data-i="${i}">${ic('plus', 'sm')}Adicionar código</button></div>
-    <p class="dica">A descrição cadastrada é a referência exibida e conferida no atendimento; a do e-mail fica ao lado, só para comparação. Código sem cadastro gera aviso e usa a descrição do e-mail de forma provisória.</p>
     ${cl._lista.length ? `<div class="busca" style="margin-bottom:8px"><span class="sr"><label for="buscaCod">Buscar código</label></span>${ic('search', 'sm')}<input type="search" id="buscaCod" placeholder="Filtrar por código ou descrição" data-filtro="cod"></div>
     <div class="tabela-scroll" style="max-height:46vh"><table class="t" id="tabCod"><thead><tr><th style="width:150px">Código (8 dígitos)</th><th>Descrição oficial</th><th style="width:56px"></th></tr></thead><tbody>
     ${cl._lista.map((x, j) => `<tr data-busca="${esc(norm(x.c + ' ' + x.d))}"><td><input type="text" inputmode="numeric" class="num ${x.c && !/^\d{8}$/.test(x.c.trim()) ? 'invalido' : ''}" data-cfg="${P}._lista.${j}.c" value="${esc(x.c)}" maxlength="8" aria-label="Código ${j + 1}"></td><td><input type="text" data-cfg="${P}._lista.${j}.d" value="${esc(x.d)}" aria-label="Descrição do código ${j + 1}"></td><td class="c"><button class="btn sm ghost ico" data-act="codRem" data-i="${i}" data-j="${j}" aria-label="Remover código" title="Remover código">${ic('trash', 'sm')}</button></td></tr>`).join('')}
@@ -3159,14 +3119,13 @@ function htmlModeloArea(k) {
   return `<div class="stack">
     <div class="card" style="box-shadow:none"><div class="card-h"><h2 ${k.endsWith('_multi') ? '' : `data-eco="modelos.${k}.nome"`}>${esc(nomeCfg(k))}</h2>${rico ? `<span class="tag ac">${ic('mail', 'sm')}E-mail com formatação</span>` : `<span class="tag info">${ic('info', 'sm')}Texto simples</span>`}<span class="esp"></span><button class="btn sm ghost" data-act="modeloRestaurar" data-k="${k}" title="Volta ao texto original do sistema">${ic('undo', 'sm')}Restaurar texto padrão</button></div>
       ${meta.custom ? `<div class="form-grid" style="margin-bottom:12px"><div><label class="lbl" for="mdNome">Nome do modelo (aparece no botão)</label><input type="text" id="mdNome" data-cfg="modelos.${k}.nome" value="${esc(m.nome)}" maxlength="60"></div>
-        <div style="grid-column:1/-1"><label class="lbl" for="mdUso">Descrição (quando usar)</label><input type="text" id="mdUso" data-cfg="modelos.${k}.uso" value="${esc(m.uso || '')}" maxlength="200"><div class="campo-ajuda">Aparece como dica ao passar o mouse sobre o botão do modelo na etapa Finalizar e abaixo do título aqui.</div></div></div>` : `<p class="dica"><b>Quando é usado:</b> ${esc(meta.uso)}</p>`}
-      ${rico ? '' : `<div class="aviso-simples" style="margin-bottom:10px">${ic('info')}<div>Este texto é copiado como <b>texto simples</b> (o campo de destino do sistema oficial não aceita formatação). Por isso o editor não oferece negrito, cor ou listas aqui.</div></div>`}
-      ${htmlEditor({ id: 'edModelo', valor: htmlComEtiquetas(m.html), rico, minAltura: 220 })}
-      <p class="dica" style="margin:6px 0 0">Use Enter para novo parágrafo e Shift+Enter para quebra de linha. Para inserir dados do atendimento, escolha um campo na lista ao lado.</p></div>
+        <div style="grid-column:1/-1"><label class="lbl" for="mdUso">Descrição (quando usar)</label><input type="text" id="mdUso" data-cfg="modelos.${k}.uso" value="${esc(m.uso || '')}" maxlength="200"></div></div>` : `<p class="dica"><b>Quando é usado:</b> ${esc(meta.uso)}</p>`}
+      ${rico ? '' : `<div class="aviso-simples" style="margin-bottom:10px">${ic('info')}<div>Copiado como <b>texto simples</b>: sem negrito, cor ou listas.</div></div>`}
+      ${htmlEditor({ id: 'edModelo', valor: htmlComEtiquetas(m.html), rico, minAltura: 220 })}</div>
     <div class="grid2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
-      <div class="card" style="box-shadow:none"><div class="card-h"><h3 style="margin:0">Campos disponíveis</h3></div><p class="dica">Clique em “Inserir” para colocar o campo onde o cursor está. O texto é preenchido com os dados reais do atendimento.</p>
+      <div class="card" style="box-shadow:none"><div class="card-h"><h3 style="margin:0">Campos disponíveis</h3></div>
         ${CAMPOS_CATS.map((cat, ci) => `<details class="campos-cat" ${ci === 0 ? 'open' : ''}><summary>${esc(cat)}</summary>${CAMPOS.filter(f => f.cat === cat).map(f => `<div class="campo-it"><b>${esc(f.nome)}</b><span class="d">${esc(f.desc)}</span><span class="ex">Exemplo: <code>${esc(f.ex)}</code></span><button class="btn sm" data-act="inserirCampo" data-k="${f.k}" aria-label="Inserir ${esc(f.nome)}">${ic('plus', 'sm')}Inserir</button></div>`).join('')}</details>`).join('')}</div>
-      <div class="card" style="box-shadow:none"><div class="card-h"><h3 style="margin:0">Pré-visualização</h3></div><p class="dica">Atualizada enquanto você edita, com valores de exemplo.</p><div id="modeloPrevia"></div></div>
+      <div class="card" style="box-shadow:none"><div class="card-h"><h3 style="margin:0">Pré-visualização</h3></div><div id="modeloPrevia"></div></div>
     </div></div>`;
 }
 function montarEditorModelo() {
@@ -3199,7 +3158,7 @@ function cfgAlertas() {
   return `<div class="card">${cabSecao('Alertas e regras de validação', 'Defina o comportamento real de cada alerta do sistema. A escolha altera o atendimento imediatamente após salvar.')}
   <div class="modos">${['bloqueio', 'obs', 'atencao', 'desativado'].map(m => `<div class="modo-card"><b>${tagModo(m)}</b>${MODOS[m].desc}</div>`).join('')}</div>
   ${ALERTAS_GRUPOS.map(gr => `<h3>${esc(gr)}</h3>${Object.entries(ALERTAS).filter(([, a]) => a.grupo === gr).map(([k, a]) => { const c = cfgEdit.alertas[k];
-    return `<div class="al-cfg"><div class="topo-al"><div><div class="n">${esc(a.nome)}</div><div class="d">${esc(a.desc)}</div></div>
+    return `<div class="al-cfg"><div class="topo-al"><div><div class="n" title="${esc(a.desc)}">${esc(a.nome)}</div></div>
       <div><label class="sr" for="al-${k}">Comportamento de ${esc(a.nome)}</label><select id="al-${k}" data-cfg="alertas.${k}.modo" data-rr="1">${Object.entries(MODOS).map(([m, x]) => `<option value="${m}" ${c.modo === m ? 'selected' : ''}>${x.nome}</option>`).join('')}</select></div></div>
       ${c.modo === 'obs' ? `<div class="extra"><div><label class="lbl" for="ald-${k}">Incluir em</label><select id="ald-${k}" data-cfg="alertas.${k}.dest"><option value="guia" ${c.dest !== 'prestador' ? 'selected' : ''}>Observação da guia</option><option value="prestador" ${c.dest === 'prestador' ? 'selected' : ''}>Resposta ao prestador</option></select></div>
         <div><label class="lbl" for="alt-${k}">Texto da observação</label><textarea id="alt-${k}" data-cfg="alertas.${k}.texto" rows="2" placeholder="Se vazio, usa o texto do próprio alerta (com os detalhes da ocorrência).">${esc(c.texto)}</textarea></div></div>` : ''}</div>`; }).join('')}`).join('')}</div>`;
@@ -3210,14 +3169,12 @@ function cfgExport() {
   const fim = isoDia(new Date()), ini = isoDia(addDias(new Date(), -7));
   return `<div class="card">${cabSecao('Exportação', 'Cópias de segurança e relatórios. Nenhum dado é enviado pela internet: os arquivos são gerados neste computador.')}
     <h3 style="margin-top:0">Registros de atendimento (CSV)</h3>
-    <p class="dica">Uma linha por guia, com resultado, itens e alertas. Não inclui nome do beneficiário, CID nem médico.</p>
     <div class="linha-flex"><div><label class="lbl" for="expIni">De</label><input type="date" id="expIni" value="${ini}" style="width:auto"></div><div><label class="lbl" for="expFim">Até</label><input type="date" id="expFim" value="${fim}" style="width:auto"></div>
       <button class="btn line" data-act="exportarPeriodo" style="align-self:flex-end">${ic('download')}Baixar CSV do período</button></div>
     <h3>Configurações (cópia de segurança)</h3>
     <div class="linha-flex"><button class="btn line" data-act="exportarCfg">${ic('download')}Baixar config.json</button>
       <label class="btn line" for="impCfg" style="cursor:pointer">${ic('upload')}Importar config.json</label><input type="file" id="impCfg" accept=".json" class="oculto">
-      <button class="btn line" data-act="exportarParam">${ic('download')}Baixar parametrizações</button></div>
-    <p class="dica" style="margin-top:8px">Ao importar, o conteúdo entra como rascunho: confira e clique em “Salvar configurações”. Não envie esses arquivos para o GitHub: contêm dados de cadastro.</p></div>`;
+      <button class="btn line" data-act="exportarParam">${ic('download')}Baixar parametrizações</button></div></div>`;
 }
 
 /* ---------- 9. Preferências operacionais ---------- */
@@ -3225,16 +3182,16 @@ function cfgPrefs() {
   const p = cfgEdit.preferencias;
   return `<div class="card">${cabSecao('Preferências operacionais')}
     <div class="stack">
-      <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência cega antes de finalizar</b><br><span class="muted" style="font-size:var(--fs-sm)">Após lançar os itens, o operador informa o que vê na grade do sistema e o resultado é comparado ao pedido. Desmarcado, a etapa Finalizar abre sem essa conferência.</span></span></label>
-      <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"><div class="campo-ajuda">Quantidades acima disso disparam o alerta “Quantidade fora do limite”.</div></div>
-      <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b><br><span class="muted" style="font-size:var(--fs-sm)">Em “Incluir observação”, o texto aparece já marcado quando a parametrização foi criada ou aplicada no atendimento. Nunca é incluído em atendimentos sem parametrização.</span></span></label>
+      <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência cega antes de finalizar</b></span></label>
+      <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
+      <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
     </div></div>
-  <div class="card"><div class="card-h"><h2>Motivos de não autorização</h2></div><p class="dica">Opções oferecidas na etapa Finalizar para guias não autorizadas e itens negados. O modelo vinculado é o texto sugerido para a situação.</p>
+  <div class="card"><div class="card-h"><h2>Motivos de não autorização</h2></div>
     ${cfgEdit.motivos.map((m, i) => `<div class="linha-flex" style="margin-bottom:8px"><input type="text" data-cfg="motivos.${i}.nome" value="${esc(m.nome)}" style="flex:2;min-width:220px;width:auto" aria-label="Motivo ${i + 1}">
       <select data-cfg="motivos.${i}.modelo" style="flex:1;min-width:200px;width:auto" aria-label="Modelo vinculado ao motivo ${i + 1}"><option value="">Sem modelo vinculado</option>${MODELOS_SITUACAO.map(k => `<option value="${k}" ${m.modelo === k ? 'selected' : ''}>${esc(MODELOS_PADRAO[k].nome)}</option>`).join('')}</select>
       <button class="btn sm ghost ico" data-act="motRem" data-i="${i}" aria-label="Remover motivo" title="Remover motivo">${ic('trash', 'sm')}</button></div>`).join('')}
     <div class="acoes" style="margin-top:6px"><button class="btn line" data-act="motAdd">${ic('plus')}Adicionar motivo</button></div></div>
-  <div class="card"><div class="card-h"><h2>Privacidade dos registros</h2></div><p class="dica">Apaga os arquivos de registros diários com mais de 180 dias (pasta compartilhada e este computador). Não afeta configurações nem parametrizações.</p>
+  <div class="card"><div class="card-h"><h2>Privacidade dos registros</h2></div>
     <button class="btn dng" data-act="limparAntigos">${ic('trash')}Apagar registros com mais de 180 dias</button></div>`;
 }
 
@@ -3253,32 +3210,27 @@ function cfgInfo() {
 /* ====================================================================
    Entrada de arquivos e início do atendimento
    ==================================================================== */
-let abrirPendente = null;   // atendimento escolhido no Painel, aguardando o .eml
 async function abrirArquivo(f) {
   if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
   if (!/\.eml$/i.test(f.name) && f.type !== 'message/rfc822') { toast('Esse arquivo não é um .eml. Envie o e-mail baixado do SmarterMail.', 'bad'); return; }
-  try {
-    const email = lerEml(await f.arrayBuffer());
-    if (abrirPendente) {
-      if (email.messageId !== abrirPendente.messageId) { toast('Esse .eml não é o e-mail do atendimento escolhido no Painel. Selecione o arquivo correto.', 'bad'); return; }
-      const idx = abrirPendente.idxGuia || 0; abrirPendente = null; aba = 'atend';
-      await iniciar(email, { idx }); return;
-    }
-    aba = 'atend'; await iniciar(email);
-  } catch (e) { console.error(e); toast('Não consegui ler esse .eml: ' + e.message, 'bad'); }
+  try { aba = 'atend'; await iniciar(lerEml(await f.arrayBuffer())); }
+  catch (e) { console.error(e); toast('Não consegui ler esse .eml: ' + e.message, 'bad'); }
 }
-async function iniciar(email, { idx } = {}) {
+/* Quem abre o e-mail é quem o finaliza. Se um colega já trabalhou nele, avisa antes de abrir. */
+function avisoEmailJaAtendido(email) {
+  const outros = Reg.cache.filter(r => !r.tipo && r.messageId === email.messageId && r.status !== 'descartado');
+  if (!outros.length) return null;
+  const quem = unicos(outros.map(r => `${r.operador || 'um operador'} (${r.status === 'concluido' ? 'concluído' : 'em andamento'} em ${fmtDH(r.atualizadoEm)})`));
+  return `Este e-mail já foi aberto por: ${quem.join('; ')}.\n\nAbrir mesmo assim?`;
+}
+async function iniciar(email) {
   await Reg.carregarTudo(); await Param.carregar();
+  const aviso = avisoEmailJaAtendido(email);
+  if (aviso && !confirm(aviso)) return;
   S = novoEstado(email);
-  const restauradas = restaurarDeRegistros(S);
-  const multi = S.guias.length > 1;
-  S.ativa = Math.min(idx ?? 0, S.guias.length - 1);
-  const g = guiaAtiva();
-  S.vista = multi && idx == null ? 1 : (g.status === 'concluido' ? 4 : Math.max(2, Math.min(4, g.vista || 2)));
-  if (S.vista >= 3) { const st = situacaoGuia(g); if (g.status !== 'concluido' && !podeFinal(g, st)) S.vista = st.pode ? 3 : 2; }
-  for (const x of S.guias) if (!x._rest && x.status === 'em_andamento') await gravarGuia(x, 'em_andamento');
+  S.ativa = 0; S.vista = S.guias.length > 1 ? 1 : 2;
+  for (const x of S.guias) await gravarGuia(x, 'em_andamento');
   persistir(); render(); window.scrollTo(0, 0);
-  if (restauradas) toast(`Atendimento retomado: ${restauradas} guia(s) já tinham registro.`);
 }
 function finalizarAtendimento(texto) {
   if (texto) { ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido); }
@@ -3560,17 +3512,6 @@ const acoes = {
     amostra = [...emb(c.filter(r => r.itens.length >= 4)), ...emb(c.filter(r => r.itens.length < 4))].slice(0, 10); render();
   },
   conciliarGuias() { conciliarGuias(); },
-  async abrirReg(b) {
-    const r = Reg.cache.find(x => x.id === b.dataset.id); if (!r) return;
-    if (S && S.atendId === r.atendimentoId) { const i = S.guias.findIndex(g => g.id === r.id); aba = 'atend'; if (i >= 0) { S.ativa = i; acoes.selGuia({ dataset: { i } }); return; } render(); return; }
-    if (S && !confirm('Há um atendimento aberto neste computador. O andamento já está salvo. Abrir outro mesmo assim?')) return;
-    if (S) { for (const g of S.guias) if (!guiaTerminal(g)) await gravarGuia(g, 'em_andamento'); S = null; persistir(); }
-    if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
-    abrirPendente = { messageId: r.messageId, idxGuia: r.idxGuia || 0 };
-    toast('Selecione o arquivo .eml deste e-mail para retomar o atendimento.');
-    $('#arquivoEml').click();
-  },
-
   /* ---- configurações: navegação e salvamento ---- */
   cfgSecao(b) { cfgSecao = b.dataset.s; render(); window.scrollTo(0, 0); },
   async salvarCfg() {
@@ -3601,7 +3542,7 @@ const acoes = {
     toast(n + ' arquivo(s) apagado(s).');
   },
   /* ---- operadores ---- */
-  opAdd() { cfgEdit.operadores.push({ id: 'op-' + Date.now().toString(36), nome: '', icone: 'user', cor: 'idc-' + (cfgEdit.operadores.length % 10) }); marcarSujo(); render(); },
+  opAdd() { cfgEdit.operadores.push({ id: 'op-' + Date.now().toString(36), nome: '', icone: animalAleatorio(), cor: 'idc-' + (cfgEdit.operadores.length % 10) }); marcarSujo(); render(); },
   opRem(b) { if (cfgEdit.operadores.length < 2) { toast('Mantenha ao menos um operador.', 'bad'); return; } if (!confirm('Remover este operador da lista? Os registros antigos continuam com o nome dele.')) return; cfgEdit.operadores.splice(+b.dataset.i, 1); marcarSujo(); render(); },
   opIcone(b) { cfgEdit.operadores[+b.dataset.i].icone = b.dataset.v; marcarSujo(); render(); },
   opCor(b) { cfgEdit.operadores[+b.dataset.i].cor = b.dataset.v; marcarSujo(); render(); },

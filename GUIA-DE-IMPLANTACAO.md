@@ -56,7 +56,7 @@ A página cria sozinha a estrutura `registros/AAAA-MM/AAAA-MM-DD_operador.json`.
 Abra **Configurações**. A tela tem 10 seções; as alterações ficam em rascunho até clicar em **Salvar configurações** (a barra inferior avisa quando há algo não salvo).
 
 - **Aparência:** modo claro, escuro ou automático (vale para cada computador).
-- **Perfil e identificação:** nome de exibição, ícone e cor de cada operador. É só identificação visual e de registro. Não existe caixa de pendências por operador: qualquer pessoa pode continuar ou concluir o atendimento de outra.
+- **Perfil e identificação:** nome de exibição, animal e cor de cada operador. É só identificação visual e de registro. Não existe caixa de pendências por operador.
 - **Clínicas e cadastros:** lista com busca à esquerda e ficha à direita. Para cada clínica informe o **credenciado executante** (exatamente como aparece no sistema oficial), os e-mails e os **códigos com a descrição oficial**. Campos não informados ficam vazios; nada é preenchido por suposição. Códigos podem ser colados em lista ou sugeridos a partir de atendimentos concluídos (você escolhe quais adicionar).
 - **Modelos de e-mail** e **Modelo de observação da guia:** editor com prévia, lista de campos por categoria (nome, descrição e exemplo) e texto rico (negrito, itálico, cor, listas). Textos que vão para campos de texto simples do sistema oficial não oferecem formatação, e o sistema avisa isso.
 - **Parametrizações:** lista de parametrizações salvas e o formato do texto estruturado.
@@ -78,7 +78,7 @@ Arquivos na pasta compartilhada: `config.json` (configurações), `parametrizaco
 3. **Etapa 3, guia e conferência:** os dados aparecem na ordem do sistema oficial, cada um com seu botão **Copiar** (fica verde depois de copiado). Os serviços mostram código e quantidade lado a lado, a descrição cadastrada da clínica e a descrição do e-mail. Depois faça a conferência cega.
 4. **Etapa 4, finalizar:** informe o número real da guia (nunca invente), escolha **Autorizada**, **Parcialmente autorizada** (marque os itens negados) ou **Não autorizada** (com motivo) e use **Incluir observação** para a observação da guia. Em e-mail com uma só guia, a resposta ao prestador aparece nessa mesma tela. Em e-mail com **várias guias**, cada guia mostra só número, resultado e observação (etapa "Resultado e observação"); a **resposta ao prestador com todas as guias** aparece na **última guia**, junto com o botão para copiar o e-mail do prestador.
 5. **Concluir guia** registra aquela guia e leva à próxima. O e-mail só termina quando todas as guias foram tratadas.
-6. O andamento é salvo sozinho a cada etapa. Outra pessoa retoma pelo **Painel do dia** ou pela aba **Ações**, em **Abrir**, selecionando o mesmo .eml.
+6. Quem abre o e-mail é quem o finaliza. Se um colega já trabalhou no mesmo e-mail, o sistema avisa antes de abrir.
 
 **Leitura do pedido:** o sistema reconhece rótulos variados (Paciente, Cartão, Procedimentos, Sessões…), campos na mesma linha separados por `|`, vários pacientes separados por traços ou por repetição de beneficiário/carteira, e vários pedidos do mesmo paciente quando médico ou data se repetem. Médico, CID, data e local escritos uma única vez no e-mail são aplicados às guias que não os têm, com aviso. Quantidades lidas do fim da linha também geram aviso.
 
