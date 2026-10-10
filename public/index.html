@@ -911,27 +911,45 @@ async function lerZip(buf) {
    ==================================================================== */
 const ROTULOS = [
   ['local', /^local(\s+d[aeo]s?\s+(emissao|pedido|atendimento|solicitacao))?\b/],
-  ['emissao', /^((data\s+(da\s+|de\s+)?)?(emissao|do\s+pedido(\s+medico)?)|data\s+de\s+solicitacao)\b/],
-  ['beneficiario', /^(beneficiari[oa]s?|paciente|nome(\s+do\s+(beneficiario|paciente))?)\b/],
-  ['carteira', /^((n[or°º.]*\s*)?(da\s+)?(carteir(a|inha)|matricula|cartao))\b(\s+(promedica|do\s+beneficiario))?/],
-  ['servico', /^(servicos?|procedimentos?|codigos?(\s+do\s+servico)?)\b/],
-  ['quantidade', /^(quantidade|qtde?|quant)\b\.?/],
-  ['medico', /^(medic[oa]s?(\s+solicitante)?|solicitante|profissional(\s+solicitante)?)\b/],
-  ['cid', /^cid(-?10)?\b/],
+  ['emissao', /^(data\s+(da\s+|de\s+|do\s+)?(emissao|pedido(\s+medico)?|solicitacao|encaminhamento|requisicao|receita)|emissao(\s+do\s+pedido)?|data)\b/],
+  ['beneficiario', /^(benefici[a]ri[oa]s?|pacientes?|usuari[oa]|segurad[oa]|nome(\s+(completo|d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa])))?)\b/],
+  ['carteira', /^((n[or°º.]*\s*)?(d[ao]s?\s+)?(carteir(a|inha)\b|cart\b\.?|matricula\b|cartao\b)(\s+(promedica|do\s+benefici[a]ri[oa]|do\s+paciente|do\s+plano))?|codigo\s+do\s+benefici[a]ri[oa])/],
+  ['servico', /^(servicos?|procedimentos?|terapias?|codigos?(\s+d[oa]s?\s+(servicos?|procedimentos?))?|tuss)(\s+(solicitad[oa]s?|autorizad[oa]s?|a\s+autorizar))?\b/],
+  ['quantidade', /^(quantidades?|qtd[es]?|quant|sess(oes|ao)|n[oru°º.]*\s*(de\s+)?sess(oes|ao))\b\.?/],
+  ['medico', /^(medic[oa]s?(\s+(solicitante|assistente|responsavel))?|dr[a]?\.?|doutor[a]?|solicitante|profissional(\s+solicitante)?|nome\s+do\s+medic[oa])\b/],
+  ['cid', /^(cid(-?10)?|diagnostico)\b/],
   ['obs', /^(obs|observac(ao|oes))\b\.?/]
 ];
+/* rótulos que dispensam os dois-pontos quando o valor tem o formato esperado (ex.: "CID F84", "Carteira 4122...") */
+const VALOR_SEM_SEPARADOR = {
+  carteira: /^\s+\d[\d\s.\-]{9,}/, cid: /^\s+[A-Za-z]\d{2}/, emissao: /^\s+\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/
+};
+const CART_RE = /(?<![\dA-Za-z])\d{4}[ .\-]?\d{4}[ .\-]?\d{4}[ .\-]?\d{3}[ .\-]?[A-Za-z0-9]{2}(?![\dA-Za-z])/;
 function normUnidades(l) { let s = ''; for (let i = 0; i < l.length; i++) { const n = semAcento(l[i]).toLowerCase(); s += n.length ? n[0] : l[i]; } return s; }
 function detectarRotulo(linhaOrig) {
-  const limpa = linhaOrig.replace(/[*_ ]/g, ' ').replace(/^\s*[•·▪►]\s*/, '').trim();
+  const limpa = linhaOrig.replace(/[*_ ]/g, ' ').replace(/\((a|o|as|os|s)\)/gi, '').replace(/^\s*(?:[•·▪►]|\d{1,2}\s*[.)\-]|[-–—])\s*(?=\S)/, '').trim();
   const norm = normUnidades(limpa);
   for (const [k, re] of ROTULOS) {
     const m = norm.match(re);
     if (!m) continue;
     const resto = limpa.slice(m[0].length);
     if (/^\s*([:=\-–—]|$)/.test(resto)) return { k, valor: resto.replace(/^\s*[:=\-–—]\s*/, '').trim() };
+    if (VALOR_SEM_SEPARADOR[k] && VALOR_SEM_SEPARADOR[k].test(resto)) return { k, valor: resto.trim() };
   }
   return null;
 }
+/* Vários campos na mesma linha ("Beneficiário: Maria | Carteira: 4122...") viram uma linha por campo */
+const PALAVRAS_ROTULO = 'benefici[aá]ri[oa]s?|pacientes?|nome(?:\\s+d[oa]\\s+(?:benefici[aá]ri[oa]|paciente|m[eé]dic[oa]))?|carteir(?:a|inha)(?:\\s+promédica|\\s+promedica)?|cart\\.?|matr[ií]cula|servi[cç]os?|procedimentos?|terapias?|quantidades?|qtd[e]?|sess[õo]es|m[eé]dic[oa](?:\\s+solicitante)?|solicitante|cid(?:-?10)?|diagn[oó]stico|data(?:\\s+d[aeo]\\s+(?:emiss[aã]o|pedido(?:\\s+m[eé]dico)?|solicita[cç][aã]o))?|emiss[aã]o|local(?:\\s+d[aeo]\\s+(?:emiss[aã]o|pedido))?|obs(?:erva[cç][aã]o|erva[cç][oõ]es)?\\.?';
+const RE_ROTULO_INLINE = new RegExp('(^|[\\s|;,])((?:' + PALAVRAS_ROTULO + ')\\s*:)', 'gi');
+function explodirLinha(l) {
+  const pos = []; let m; RE_ROTULO_INLINE.lastIndex = 0;
+  while ((m = RE_ROTULO_INLINE.exec(l))) pos.push(m.index + m[1].length);
+  if (pos.length < 2) return [l];
+  const out = []; if (pos[0] > 0 && l.slice(0, pos[0]).trim()) out.push(l.slice(0, pos[0]).trim());
+  pos.forEach((ini, i) => out.push(l.slice(ini, i + 1 < pos.length ? pos[i + 1] : l.length).replace(/[\s|;,]+$/, '').trim()));
+  return out;
+}
+const explodirTexto = t => t.split('\n').flatMap(explodirLinha).join('\n');
 function secionar(texto) {
   const secoes = [{ k: null, linhas: [] }];
   for (const l of texto.split('\n')) {
@@ -944,18 +962,27 @@ function secionar(texto) {
 const primeiraLinha = s => ((s && s.linhas.find(x => x.trim())) || '').trim().replace(/[.;,]+$/, '').trim();
 function extrairItens(bloco) {
   const ms = [...bloco.matchAll(/(?<!\d)(\d{8})(?!\d)/g)];
+  const SEM_FREQ = '(?!\\s*(?:por|\\/|ao|na)\\s*(?:semana|m[eê]s|dia))';
   const pats = [
-    /\(?\s*(?:quantidade|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
-    /(?:^|\s)[x×]\s*(\d{1,2})(?!\d)/i,
-    /[-–—:|]\s*(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o))?\s*\.?\s*$/im
+    /\(?\s*(?:quantidades?|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
+    /(?<!\d)(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o)|vezes|atendimentos?|consultas?)\b/i,
+    new RegExp('(?:^|\\s)[x×]\\s*(\\d{1,2})(?!\\d)' + SEM_FREQ, 'i'),
+    new RegExp('(?<!\\d)(\\d{1,2})\\s*[x×](?=\\s|$)' + SEM_FREQ, 'i'),
+    /[-–—:|]\s*(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o))?\s*\.?\s*$/im,
+    /\(\s*(\d{1,2})\s*\)\s*\.?\s*$/m
   ];
   const itens = ms.map((m, k) => {
     const seg = bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
     let qtd = null, qm = null;
     for (const p of pats) { qm = seg.match(p); if (qm) { qtd = Number(qm[1]); break; } }
+    let origem = qtd != null ? 'linha' : null;
     let desc = (qm ? seg.slice(0, qm.index) : seg).split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+    if (qtd == null) {   // último recurso: número solto no fim da própria linha do serviço ("80000004 Terapia 2")
+      const fim = desc.match(/^(.*\D)\s+(\d{1,2})$/);
+      if (fim && fim[1].replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 3) { qtd = Number(fim[2]); desc = fim[1]; origem = 'fim-da-linha'; }
+    }
     desc = desc.replace(/^[\s\-–—:|.]+/, '').replace(/[\s\-–—:|(.,]+$/, '').trim();
-    return { codigo: m[1], desc, qtd, origemQtd: qtd != null ? 'linha' : null };
+    return { codigo: m[1], desc, qtd, origemQtd: origem };
   });
   const invalidos = [...bloco.matchAll(/(?<!\d)(\d{5,7}|\d{9,12})(?!\d)/g)].map(m => m[1]);
   return { itens, invalidos };
@@ -980,16 +1007,26 @@ function lerEmissao(bruto, referencia) {
   return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: dt > ref, mesesAtras: (ref - dt) / (30.44 * 864e5) };
 }
 function lerPedido(texto, referencia) {
+  texto = explodirTexto(texto);
   const secoes = secionar(texto);
   const de = k => secoes.filter(s => s.k === k);
-  const p = { itens: [], invalidos: [], soltos: [], qtdUnicaAplicada: false, semRotulo: false };
+  const p = { itens: [], invalidos: [], soltos: [], qtdUnicaAplicada: false, semRotulo: false, herdados: [] };
   p.beneficiarios = de('beneficiario').map(primeiraLinha).filter(Boolean);
   p.beneficiario = p.beneficiarios[0] || '';
   p.carteiraBruta = primeiraLinha(de('carteira')[0]);
+  if (!cartValida(normCart(p.carteiraBruta))) { const m = p.carteiraBruta.match(CART_RE) || (!p.carteiraBruta ? texto.match(CART_RE) : null); if (m) p.carteiraBruta = m[0].trim(); }
+  if (p.beneficiario) {   // carteira escrita na mesma linha do nome: separa
+    const m = p.beneficiario.match(CART_RE);
+    if (m) { if (!p.carteiraBruta) p.carteiraBruta = m[0].trim(); p.beneficiario = p.beneficiario.replace(CART_RE, '').replace(/[\s\-–—,;|:()]*(cart\w*\.?)?[\s\-–—,;|:()]*$/i, '').trim(); p.beneficiarios[0] = p.beneficiario; }
+  }
   const lc = normCart(p.carteiraBruta);
   p.carteira = cartValida(lc) ? lc : null;
-  p.medico = lerMedico(primeiraLinha(de('medico')[0]));
-  p.cid = primeiraLinha(de('cid')[0]).toUpperCase();
+  let medicoTxt = primeiraLinha(de('medico')[0]);
+  if (!medicoTxt) { const m = texto.match(/(?:^|\n)\s*(?:dr\.?|dra\.?|doutor(?:a)?)\s+([^\n]+)/i); if (m) medicoTxt = m[0].trim().replace(/^(dr\.?|dra\.?|doutor(a)?)\s+/i, ''); }
+  p.medico = lerMedico(medicoTxt);
+  let cidTxt = primeiraLinha(de('cid')[0]);
+  if (!cidTxt) { const m = texto.match(/\bCID(?:-?10)?\s*[:\-]?\s*([A-Z]\d{2}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1]; }
+  p.cid = cidTxt.toUpperCase();
   p.emissao = lerEmissao(primeiraLinha(de('emissao')[0]), referencia);
   p.local = primeiraLinha(de('local')[0]);
   p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
@@ -1006,7 +1043,7 @@ function lerPedido(texto, referencia) {
     p.itens.push(...r.itens);
   }
   if (!de('servico').length) {
-    const livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*\d{8}(?!\d)/.test(l));
+    const livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*(?:[-•·*]|\d{1,2}[.)])?\s*\d{8}(?!\d)/.test(l));
     const r = extrairItens(livres.join('\n'));
     if (r.itens.length) { p.semRotulo = true; p.itens = r.itens; }
   }
@@ -1021,21 +1058,92 @@ function lerPedido(texto, referencia) {
 
 
 /* ====================================================================
-   Vários beneficiários no mesmo e-mail (até 5 diferentes)
-   Cada "Beneficiário:" abre um bloco. Cada bloco vira uma solicitação (guia) independente,
-   com seus próprios dados e serviços. Nada é herdado de um bloco para outro.
+   Vários beneficiários e várias solicitações no mesmo e-mail
+   - Cada beneficiário (ou cada pedido do mesmo beneficiário, com médico/data próprios) vira uma guia independente.
+   - Dados comuns a todos (médico, CID, data, local) escritos uma única vez fora dos blocos são aplicados
+     apenas onde faltam, e o sistema avisa (alerta "Dados comuns"). Serviços e quantidades nunca são herdados.
    ==================================================================== */
 const chaveBenef = p => norm(p.beneficiario) || (p.carteira ? 'c:' + p.carteira : '');
+const RE_SEPARADOR = /^\s*(?:[-_=*#~.]{4,}|(?:paciente|benefici[aá]ri[oa]|solicita[cç][aã]o|pedido)\s*(?:n[ºo°.]*\s*)?\d+\s*[:.)\-]?)\s*$/i;
+function rotulosDe(linhas) { return linhas.map(l => { const r = detectarRotulo(l); return r ? r.k : null; }); }
+const contar = (ks, k) => ks.filter(x => x === k).length;
+/* divide uma lista de linhas em blocos que começam a cada repetição do rótulo "abridor" */
+function dividirPor(linhas, ks, tipos, cabecalhoCompartilhado) {
+  const cont = Object.fromEntries(tipos.map(t => [t, contar(ks, t)]));
+  const repetidos = tipos.filter(t => cont[t] >= 2);
+  if (!repetidos.length) return null;
+  const primeiro = ks.findIndex(k => repetidos.includes(k));
+  const abridor = ks[primeiro];
+  const inicios = ks.map((k, i) => (k === abridor ? i : -1)).filter(i => i >= 0);
+  const cab = linhas.slice(0, inicios[0]);
+  return { cab, blocos: inicios.map((ini, j) => linhas.slice(ini, j + 1 < inicios.length ? inicios[j + 1] : linhas.length)) };
+}
 function lerPedidos(texto, referencia) {
-  const L = texto.split('\n'), inicios = [];
-  L.forEach((l, i) => { const r = detectarRotulo(l); if (r && r.k === 'beneficiario') inicios.push(i); });
-  if (inicios.length <= 1) return { blocos: [{ texto, pedido: lerPedido(texto, referencia) }], preambulo: false };
-  const pre = L.slice(0, inicios[0]).join('\n');
-  const preambulo = pre.split('\n').some(l => detectarRotulo(l));
-  const blocos = inicios.map((ini, k) => {
-    const t = L.slice(ini, k + 1 < inicios.length ? inicios[k + 1] : L.length).join('\n');
-    return { texto: t, pedido: lerPedido(t, referencia) };
+  const L = texto.split('\n').flatMap(explodirLinha);
+  /* 1) separadores explícitos (linhas de traços, "Paciente 2") */
+  const chunks = [[]];
+  L.forEach(l => { if (RE_SEPARADOR.test(l)) chunks.push([]); else chunks[chunks.length - 1].push(l); });
+  const comDados = [], compartilhado = [];
+  chunks.forEach(c => {
+    const ks = rotulosDe(c);
+    if (ks.some(k => k === 'beneficiario' || k === 'carteira')) comDados.push(c);
+    else if (ks.includes('servico') && comDados.length) comDados[comDados.length - 1].push(...c);   // serviços depois de um traço continuam o mesmo paciente
+    else compartilhado.push(c);
   });
+  /* 2) dentro de cada trecho, repetição de beneficiário/carteira abre um novo paciente */
+  let pacientes = [];
+  comDados.forEach(c => {
+    const ks = rotulosDe(c);
+    const div = dividirPor(c, ks, ['beneficiario', 'carteira'], true);
+    if (div) { if (div.cab.some(l => l.trim())) compartilhado.push(div.cab); pacientes.push(...div.blocos); } else pacientes.push(c);
+  });
+  if (!pacientes.length) pacientes = [L];
+  /* 3) mesmo paciente com vários pedidos (médico ou data repetidos): cabeçalho do paciente replicado em cada pedido */
+  const blocosL = [];
+  pacientes.forEach(pl => {
+    const ks = rotulosDe(pl);
+    if (contar(ks, 'medico') >= 2 || contar(ks, 'emissao') >= 2) {
+      const div = dividirPor(pl, ks, ['servico', 'medico', 'emissao'], false);
+      if (div && div.blocos.length >= 2) { div.blocos.forEach(b => blocosL.push([...div.cab, ...b])); return; }
+    }
+    blocosL.push(pl);
+  });
+  /* dados comuns escritos no rodapé do último bloco (depois dos serviços) e que nenhum outro bloco tem: ficam compartilhados */
+  const comunsK = ['medico', 'cid', 'emissao', 'local'];
+  if (blocosL.length >= 2) {
+    const ult = blocosL[blocosL.length - 1], ksU = rotulosDe(ult);
+    let fimId = -1; ksU.forEach((k, i) => { if (['beneficiario', 'carteira', 'servico', 'quantidade'].includes(k)) fimId = i; });
+    const outros = blocosL.slice(0, -1).flatMap(b => rotulosDe(b));
+    const manter = ult.slice(0, fimId + 1), movidas = [];
+    let i = fimId + 1;
+    while (i < ult.length) {
+      const k = ksU[i];
+      let j = i + 1; while (j < ult.length && ksU[j] == null) j++;
+      if (comunsK.includes(k) && !outros.includes(k) && !ksU.slice(0, fimId + 1).includes(k)) movidas.push(...ult.slice(i, j)); else manter.push(...ult.slice(i, j));
+      i = j;
+    }
+    // linhas sem rótulo logo após o último item (continuação de um serviço) já estão em "manter"
+    if (movidas.length) { blocosL[blocosL.length - 1] = manter; compartilhado.push(movidas); }
+  }
+  const blocos = blocosL.map(b => { const t = b.join('\n'); return { texto: t, pedido: lerPedido(t, referencia) }; });
+  /* 4) dados comuns fora dos blocos */
+  let preambulo = false;
+  if (blocos.length >= 2 && compartilhado.length) {
+    const ctexto = compartilhado.map(c => c.join('\n')).join('\n');
+    const ks = rotulosDe(ctexto.split('\n'));
+    const comuns = ['medico', 'cid', 'emissao', 'local'];
+    preambulo = ks.some(k => k && !comuns.includes(k) && k !== 'obs');
+    const sh = lerPedido(ctexto, referencia);
+    blocos.forEach(b => {
+      const p = b.pedido;
+      if (!p.medico.nome && !p.medico.crm && (sh.medico.nome || sh.medico.crm)) { p.medico = sh.medico; p.herdados.push('médico'); }
+      if (p.emissao.estado === 'ausente' && sh.emissao.estado !== 'ausente') { p.emissao = sh.emissao; p.herdados.push('data do pedido'); }
+      if (!p.cid && sh.cid) { p.cid = sh.cid; p.herdados.push('CID'); }
+      if (!p.local && sh.local) { p.local = sh.local; p.herdados.push('local'); }
+    });
+  } else if (blocos.length < 2) {
+    preambulo = false;
+  }
   return { blocos, preambulo };
 }
 /* Metadados de relação entre as solicitações do mesmo e-mail */
@@ -1315,7 +1423,7 @@ function resumoGuiaTexto(g) {
   const r = g.resultado, L = [];
   L.push(`Beneficiário: ${g.pedido.beneficiario || '(não informado)'}`);
   if (g.status === 'descartado') return L.concat('Solicitação ignorada.').join('\n');
-  if (!r.situacao || (g.status !== 'concluido' && g.status !== 'aguardando_clinica')) return L.concat('Guia ainda não processada.').join('\n');
+  if (!r.situacao || (g.status !== 'concluido' && g.status !== 'aguardando_clinica' && !g.numero)) return L.concat('Guia ainda não processada.').join('\n');
   if (g.status === 'aguardando_clinica') return L.concat('Aguardando retorno da clínica (guia não gerada).').join('\n');
   L.push(`Guia: ${g.numero} — Situação: ${SIT_ROTULO[r.situacao]}`);
   const a = autorizadosDe(g), n = negadosDe(g);
@@ -1398,6 +1506,7 @@ const ALERTAS = {
   'qtd-ausente': { grupo: 'Serviços', nome: 'Quantidade não informada', desc: 'Não foi possível ler a quantidade de um serviço.', modo: 'bloqueio' },
   'qtd-invalida': { grupo: 'Serviços', nome: 'Quantidade fora do limite', desc: 'A quantidade é 0 ou maior que o máximo definido em Preferências operacionais.', modo: 'bloqueio' },
   'qtd-unica': { grupo: 'Serviços', nome: 'Quantidade única aplicada a vários serviços', desc: 'Havia uma só quantidade no e-mail e ela foi aplicada a todos os serviços.', modo: 'atencao' },
+  'qtd-inferida': { grupo: 'Serviços', nome: 'Quantidade inferida do fim da linha', desc: 'A quantidade foi lida como o número solto no fim da linha do serviço (sem a palavra Quantidade).', modo: 'atencao' },
   'sem-rotulo': { grupo: 'Serviços', nome: 'Códigos lidos sem o rótulo "Serviço"', desc: 'Os códigos vieram de linhas soltas do e-mail.', modo: 'atencao' },
   'solto': { grupo: 'Serviços', nome: 'Número de 8 dígitos que não virou item', desc: 'Pode ser um serviço esquecido ou um telefone.', modo: 'atencao' },
   'serv-repetido-guias': { grupo: 'Serviços', nome: 'Mesmo serviço em outra guia do mesmo beneficiário', desc: 'Dois pedidos do mesmo beneficiário no e-mail pedem o mesmo código. Pode ser duplicidade ou contradição.', modo: 'atencao' },
@@ -1416,6 +1525,7 @@ const ALERTAS = {
   'replyto': { grupo: 'E-mail', nome: 'Resposta vai para outro endereço', desc: 'O campo Responder-para é diferente do remetente.', modo: 'atencao' },
   'cortado': { grupo: 'E-mail', nome: 'Mensagens anteriores ignoradas', desc: 'O histórico da conversa foi ignorado na leitura. Informativo.', modo: 'atencao', nivel: 'info' },
   'colado': { grupo: 'E-mail', nome: 'Texto colado manualmente', desc: 'O remetente foi digitado, sem verificação pelo cabeçalho. Informativo.', modo: 'atencao', nivel: 'info' },
+  'dados-comuns': { grupo: 'E-mail', nome: 'Dados comuns aplicados a esta guia', desc: 'Médico, CID, data ou local escritos uma única vez no e-mail foram aplicados às guias que não tinham o dado. Confira.', modo: 'atencao' },
   'preambulo': { grupo: 'E-mail', nome: 'Dados fora dos blocos de beneficiário', desc: 'Há campos antes do primeiro beneficiário. Eles não são herdados por nenhuma guia.', modo: 'atencao' },
   'mesmo-email': { grupo: 'Duplicidade', nome: 'E-mail já registrado em outro atendimento', desc: 'Existe registro anterior deste mesmo e-mail. Informa quem atendeu, sem impedir outro operador de continuar.', modo: 'atencao' },
   'guia-repetida': { grupo: 'Duplicidade', nome: 'Número de guia já registrado', desc: 'O número digitado já consta em outro registro.', modo: 'atencao' },
@@ -1758,6 +1868,8 @@ function avaliar(g) {
     else if (it.qtd < 1 || it.qtd > P.qtdMax) add('qtd-invalida', `Quantidade ${it.qtd} inválida para ${it.codigo} (aceita de 1 a ${P.qtdMax}).`, { sub: it.codigo, clinica: `Quantidade inválida (${it.qtd}) para o serviço ${it.codigo}.` });
   });
   if (p.qtdUnicaAplicada) add('qtd-unica', 'Havia uma única "Quantidade" para vários serviços e ela foi aplicada a todos. Confirme no e-mail.');
+  p.itens.filter(i => i.origemQtd === 'fim-da-linha').forEach(i => add('qtd-inferida', `A quantidade ${i.qtd} de ${i.codigo} foi lida como o número solto no fim da linha. Confirme no e-mail.`, { sub: i.codigo }));
+  if (p.herdados && p.herdados.length) add('dados-comuns', `Dados escritos uma única vez no e-mail foram aplicados a esta guia: ${p.herdados.join(', ')}. Confira se valem para este beneficiário.`);
   if (p.semRotulo) add('sem-rotulo', 'O pedido não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.');
   p.soltos.forEach(n => add('solto', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`, { sub: n }));
   if (g.itensEditados) add('editado', 'Dados ou itens foram corrigidos à mão. Confira de novo com o e-mail original.');
@@ -1821,6 +1933,10 @@ function situacaoGuia(g) {
 }
 const cegaExigida = () => !!cfg.preferencias.conferenciaCega;
 const podeFinal = (g, st) => st.pode && (!cegaExigida() || g.cega.ok);
+const guiasAtivas = () => S.guias.filter(x => x.status !== 'descartado');
+const usaConsolidada = () => guiasAtivas().length > 1;
+const ehUltima = g => S.guias.every(x => x === g || guiaTerminal(x));
+const mostraResposta = g => !usaConsolidada() || ehUltima(g);
 const guiaTerminal = g => ['concluido', 'aguardando_clinica', 'descartado'].includes(g.status);
 
 /* ---------- Parametrização ---------- */
@@ -1881,7 +1997,7 @@ function guiaAnterior(g) {
 }
 function respostaDaGuia(g, marcar) {
   const sit = g.resultado.situacao;
-  const k = sit === 'parcial' ? 'parcial' : sit === 'nao' ? 'nao_autorizada' : (g.usarCorrecao ? 'correcao' : 'autorizada');
+  const k = usaConsolidada() ? 'resposta_multipla' : sit === 'parcial' ? 'parcial' : sit === 'nao' ? 'nao_autorizada' : (g.usarCorrecao ? 'correcao' : 'autorizada');
   const r = renderModelo(k, ctxDe(g), { marcar });
   let html = r.html;
   g.respExtras.forEach(x => { html += x.html; });
@@ -2015,7 +2131,7 @@ function htmlPassos(g) {
     { n: 1, t: 'E-mail', e: v === 1 ? 'atual' : 'feito', s: v === 1 ? 'Você está aqui' : 'Pedido recebido', ok: true },
     { n: 2, t: 'Pedido e alertas', e: v === 2 ? 'atual' : st.bloqueios.length ? 'atencao' : (g.etapa > 2 || fin ? 'feito' : 'futuro'), s: st.bloqueios.length ? `${st.bloqueios.length} bloqueio(s)` : v === 2 ? 'Você está aqui' : g.etapa > 2 ? 'Concluída' : 'A fazer', ok: true },
     { n: 3, t: 'Guia e conferência', e: v === 3 ? 'atual' : cegaPend ? 'atencao' : ((g.cega.ok || !cegaExigida()) && g.etapa > 3) || fin ? 'feito' : 'futuro', s: !st.pode ? 'Resolva os bloqueios' : cegaPend ? 'Conferência divergente' : v === 3 ? 'Você está aqui' : g.cega.ok ? 'Conferida' : 'A fazer', ok: st.pode },
-    { n: 4, t: 'Finalizar', e: v === 4 ? 'atual' : fin ? 'feito' : 'futuro', s: fin ? 'Concluída' : v === 4 ? 'Você está aqui' : !podeFinal(g, st) ? 'Falta conferir' : 'A fazer', ok: podeFinal(g, st) || fin }
+    { n: 4, t: usaConsolidada() ? (ehUltima(g) ? 'Finalizar e-mail' : 'Resultado e observação') : 'Finalizar', e: v === 4 ? 'atual' : fin ? 'feito' : 'futuro', s: fin ? 'Concluída' : v === 4 ? 'Você está aqui' : !podeFinal(g, st) ? 'Falta conferir' : 'A fazer', ok: podeFinal(g, st) || fin }
   ];
   return `<nav class="passos" aria-label="Etapas do atendimento">${def.map(d => `<button class="passo ${d.e}" data-act="irVista" data-v="${d.n}" ${d.ok ? '' : 'disabled'} ${d.e === 'atual' ? 'aria-current="step"' : ''} title="${esc(d.t + ' — ' + d.s)}">
     <span class="bola">${d.e === 'feito' ? ic('check', 'sm') : d.e === 'atencao' ? ic('alert', 'sm') : d.n}</span>
@@ -2322,7 +2438,7 @@ function pendenciasConclusao(g, st) {
     if (!n) P.push('Marque os itens que não foram autorizados.');
     else if (n >= g.pedido.itens.length) P.push('Todos os itens estão marcados como não autorizados: use a situação “Não autorizada”.');
   }
-  if (r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.');
+  if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.');
   if (!st.pode) P.push('Há bloqueio nesta guia (veja Alertas e ocorrências).');
   if (cegaExigida() && !g.cega.ok) P.push('Falta concluir a conferência da grade.');
   return P;
@@ -2346,22 +2462,25 @@ function htmlSituacao(g) {
 function renderFinal(alvo, g) {
   const r = g.resultado, st = situacaoGuia(g), guiaOk = /^T\d{8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
-  const resp = r.situacao ? respostaDaGuia(g, true) : null;
+  const showResp = mostraResposta(g), multi = usaConsolidada(), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
+  const resp = showResp && (r.situacao || multi) ? respostaDaGuia(g, true) : null;
   const html = g.respEdit != null ? g.respEdit : (resp ? resp.html : '');
   const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
   const emailOk = r.emailPrestador && g.copiados.email === r.emailPrestador;
   alvo.innerHTML = `
-  <div class="grid2">
+  ${multi && !showResp ? `<div class="aviso">${ic('info')}<div>Este e-mail tem ${guiasAtivas().length} guias. Aqui você registra o número, o resultado e a observação desta guia. A <b>resposta ao prestador, com todas as guias</b>, aparece na última guia (faltam ${faltam}).</div></div>` : ''}
+  ${multi && showResp ? `<div class="banner-param">${ic('mail', 'lg')}<div class="esp"><b>Última guia do e-mail.</b> A resposta abaixo reúne o resultado de todas as guias geradas neste e-mail.</div></div>` : ''}
+  <div class="${showResp ? 'grid2' : ''}">
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
         <div class="form-grid">
           <div><label class="lbl" for="guia">Número da guia</label><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000" autocomplete="off" aria-describedby="guiaAjuda">
             <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato esperado: T + 8 dígitos.' : 'Número gerado pelo sistema oficial. Nunca preencha um número que não foi gerado.'}</div></div>
-          <div><label class="lbl" for="emailPrest">E-mail do prestador</label>
+          ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
               <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button></div>
-            <div class="campo-ajuda">Copia somente o endereço (sem assunto, nome ou histórico).</div></div>
+            <div class="campo-ajuda">Copia somente o endereço (sem assunto, nome ou histórico).</div></div>` : ''}
         </div>
         <h3>Situação da autorização</h3>
         ${htmlSituacao(g)}
@@ -2375,10 +2494,10 @@ function renderFinal(alvo, g) {
         <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>
     </div>
-    <div class="stack">
+    ${showResp ? `<div class="stack">
       <div class="card">
-        <div class="card-h"><h2>Resposta ao prestador</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(cfg.modelos[resp.modelo] ? MODELOS_PADRAO[resp.modelo].nome : resp.modelo)}</span>` : ''}<span class="esp"></span>
-          ${r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
+        <div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(cfg.modelos[resp.modelo] ? MODELOS_PADRAO[resp.modelo].nome : resp.modelo)}</span>` : ''}<span class="esp"></span>
+          ${!multi && r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
         ${!resp ? `<div class="aviso">${ic('info')}<div>Selecione a situação da autorização. O modelo da resposta é definido pelo resultado real da guia: autorizada, parcial ou não autorizada.</div></div>` : `
         ${resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Preencha-os acima ou edite o texto.</div></div>` : ''}
         ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
@@ -2393,12 +2512,11 @@ function renderFinal(alvo, g) {
         <p class="dica">Geram um texto completo para você revisar e copiar, usando os dados desta guia.</p>
         <div class="linha-flex">${MODELOS_SITUACAO.map(k => `<button class="btn line" data-act="respSituacao" data-modelo="${k}">${ic('message')}${BOTOES_SITUACAO[k]}</button>`).join('')}</div>
       </div>
-    </div>
+    </div>` : ''}
   </div>
   ${htmlPainelAlertas(g, st)}
   <div class="acoes" style="margin-top:0">
     <button class="btn" data-act="irVista" data-v="3">${ic('left')}Guia e conferência</button>
-    ${S.guias.length > 1 ? `<button class="btn line" data-act="respostaEmail">${ic('mail')}Resposta do e-mail</button>` : ''}
     <span class="esp"></span>
     <button class="btn" data-act="salvarFechar">${ic('pause')}Salvar e fechar</button>
     <button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>
@@ -2417,9 +2535,9 @@ function renderConcluida(alvo, g) {
       <div class="acoes"><button class="btn line" data-act="reabrirGuia">${ic('edit')}Reabrir para correção</button><span class="esp"></span>
         ${prox >= 0 ? `<button class="btn pri" data-act="selGuia" data-i="${prox}">Próxima guia pendente${ic('right')}</button>` : ''}
         ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div></div>
-    <div class="card"><div class="card-h"><h2>Resposta ao prestador</h2></div>
+    ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta ao prestador${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
-      <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button>${S.guias.length > 1 ? `<button class="btn line" data-act="respostaEmail">${ic('mail')}Resposta do e-mail</button>` : ''}</div></div></div>`;
+      <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
 }
 
 /* ====================================================================
@@ -2589,17 +2707,12 @@ async function renderPainel(app) {
     <button class="btn" data-act="atualizarPainel" style="align-self:flex-end">${ic('refresh')}Atualizar</button>
     <span style="flex:1"></span>
     <button class="btn apoio line" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (${lista.length})</button></div></div>
-  <div class="kpis">
-    <div class="kpi info"><b>${emails}</b><span>E-mails com atendimento</span></div>
-    <div class="kpi"><b>${regs.length}</b><span>Guias no dia</span></div>
-    <div class="kpi ok"><b>${n(r => resultadoDe(r) === 'autorizada')}</b><span>Autorizadas</span></div>
-    <div class="kpi warn"><b>${n(r => resultadoDe(r) === 'parcial')}</b><span>Parcialmente autorizadas</span></div>
-    <div class="kpi bad"><b>${n(r => resultadoDe(r) === 'nao')}</b><span>Não autorizadas</span></div>
-    <div class="kpi warn"><b>${n(r => r.status === 'aguardando_clinica')}</b><span>Aguardando clínica</span></div>
-    <div class="kpi info"><b>${n(r => r.status === 'em_andamento')}</b><span>Em andamento</span></div>
-    <div class="kpi ac"><b>${n(r => r.parametrizado)}</b><span>Parametrizadas</span></div>
-    <div class="kpi"><b>${pegos}</b><span>Divergências pegas na conferência</span></div>
-    <div class="kpi"><b>${tempo}</b><span>Tempo médio por guia</span></div>
+  <div class="kpis">${[
+    ['info', emails, 'E-mails com atendimento', true], ['', regs.length, 'Guias no dia', true],
+    ['ok', n(r => resultadoDe(r) === 'autorizada'), 'Autorizadas'], ['warn', n(r => resultadoDe(r) === 'parcial'), 'Parcialmente autorizadas'], ['bad', n(r => resultadoDe(r) === 'nao'), 'Não autorizadas'],
+    ['warn', n(r => r.status === 'aguardando_clinica'), 'Aguardando clínica'], ['info', n(r => r.status === 'em_andamento'), 'Em andamento'], ['ac', n(r => r.parametrizado), 'Parametrizadas'],
+    ['', pegos, 'Divergências pegas na conferência'], ['', concl.length ? tempo : 0, 'Tempo médio por guia']
+  ].filter(k => k[3] || (k[1] && k[1] !== 0)).map(([c, v, t]) => `<div class="kpi ${c}"><b>${v}</b><span>${t}</span></div>`).join('')}
   </div>
   <div class="grid2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)">
   <div class="card"><div class="card-h"><h2>O que ainda precisa ser feito</h2><span class="tag ${acao.length ? 'warn' : 'ok'}">${acao.length ? ic('clip', 'sm') + acao.length + ' guia(s)' : ic('check', 'sm') + 'Nada pendente'}</span></div>
