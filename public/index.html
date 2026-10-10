@@ -110,6 +110,8 @@ header.topo{background:var(--surface);border-bottom:1px solid var(--border);box-
 button.chip{cursor:pointer}
 button.chip:hover{background:var(--soft-2)}
 button.chip:active{transform:translateY(1px)}
+.chip.chip-op{background:var(--c-bg,var(--surface-2));border-color:var(--c-br,var(--border));color:var(--c-fg,var(--text))}
+.chip select option{color:var(--text);background:var(--surface)}
 .chip select{width:auto;min-width:110px;max-width:170px;border:0;background:transparent;padding:0 2px;font-weight:600;color:inherit;cursor:pointer;min-height:0;box-shadow:none;border-radius:0}
 .chip select:focus{outline:none;box-shadow:none}
 .chip:focus-within,.chip:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
@@ -318,6 +320,9 @@ table.t{border-collapse:collapse;width:100%}
 .t td.c,.t th.c{text-align:center}
 .t tr.novo td{background:var(--accent-bg)}
 .qtd{font-size:var(--fs-lg);font-weight:750;color:var(--accent-fg);font-variant-numeric:tabular-nums}
+@keyframes arco{to{background-position:200% 0}}
+.qtd.multi{display:inline-block;font-size:26px;font-weight:900;line-height:1.1;padding:0 4px;background:linear-gradient(90deg,#ff1744,#ff9100,#ffea00,#00e676,#00b0ff,#d500f9,#ff1744);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:arco 1.6s linear infinite;filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 0 2px rgba(0,0,0,.35))}
+@media (prefers-reduced-motion:reduce){.qtd.multi{animation:none}}
 .cod{font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .t-celula{display:flex;align-items:center;gap:8px;justify-content:center}
 
@@ -458,6 +463,10 @@ pre.simples{white-space:pre-wrap;font-family:var(--font-sans);margin:0}
 .av-op button:hover{background:var(--surface-3)}
 .av-op button.on{border-color:var(--primary);background:var(--soft);color:var(--soft-fg)}
 .av-op button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.op-card.trancado{opacity:.85}
+.cor-linha{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.cor-linha input[type=color]{width:46px;height:34px;padding:2px;min-height:0;cursor:pointer}
+.cor-linha input[type=range]{width:160px;min-height:0;padding:0}
 .op-card{border:1px solid var(--border);border-radius:var(--r);padding:14px;background:var(--surface-2)}
 .op-card + .op-card{margin-top:10px}
 .modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:12px}
@@ -773,6 +782,31 @@ function fecharModal(silencioso) {
 }
 let M = null; // estado do modal aberto
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modalFundo')) { e.preventDefault(); fecharModal(); } });
+
+/* ---------- Cor de identificação do operador (RGB + transparência) ---------- */
+const CORES_PADRAO_HEX = ['#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d', '#4f46e5', '#7c3aed', '#c026d3', '#db2777', '#b45309'];
+const hexValido = h => /^#[0-9a-f]{6}$/i.test(h || '');
+function estiloCor(hex, alfaPct) {
+  const h = hexValido(hex) ? hex.slice(1) : '2c4a70';
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const a = Math.min(1, Math.max(.05, (Number(alfaPct) || 30) / 100));
+  const base = Tema.efetivo() === 'dark' ? [21, 28, 42] : [255, 255, 255];
+  const mix = [r, g, b].map((v, i) => v * a + base[i] * (1 - a));
+  const L = (0.2126 * mix[0] + 0.7152 * mix[1] + 0.0722 * mix[2]) / 255;
+  return `--c-bg:rgba(${r},${g},${b},${a.toFixed(2)});--c-br:rgba(${r},${g},${b},${Math.min(1, a + .35).toFixed(2)});--c-fg:${L > 0.58 ? '#111827' : '#ffffff'};--c-solid:rgb(${r},${g},${b})`;
+}
+/* ---------- Senha do operador (trava de uso; o hash fica no config.json) ---------- */
+const Senha = {
+  async hash(senha, sal) {
+    if (!(window.crypto && crypto.subtle)) throw new Error('este navegador não permite criar senha');
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sal + ':' + senha));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  },
+  novoSal() { return [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join(''); },
+  async confere(op, senha) { return !!op.senhaHash && (await this.hash(senha, op.senhaSalt)) === op.senhaHash; },
+  autenticado() { try { return sessionStorage.getItem('conferidor.auth') || ''; } catch (e) { return ''; } },
+  marcar(id) { try { sessionStorage.setItem('conferidor.auth', id); } catch (e) { } }
+};
 /* ====================================================================
    Leitura de .eml (MIME)
    ==================================================================== */
@@ -1687,10 +1721,10 @@ const ctxDe = (g, extra = {}) => ({ S, g, extra });
 function configPadrao() {
   return {
     operadores: [
-      { id: 'alipio', nome: 'Alípio', icone: '🦊', cor: 'idc-0' },
-      { id: 'rafael', nome: 'Rafael', icone: '🐻', cor: 'idc-1' },
-      { id: 'thiago', nome: 'Thiago', icone: '🦉', cor: 'idc-2' },
-      { id: 'apoio', nome: 'Apoio', icone: '🐧', cor: 'idc-5' }
+      { id: 'alipio', nome: 'Alípio', icone: '🦊', corRgb: '#2563eb', corAlfa: 25 },
+      { id: 'rafael', nome: 'Rafael', icone: '🐻', corRgb: '#0891b2', corAlfa: 25 },
+      { id: 'thiago', nome: 'Thiago', icone: '🦉', corRgb: '#0d9488', corAlfa: 25 },
+      { id: 'apoio', nome: 'Apoio', icone: '🐧', corRgb: '#4f46e5', corAlfa: 25 }
     ],
     clinicas: [],
     modelos: Object.fromEntries(Object.entries(MODELOS_PADRAO).map(([k, m]) => [k, { nome: m.nome, html: padraoHtml(m.texto), uso: (MODELOS_META[k] || {}).custom ? MODELOS_META[k].uso : undefined }])),
@@ -1703,7 +1737,12 @@ function normOperadores(lista) {
   const ids = new Set();
   return (lista || []).map(o => typeof o === 'string' ? { nome: o } : o).filter(o => o && String(o.nome || '').trim()).map((o, i) => {
     let id = o.id || slug(o.nome); while (ids.has(id)) id += '-' + i; ids.add(id);
-    return { id, nome: String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : AVATARES[(i * 3 + 2) % AVATARES.length], cor: corClasse(o.cor || 'idc-' + (i % 10)) };
+    const idx = CORES_ID.findIndex(x => x[0] === o.cor);
+    const corRgb = hexValido(o.corRgb) ? o.corRgb.toLowerCase() : CORES_PADRAO_HEX[(idx >= 0 ? idx : i) % CORES_PADRAO_HEX.length];
+    const corAlfa = Number.isFinite(Number(o.corAlfa)) && o.corAlfa !== undefined ? Math.min(100, Math.max(5, Math.round(Number(o.corAlfa)))) : 25;
+    const r = { id, nome: String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : AVATARES[(i * 3 + 2) % AVATARES.length], corRgb, corAlfa };
+    if (o.senhaHash && o.senhaSalt) { r.senhaHash = String(o.senhaHash); r.senhaSalt = String(o.senhaSalt); }
+    return r;
   });
 }
 function mesclarConfig(base, c) {
@@ -1745,11 +1784,23 @@ async function carregarConfig() {
 function configParaSalvar(c) {
   return {
     versao: VERSAO, atualizadoEm: agora(), atualizadoPor: operador(),
-    operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, cor: o.cor })),
+    operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, corRgb: o.corRgb, corAlfa: o.corAlfa, ...(o.senhaHash ? { senhaHash: o.senhaHash, senhaSalt: o.senhaSalt } : {}) })),
     clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', codigos: cl.codigos || {} })),
     modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
     alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], preferencias: c.preferencias
   };
+}
+// Antes de gravar, traz do config.json da pasta os operadores que colegas criaram ou protegeram com senha
+// depois que esta tela foi aberta, para que salvar nunca desfaça o trabalho de outro operador.
+async function mesclarOperadoresDaPasta(novo) {
+  if (!Pasta.ok) return;
+  const p = await Pasta.ler([], 'config.json'); if (!p || !Array.isArray(p.operadores)) return;
+  const arq = normOperadores(p.operadores), eu = operadorObj();
+  arq.forEach(o => {
+    const i = novo.operadores.findIndex(x => x.id === o.id);
+    if (i < 0) { if (!cfgOpsIni.includes(o.id)) novo.operadores.push(o); }                       // criado por outro
+    else if (o.senhaHash && !(eu && eu.id === o.id)) novo.operadores[i] = { ...novo.operadores[i], ...o };   // protegido: vale o arquivo
+  });
 }
 async function salvarConfig(novo) {
   const obj = configParaSalvar(novo);
@@ -1767,15 +1818,17 @@ const modoDe = tipo => (cfg.alertas[tipo] && MODOS[cfg.alertas[tipo].modo]) ? cf
 function operadorObj() {
   let id = LS.get('operadorId', '');
   let o = cfg.operadores.find(x => x.id === id);
-  if (!o) { const antigo = LS.get('operador', ''); o = cfg.operadores.find(x => x.nome === antigo); if (o) LS.set('operadorId', o.id); }
+  if (o && o.senhaHash && Senha.autenticado() !== o.id) o = null;   // com senha: precisa ter confirmado nesta sessão
+  if (!o && !id) { const antigo = LS.get('operador', ''); o = cfg.operadores.find(x => x.nome === antigo && !x.senhaHash); if (o) LS.set('operadorId', o.id); }
   return o || null;
 }
 const operador = () => (operadorObj() || {}).nome || '';
 const operadorPorNomeOuId = (nome, id) => cfg.operadores.find(o => o.id === id) || cfg.operadores.find(o => o.nome === nome) || null;
-function htmlAvatar(o, lg) { return o ? `<span class="avatar idc ${corClasse(o.cor)} ${lg ? 'lg' : ''}" title="${esc(o.nome)}">${glifo(o.icone)}</span>` : `<span class="avatar ${lg ? 'lg' : ''}">${ic('user')}</span>`; }
+function htmlAvatar(o, lg) { return o ? `<span class="avatar ${lg ? 'lg' : ''}" style="${estiloOp(o)}" title="${esc(o.nome)}">${glifo(o.icone)}</span>` : `<span class="avatar ${lg ? 'lg' : ''}">${ic('user')}</span>`; }
+const estiloOp = o => estiloCor(o.corRgb, o.corAlfa);
 function htmlOperador(nome, id) {
   const o = operadorPorNomeOuId(nome, id);
-  return o ? `<span class="tag id idc ${corClasse(o.cor)}">${glifo(o.icone)}${esc(o.nome)}</span>` : (nome ? `<span class="tag">${ic('user', 'sm')}${esc(nome)}</span>` : '');
+  return o ? `<span class="tag id" style="${estiloOp(o)}">${glifo(o.icone)}${esc(o.nome)}</span>` : (nome ? `<span class="tag">${ic('user', 'sm')}${esc(nome)}</span>` : '');
 }
 const iniciais = nome => (String(nome).trim().split(/\s+/).filter(w => w.length > 2 || /^[A-ZÀ-Ý]/.test(w)).slice(0, 2).map(w => w[0]).join('') || '?').toUpperCase();
 const corClinica = cl => cl ? corPorTexto(cl.id) : '';
@@ -1873,6 +1926,7 @@ const Reg = {
     this.mesclarHist([...mapa.values()]);
     await this.carregar(); this.mesclarHist(this.cache); this.histPronto = true;
   },
+  doPeriodo(ini, fim) { const ok = r => r.dia && r.dia >= ini && r.dia <= fim; const m = new Map(Object.values(this.todos).filter(ok).map(r => [r.id, r])); this.cache.filter(r => !r.tipo && ok(r)).forEach(r => m.set(r.id, r)); return [...m.values()]; },
   doMes(ym) { const m = new Map(Object.values(this.todos).filter(r => r.dia && r.dia.startsWith(ym)).map(r => [r.id, r])); this.cache.filter(r => !r.tipo && r.dia && r.dia.startsWith(ym)).forEach(r => m.set(r.id, r)); return [...m.values()]; },
   async excluir(id) {
     const r = this.cache.find(x => x.id === id) || this.todos[id]; if (!r) return false;
@@ -2101,8 +2155,8 @@ function aplicarParametrizacao(g) {
 }
 
 /* ---------- Registro gravado (sem nome, CID ou médico) ---------- */
-function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; const gl = glosaDe(g), temGlosa = r.situacao === 'autorizada' && gl.resp === 'sim';
-  return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut, glosaResp: r.situacao === 'autorizada' ? gl.resp : null, glosas: temGlosa ? Object.entries(gl.itens).map(([c, x]) => ({ c, g: x.glosa || '', m: x.motivo || '' })) : [] }; }
+function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; const gl = glosaDe(g), temGlosa = (r.situacao === 'autorizada' || r.situacao === 'parcial') && gl.resp === 'sim', okI = new Set(itensGlosaveis(g).map(i => i.codigo));
+  return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut, glosaResp: (r.situacao === 'autorizada' || r.situacao === 'parcial') ? gl.resp : null, glosas: temGlosa ? Object.entries(gl.itens).filter(([c]) => okI.has(c)).map(([c, x]) => ({ c, g: x.glosa || '', m: x.motivo || '' })) : [] }; }
 function montarRegistro(g, status, extra = {}) {
   const p = g.pedido, cl = clinicaDe(S), A = avaliar(g), op = operadorObj();
   const neg = negadosDe(g).map(x => x.it.codigo);
@@ -2180,7 +2234,7 @@ const nomeGuia = g => `${g.pedido.beneficiario || 'Beneficiário não informado'
 /* ---------- Topo e abas ---------- */
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
-  const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
+  const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : painelModo === 'semana' ? 'Semana: ' + rotuloSemana(painelSemana) : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
   const pasta = !Pasta.suportado ? { c: 'alerta', i: 'alert', t: 'Use o Chrome ou Edge', d: 'Este navegador não permite acessar a pasta compartilhada.' }
     : Pasta.ok ? { c: 'ok', i: 'folder', t: 'Pasta: ' + Pasta.handle.name, d: 'Pasta compartilhada conectada. Configurações e registros ficam nela.' }
       : Pasta.handle ? { c: 'alerta', i: 'folder', t: 'Reautorizar pasta', d: 'A pasta lembrada precisa de autorização (um clique por dia).' }
@@ -2188,7 +2242,7 @@ function renderTopo() {
   const escuro = Tema.efetivo() === 'dark';
   $('#topoAcoes').innerHTML = `
     <span class="chip ctx" title="${aba === 'painel' ? 'Dia selecionado no Painel' : 'Data de hoje'}">${ic('calendar', 'sm')}${dataTxt}</span>
-    <label class="chip" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
+    <label class="chip chip-op" style="${op ? estiloOp(op) : ''}" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}">${ic(pasta.i, 'sm')}${esc(pasta.t)}</button>
     <button class="chip tema" data-act="alternarTema" title="Alternar entre modo claro e escuro" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span>${escuro ? 'Claro' : 'Escuro'}</span></button>`;
@@ -2401,7 +2455,7 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
     const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button>` : '';
     return `<tr><td class="c">${i + 1}</td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${cpCod}</div></td>
-      <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd">${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
+      <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
       <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria ? `<span class="tag obs" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Provisória</span> <button class="btn sm" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar</button>` : ''}</td>
       <td class="muted">${esc(it.desc) || '—'}</td>
       <td>${tagItem(est)}</td></tr>`;
@@ -2596,12 +2650,12 @@ function pendenciasConclusao(g, st) {
   if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
   if (!/^[TS]\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
-  if (r.situacao === 'autorizada') {
+  if (r.situacao === 'autorizada' || r.situacao === 'parcial') {
     const gl = glosaDe(g);
-    if (!gl.resp) P.push('Responda: houve alguma glosa?');
+    if (!gl.resp) P.push('Responda: retirou alguma glosa?');
     else if (gl.resp === 'sim') {
-      const its = Object.entries(gl.itens);
-      if (!its.length) P.push('Selecione o(s) item(ns) em que houve glosa.');
+      const its = glosasValidas(g);
+      if (!its.length) P.push('Selecione o(s) item(ns) em que a glosa foi retirada.');
       its.forEach(([c, x]) => { if (!(x.glosa || '').trim()) P.push(`Informe a glosa do item ${c}.`); if (!(x.motivo || '').trim()) P.push(`Informe por que a glosa do item ${c} foi retirada.`); });
     }
   }
@@ -2615,6 +2669,17 @@ function pendenciasConclusao(g, st) {
   if (cegaExigida() && !g.cega.ok) P.push('Falta concluir a conferência da grade.');
   return P;
 }
+// Itens em que a glosa pode ser retirada: na parcial, só os autorizados (os negados ficam de fora)
+const itensGlosaveis = g => g.resultado.situacao === 'parcial' ? g.pedido.itens.filter(it => g.resultado.naoAut[it.codigo] == null) : g.pedido.itens;
+const glosasValidas = g => { const ok = new Set(itensGlosaveis(g).map(i => i.codigo)); return Object.entries(glosaDe(g).itens).filter(([c]) => ok.has(c)); };
+function htmlGlosa(g) {
+  const gl = glosaDe(g), lista = cfg.glosas || [];
+  const campo = (it, x) => lista.length
+    ? `<select data-glf="glosa" data-c="${it.codigo}" aria-label="Glosa do item ${it.codigo}"><option value="">Selecione a glosa…</option>${[...new Set([...(x.glosa && !lista.includes(x.glosa) ? [x.glosa] : []), ...lista])].map(v => `<option value="${esc(v)}" ${v === x.glosa ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`
+    : `<input type="text" data-glf="glosa" data-c="${it.codigo}" value="${esc(x.glosa || '')}" placeholder="Glosa (cadastre a lista em Configurações)" aria-label="Glosa do item ${it.codigo}">`;
+  return `<div class="glosa"><div class="linha-flex" style="margin-top:10px"><b>Retirou alguma glosa?</b><div class="seg" role="radiogroup" aria-label="Retirou alguma glosa?"><button type="button" role="radio" aria-checked="${gl.resp === 'sim'}" class="${gl.resp === 'sim' ? 'on igual' : ''}" data-act="setGlosa" data-v="sim">Sim</button><button type="button" role="radio" aria-checked="${gl.resp === 'nao'}" class="${gl.resp === 'nao' ? 'on igual' : ''}" data-act="setGlosa" data-v="nao">Não</button></div>${gl.resp ? '' : '<span class="tag warn">Obrigatório</span>'}</div>
+    ${gl.resp === 'sim' ? `<div class="negados">${itensGlosaveis(g).map(it => { const x = gl.itens[it.codigo], ref = descRefItem(g, it); return `<div class="negado gl ${x ? 'on' : ''}" style="grid-template-columns:auto 1fr"><input type="checkbox" id="gl-${it.codigo}" data-gl="${it.codigo}" ${x ? 'checked' : ''}><label for="gl-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label>${x ? `<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr;gap:8px">${campo(it, x)}<input type="text" data-glf="motivo" data-c="${it.codigo}" value="${esc(x.motivo || '')}" placeholder="Por que a glosa foi retirada" aria-label="Motivo da retirada do item ${it.codigo}"></div>` : ''}</div>`; }).join('')}</div>` : ''}</div>`;
+}
 function optsMotivos(sel) { return `<option value="">Selecione o motivo…</option>` + cfg.motivos.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(m.nome)}</option>`).join(''); }
 function htmlSituacao(g) {
   const r = g.resultado;
@@ -2623,14 +2688,11 @@ function htmlSituacao(g) {
   if (r.situacao === 'parcial') {
     extra = `<div class="negados">${g.pedido.itens.map(it => { const neg = r.naoAut[it.codigo] != null; const ref = descRefItem(g, it); return `<div class="negado ${neg ? 'on' : ''}"><input type="checkbox" id="neg-${it.codigo}" data-neg="${it.codigo}" ${neg ? 'checked' : ''}><label for="neg-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label><select data-negmot="${it.codigo}" ${neg ? '' : 'disabled'} aria-label="Motivo da não autorização de ${it.codigo}">${optsMotivos(r.naoAut[it.codigo])}</select></div>`; }).join('')}</div>`;
   }
-  if (r.situacao === 'autorizada') {
-    const gl = glosaDe(g);
-    extra = `<div class="glosa"><div class="linha-flex" style="margin-top:10px"><b>Houve alguma glosa?</b><div class="seg" role="radiogroup" aria-label="Houve alguma glosa?"><button type="button" role="radio" aria-checked="${gl.resp === 'sim'}" class="${gl.resp === 'sim' ? 'on igual' : ''}" data-act="setGlosa" data-v="sim">Sim</button><button type="button" role="radio" aria-checked="${gl.resp === 'nao'}" class="${gl.resp === 'nao' ? 'on igual' : ''}" data-act="setGlosa" data-v="nao">Não</button></div>${gl.resp ? '' : '<span class="tag warn">Obrigatório</span>'}</div>
-      ${gl.resp === 'sim' ? `<div class="negados">${g.pedido.itens.map(it => { const x = gl.itens[it.codigo], ref = descRefItem(g, it); return `<div class="negado gl ${x ? 'on' : ''}" style="grid-template-columns:auto 1fr"><input type="checkbox" id="gl-${it.codigo}" data-gl="${it.codigo}" ${x ? 'checked' : ''}><label for="gl-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label>${x ? `<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr;gap:8px"><input type="text" list="glosasList" data-glf="glosa" data-c="${it.codigo}" value="${esc(x.glosa || '')}" placeholder="Glosa" aria-label="Glosa do item ${it.codigo}"><input type="text" data-glf="motivo" data-c="${it.codigo}" value="${esc(x.motivo || '')}" placeholder="Por que a glosa foi retirada" aria-label="Motivo da retirada do item ${it.codigo}"></div>` : ''}</div>`; }).join('')}</div><datalist id="glosasList">${(cfg.glosas || []).map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}</div>`;
-  }
   if (r.situacao === 'nao') {
     extra = `<div class="form-grid" style="margin-top:12px"><div><label class="lbl" for="rMotivo">Motivo da não autorização</label><select id="rMotivo" data-resf="motivoId">${optsMotivos(r.motivoId)}</select></div><div><label class="lbl" for="rMotivoTxt">Detalhe do motivo (opcional)</label><input type="text" id="rMotivoTxt" data-resf="motivoTxt" value="${esc(r.motivoTxt)}"></div></div>`;
   }
+  if (r.situacao === 'autorizada') extra = htmlGlosa(g);
+  else if (r.situacao === 'parcial') extra += htmlGlosa(g);
   return `<div class="sit-opcoes" role="radiogroup" aria-label="Situação da autorização">
     ${op('autorizada', 'check', 'Autorizada', 'Todos os itens aplicáveis foram autorizados.')}
     ${op('parcial', 'halfcircle', 'Parcialmente autorizada', 'Somente parte dos itens foi autorizada.')}
@@ -2756,10 +2818,12 @@ function abrirRespostaEmail() {
 function opcoesObservacao(g, st) {
   const L = [];
   st.obs.forEach(a => L.push({ id: 'a:' + a.key, titulo: ALERTAS[a.tipo].nome, texto: a.obsTexto, pre: true }));
+  const mo = renderModelo('observacao', ctxDe(g)).texto; if ((mo || '').trim()) L.push({ id: 'm:obs', titulo: nomeModelo('observacao') + ' (modelo)', texto: mo, pre: false });
   if (g.param) {
     L.push({ id: 'p:obs', titulo: 'Atendimento parametrizado', texto: renderModelo('obs_parametrizado', ctxDe(g)).texto, pre: !!cfg.preferencias.obsParametrizadoAuto });
     const prm = Param.porId(g.param.id); if (prm && prm.texto) L.push({ id: 'p:txt', titulo: 'Dados da parametrização', texto: prm.texto, pre: false });
   }
+  if (!g.param) { const mp = renderModelo('obs_parametrizado', ctxDe(g)).texto; if ((mp || '').trim()) L.push({ id: 'm:par', titulo: nomeModelo('obs_parametrizado') + ' (modelo)', texto: mp, pre: false }); }
   if (g.pedido.obs) L.push({ id: 'o:ped', titulo: 'Observações do pedido (e-mail)', texto: g.pedido.obs, pre: false });
   return L;
 }
@@ -2832,8 +2896,14 @@ function htmlModalCorrigir() {
    Painel do dia: visão operacional (sem caixa de pendências por operador)
    ==================================================================== */
 let painelDia = isoDia(new Date());
-let painelModo = 'dia';   // 'dia' | 'mes'
+let painelModo = 'dia';   // 'dia' | 'semana' | 'mes'
 let painelMes = isoDia(new Date()).slice(0, 7);
+// Semana ISO (segunda a domingo), no formato do <input type="week">: AAAA-Www
+function semanaDe(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const dow = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dow); const a = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return t.getUTCFullYear() + '-W' + String(Math.ceil(((t - a) / 864e5 + 1) / 7)).padStart(2, '0'); }
+function intervaloSemana(v) { const m = /^(\d{4})-W(\d{2})$/.exec(v || ''); if (!m) return null; const j4 = new Date(Date.UTC(+m[1], 0, 4)); const seg = new Date(j4); seg.setUTCDate(j4.getUTCDate() - ((j4.getUTCDay() || 7) - 1) + (+m[2] - 1) * 7); const dom = new Date(seg); dom.setUTCDate(seg.getUTCDate() + 6); const f = x => x.toISOString().slice(0, 10); return { ini: f(seg), fim: f(dom) }; }
+let painelSemana = semanaDe(new Date());
+const rotuloSemana = v => { const i = intervaloSemana(v); return i ? diaBR(i.ini).slice(0, 5) + ' a ' + diaBR(i.fim).slice(0, 5) : v; };
+const regsDoPeriodo = () => painelModo === 'mes' ? Reg.doMes(painelMes) : painelModo === 'semana' ? (i => Reg.doPeriodo(i.ini, i.fim))(intervaloSemana(painelSemana) || { ini: '', fim: '' }) : Reg.doDia(painelDia);
 let painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' };
 let conc = null;    // resultado da conciliação
 let amostra = null;
@@ -2882,10 +2952,10 @@ function csvRegistros(regs) {
 }
 async function renderPainel(app) {
   app.innerHTML = '<p class="muted">Carregando registros…</p>';
-  const mes = painelModo === 'mes';
-  if (mes) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
+  const mes = painelModo === 'mes', sem = painelModo === 'semana', longo = mes || sem;
+  if (longo) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
   await Param.carregar();
-  const base = mes ? Reg.doMes(painelMes) : Reg.doDia(painelDia);
+  const base = regsDoPeriodo();
   const todos = base.filter(r => !r.tipo).sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1));
   const regs = todos.filter(r => r.status !== 'descartado' && r.status !== 'devolvido');
   const ativos = regs.filter(r => r.status !== 'cancelado');
@@ -2898,11 +2968,11 @@ async function renderPainel(app) {
   const porClinica = {}; ativos.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
   const maxC = Math.max(1, ...Object.values(porClinica).map(x => x.n));
   const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean));
-  const per = mes ? 'mês' : 'dia';
+  const per = mes ? 'mês' : sem ? 'semana' : 'dia';
   app.innerHTML = `
   <div class="card"><div class="linha-flex">
-    <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!mes}" class="${!mes ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('layers', 'sm')} Mês</button></div>
-    ${mes ? `<div><label class="lbl" for="painelMes">Mês</label><input type="month" id="painelMes" value="${painelMes}" style="width:auto"></div>` : `<div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>`}
+    <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!longo}" class="${!longo ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${sem}" class="${sem ? 'on igual' : ''}" data-act="painelModo" data-v="semana">${ic('calendar', 'sm')} Semana</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('layers', 'sm')} Mês</button></div>
+    ${sem ? `<div><label class="lbl" for="painelSemana">Semana</label><input type="week" id="painelSemana" value="${painelSemana}" style="width:auto"></div>` : mes ? `<div><label class="lbl" for="painelMes">Mês</label><input type="month" id="painelMes" value="${painelMes}" style="width:auto"></div>` : `<div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>`}
     <button class="btn" data-act="atualizarPainel" style="align-self:flex-end">${ic('refresh')}Atualizar</button>
     <span style="flex:1"></span>
     <button class="btn line" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (${lista.length})</button></div></div>
@@ -2914,7 +2984,7 @@ async function renderPainel(app) {
   ].filter(k => k[3] || (k[1] && k[1] !== 0)).map(([c, v, t]) => `<div class="kpi ${c}"><b>${v}</b><span>${t}</span></div>`).join('')}
   </div>
   <div class="card"><div class="card-h"><h2>Guias por clínica</h2></div>
-    ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste dia.</p>'}</div>
+    ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste período.</p>'}</div>
   <div class="card">
     <div class="card-h"><h2>Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
     <div class="filtros" style="margin-bottom:12px">
@@ -2925,10 +2995,10 @@ async function renderPainel(app) {
       <div><label class="lbl" for="fP">Parametrização</label><select id="fP" data-fp="param"><option value="">Todas</option><option value="sim" ${painelFiltro.param === 'sim' ? 'selected' : ''}>Parametrizadas</option><option value="nao" ${painelFiltro.param === 'nao' ? 'selected' : ''}>Não parametrizadas</option></select></div>
       <div><button class="btn ghost" data-act="limparFiltros" ${Object.values(painelFiltro).some(Boolean) ? '' : 'disabled'}>${ic('x', 'sm')}Limpar filtros</button></div>
     </div>
-    <div class="tabela-scroll"><table class="t"><thead><tr><th>${mes ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
+    <div class="tabela-scroll"><table class="t"><thead><tr><th>${longo ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
     ${lista.map(r => {
       const tot = r.totalGuias || 1, canc = r.status === 'cancelado';
-      return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${mes ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}</td>
+      return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${longo ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}${r.operador ? `<div style="margin-top:4px" title="Quem gerou">${htmlOperador(r.operador, r.operadorId)}</div>` : ''}</td>
       <td class="c">${tot > 1 ? `<span class="sq idc idc-${(r.idxGuia || 0) % 10}" title="Guia ${(r.idxGuia || 0) + 1} de ${tot}">${(r.idxGuia || 0) + 1}/${tot}</span>` : '—'}</td>
       <td class="num">${esc(r.carteira || '')}</td><td class="num">${(r.itens || []).map(i => `${i.c} × ${i.q ?? '?'}${i.aut === false ? ' <span class="tag bad">' + ic('x', 'sm') + 'negado</span>' : ''}`).join('<br>')}</td><td class="num"><b>${esc(r.guia || '')}</b></td>
       <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
@@ -2938,7 +3008,7 @@ async function renderPainel(app) {
     }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`}
     </tbody></table></div>
   </div>
-  ${mes ? '' : `<div class="card">
+  ${longo ? '' : `<div class="card">
     <div class="card-h"><h2>Amostragem do apoio</h2></div>
     <div class="acoes" style="margin-top:0"><button class="btn" data-act="sortear">${ic('refresh')}Sortear amostra</button></div>
     ${amostra ? `<div class="tabela-scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Guia</th><th>Resultado</th><th>Carteira</th><th>Itens (código × qtd.)</th></tr></thead><tbody>${amostra.map(r => `<tr><td class="num">${esc(r.guia)}</td><td>${tagResultado(resultadoDe(r))}</td><td class="num">${esc(r.carteira)}</td><td class="num">${r.itens.map(i => i.c + ' × ' + i.q).join(' · ')}</td></tr>`).join('')}</tbody></table></div>` : ''}
@@ -3041,8 +3111,9 @@ const CFG_SECOES = [
   ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['param', 'layers', 'Parametrizações'],
   ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['info', 'info', 'Informações e versão do sistema']
 ];
+let cfgOpsIni = [];
 function iniciarCfgEdit() {
-  cfgEdit = clonar(cfg); cfgDirty = false; cfgErros = [];
+  cfgEdit = clonar(cfg); cfgOpsIni = cfg.operadores.map(o => o.id); cfgDirty = false; cfgErros = [];
   cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); });
 }
 const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
@@ -3056,7 +3127,7 @@ function atualizarBarraCfg() {
 function validarCfg(c) {
   const E = [], add = (s, m) => E.push({ s, m });
   const ops = new Set();
-  c.operadores.forEach((o, i) => { const n = norm(o.nome); if (!n) add('perfil', `Operador ${i + 1}: informe o nome de exibição.`); else if (ops.has(n)) add('perfil', `Há dois operadores chamados “${o.nome}”.`); ops.add(n); });
+  c.operadores.forEach((o, i) => { if (!hexValido(o.corRgb)) add('perfil', `Operador ${i + 1}: cor inválida.`); const n = norm(o.nome); if (!n) add('perfil', `Operador ${i + 1}: informe o nome de exibição.`); else if (ops.has(n)) add('perfil', `Há dois operadores chamados “${o.nome}”.`); ops.add(n); });
   if (!c.operadores.length) add('perfil', 'Cadastre ao menos um operador.');
   const nomes = new Set(), emails = {};
   c.clinicas.forEach((cl, i) => {
@@ -3128,12 +3199,19 @@ function cfgAparencia() {
 }
 
 /* ---------- 2. Perfil e identificação ---------- */
+const perfilEditavel = o => { const eu = operadorObj(); return !o.senhaHash || (eu && eu.id === o.id); };
 function cfgPerfil() {
-  return `<div class="card">${cabSecao('Perfil e identificação', 'Cada operador tem nome de exibição, ícone e cor. A identificação é só visual e de registro: não atribui atendimentos a ninguém, e qualquer operador pode continuar ou concluir o trabalho de outro.')}
-  ${cfgEdit.operadores.map((o, i) => `<div class="op-card"><div class="linha-flex" style="margin-bottom:10px">${htmlAvatar(o, true)}<b data-eco="operadores.${i}.nome">${esc(o.nome || 'Novo operador')}</b><span class="tag id idc ${o.cor}">${glifo(o.icone)}${esc(o.nome || 'Prévia')}</span><span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}">${ic('trash', 'sm')}Remover</button></div>
-    <div class="form-grid"><div><label class="lbl" for="opn-${i}">Nome de exibição</label><input type="text" id="opn-${i}" data-cfg="operadores.${i}.nome" value="${esc(o.nome)}"></div></div>
-    <div style="margin-top:12px"><span class="lbl">Animal</span><div class="av-op" role="radiogroup" aria-label="Ícone">${AVATARES.map(a => `<button type="button" class="${o.icone === a ? 'on' : ''}" role="radio" aria-checked="${o.icone === a}" data-act="opIcone" data-i="${i}" data-v="${a}" title="${AVATAR_NOME[a]}" aria-label="${AVATAR_NOME[a]}">${glifo(a)}</button>`).join('')}</div></div>
-    <div style="margin-top:12px"><span class="lbl">Cor de identificação</span><div class="sw" role="radiogroup" aria-label="Cor">${CORES_ID.map(([c, n]) => `<button type="button" class="idc ${c} ${o.cor === c ? 'on' : ''}" role="radio" aria-checked="${o.cor === c}" data-act="opCor" data-i="${i}" data-v="${c}" title="${n}" aria-label="${n}">${o.cor === c ? ic('check', 'sm') : ''}</button>`).join('')}</div></div></div>`).join('')}
+  const eu = operadorObj();
+  return `<div class="card">${cabSecao('Perfil e identificação')}
+  ${cfgEdit.operadores.map((o, i) => { const meu = eu && eu.id === o.id, tranc = !perfilEditavel(o), dis = tranc ? 'disabled' : '';
+    return `<div class="op-card ${tranc ? 'trancado' : ''}"><div class="linha-flex" style="margin-bottom:8px"><span data-opprev="${i}" class="tag id" style="${estiloOp(o)}">${glifo(o.icone)}<span data-eco="operadores.${i}.nome">${esc(o.nome || 'Novo operador')}</span></span>
+      ${o.senhaHash ? `<span class="tag ok">${ic('lock', 'sm')}Com senha</span>` : '<span class="tag">Sem senha</span>'}${tranc ? `<span class="tag warn">${ic('lock', 'sm')}Protegido: selecione este operador para editar</span>` : ''}${meu ? '<span class="tag info">Você</span>' : ''}
+      <span style="flex:1"></span><button class="btn sm dng" data-act="opRem" data-i="${i}" ${dis}>${ic('trash', 'sm')}Remover</button></div>
+    <div class="form-grid"><div><label class="lbl" for="opn-${i}">Nome de exibição</label><input type="text" id="opn-${i}" data-cfg="operadores.${i}.nome" value="${esc(o.nome)}" ${dis}></div>
+      <div><span class="lbl">Cor de identificação (RGB) e transparência</span><div class="cor-linha"><input type="color" data-opcor="${i}:rgb" value="${esc(o.corRgb)}" aria-label="Cor" ${dis}><input type="text" data-opcor="${i}:hex" value="${esc(o.corRgb)}" maxlength="7" style="width:92px" aria-label="Cor em hexadecimal" ${dis}>
+        <label class="lbl" style="margin:0" for="opt-${i}">Transparência</label><input type="range" id="opt-${i}" min="0" max="95" value="${100 - o.corAlfa}" data-opcor="${i}:transp" ${dis}><span class="num" data-opteco="${i}">${100 - o.corAlfa}%</span></div></div></div>
+    <div style="margin-top:10px"><span class="lbl">Animal</span><div class="av-op" role="radiogroup" aria-label="Animal">${AVATARES.map(a => `<button type="button" class="${o.icone === a ? 'on' : ''}" role="radio" aria-checked="${o.icone === a}" data-act="opIcone" data-i="${i}" data-v="${a}" title="${AVATAR_NOME[a]}" aria-label="${AVATAR_NOME[a]}" ${dis}>${glifo(a)}</button>`).join('')}</div></div>
+    ${meu ? `<div style="margin-top:10px"><span class="lbl">Senha deste operador (pedida ao trocar para ele; protege a edição do perfil)</span><div class="cor-linha"><input type="password" id="sn-${i}" placeholder="Nova senha (mín. 4)" autocomplete="new-password" style="width:170px"><input type="password" id="sc-${i}" placeholder="Confirmar senha" autocomplete="new-password" style="width:170px"><button class="btn sm" data-act="opSenha" data-i="${i}">${ic('lock', 'sm')}${o.senhaHash ? 'Trocar senha' : 'Definir senha'}</button>${o.senhaHash ? `<button class="btn sm dng" data-act="opSenhaRem" data-i="${i}">Remover senha</button>` : ''}</div></div>` : ''}</div>`; }).join('')}
   <div class="acoes"><button class="btn line" data-act="opAdd">${ic('plus')}Adicionar operador</button></div></div>`;
 }
 
@@ -3486,7 +3564,7 @@ const acoes = {
 
   /* ---- etapa 4: resultado, observação e resposta ---- */
   setGlosa(b) { const g = guiaAtiva(), gl = glosaDe(g); gl.resp = b.dataset.v; if (gl.resp === 'nao') gl.itens = {}; persistir(); render(); },
-  setSit(b) { const g = guiaAtiva(), r = g.resultado; r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; g.respEdit = null; persistir(); render(); },
+  setSit(b) { const g = guiaAtiva(), r = g.resultado; r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; if (r.situacao === 'nao') glosaDe(g).itens = {}; g.respEdit = null; persistir(); render(); },
   async copiarEmail(b) {
     const g = guiaAtiva(), v = $('#emailPrest').value.trim();
     if (!emailValido(v)) { toast('Informe um e-mail de prestador válido para copiar.', 'bad'); return; }
@@ -3558,14 +3636,14 @@ const acoes = {
   },
   /* ---- painel do dia ---- */
   atualizarQuadro() { render(); },
-  atualizarPainel() { if ($('#painelMes')) painelMes = $('#painelMes').value || painelMes; if ($('#painelDia')) painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
+  atualizarPainel() { if ($('#painelSemana')) painelSemana = $('#painelSemana').value || painelSemana; if ($('#painelMes')) painelMes = $('#painelMes').value || painelMes; if ($('#painelDia')) painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
   painelModo(b) { painelModo = b.dataset.v; render(); },
   limparFiltros() { painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' }; render(); },
   exportarCsv() {
-    const base = painelModo === 'mes' ? Reg.doMes(painelMes) : Reg.doDia(painelDia);
+    const base = regsDoPeriodo();
     const regs = filtrarRegs(base.filter(r => !r.tipo && r.status !== 'descartado' && r.status !== 'devolvido'));
     if (!regs.length) { toast('Não há linhas para exportar com os filtros atuais.', 'bad'); return; }
-    baixar(painelModo === 'mes' ? `Conferidor_Guias_Registros_Mes_${painelMes.split('-').reverse().join('-')}.csv` : nomeArquivo('Registros', painelDia, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8');
+    baixar(painelModo === 'semana' ? `Conferidor_Guias_Registros_Semana_${painelSemana}.csv` : painelModo === 'mes' ? `Conferidor_Guias_Registros_Mes_${painelMes.split('-').reverse().join('-')}.csv` : nomeArquivo('Registros', painelDia, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8');
   },
   /* ---- corrigir / cancelar / excluir guia (Painel) ---- */
   corrigirGuia(b) {
@@ -3615,6 +3693,7 @@ const acoes = {
     prepararSalvar(cfgEdit); cfgErros = validarCfg(cfgEdit);
     if (cfgErros.length) { await render(); window.scrollTo(0, 0); toast(`${cfgErros.length} problema(s) encontrado(s). Nada foi salvo.`, 'bad'); return; }
     try {
+      await mesclarOperadoresDaPasta(cfgEdit);
       await salvarConfig(cfgEdit); iniciarCfgEdit(); await render();
       toast('Configurações salvas' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.'));
     } catch (e) { toast('Erro ao salvar: ' + e.message, 'bad'); }
@@ -3639,10 +3718,24 @@ const acoes = {
     toast(n + ' arquivo(s) apagado(s).');
   },
   /* ---- operadores ---- */
-  opAdd() { cfgEdit.operadores.push({ id: 'op-' + Date.now().toString(36), nome: '', icone: animalAleatorio(), cor: 'idc-' + (cfgEdit.operadores.length % 10) }); marcarSujo(); render(); },
-  opRem(b) { if (cfgEdit.operadores.length < 2) { toast('Mantenha ao menos um operador.', 'bad'); return; } if (!confirm('Remover este operador da lista? Os registros antigos continuam com o nome dele.')) return; cfgEdit.operadores.splice(+b.dataset.i, 1); marcarSujo(); render(); },
-  opIcone(b) { cfgEdit.operadores[+b.dataset.i].icone = b.dataset.v; marcarSujo(); render(); },
-  opCor(b) { cfgEdit.operadores[+b.dataset.i].cor = b.dataset.v; marcarSujo(); render(); },
+  opAdd() { cfgEdit.operadores.push({ id: 'op-' + Date.now().toString(36), nome: '', icone: animalAleatorio(), corRgb: CORES_PADRAO_HEX[cfgEdit.operadores.length % 10], corAlfa: 25 }); marcarSujo(); render(); },
+  opRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; } if (cfgEdit.operadores.length < 2) { toast('Mantenha ao menos um operador.', 'bad'); return; } if (!confirm('Remover este operador da lista? Os registros antigos continuam com o nome dele.')) return; cfgEdit.operadores.splice(+b.dataset.i, 1); marcarSujo(); render(); },
+  opIcone(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; } o.icone = b.dataset.v; marcarSujo(); render(); },
+  async opSenha(b) {
+    const i = +b.dataset.i, o = cfgEdit.operadores[i], s1 = $('#sn-' + i).value, s2 = $('#sc-' + i).value;
+    if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; }
+    if (s1.length < 4) { toast('A senha deve ter ao menos 4 caracteres.', 'bad'); return; }
+    if (s1 !== s2) { toast('A confirmação não confere com a senha.', 'bad'); return; }
+    o.senhaSalt = Senha.novoSal(); o.senhaHash = await Senha.hash(s1, o.senhaSalt); marcarSujo(); render(); toast('Senha definida. Clique em Salvar configurações para valer.');
+  },
+  opSenhaRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o) || !confirm('Remover a senha deste operador?')) return; delete o.senhaHash; delete o.senhaSalt; marcarSujo(); render(); },
+  async senhaOk(el) {
+    const op = cfg.operadores.find(x => x.id === M.opId), v = $('#senhaIn').value;
+    if (!op) return;
+    let ok = false; try { ok = await Senha.confere(op, v); } catch (e) { toast('Não foi possível verificar a senha: ' + e.message, 'bad'); return; }
+    if (!ok) { toast('Senha incorreta.', 'bad'); $('#senhaIn').select(); return; }
+    Senha.marcar(op.id); LS.set('operadorId', op.id); fecharModal(true); render(); toast('Operador: ' + op.nome);
+  },
   /* ---- clínicas ---- */
   clSel(b) { cfgClinicaSel = +b.dataset.i; render(); },
   clNova() { cfgEdit.clinicas.push({ id: 'nova-' + Date.now().toString(36), nome: '', cidade: '', executante: '', emails: [], apelidos: '', codigos: {}, _lista: [] }); cfgClinicaSel = cfgEdit.clinicas.length - 1; marcarSujo(); render(); setTimeout(() => $('#cl-nome')?.focus(), 30); },
@@ -3736,6 +3829,13 @@ let tFiltro;
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.classList && t.classList.contains('ed')) return onEditorInput(t);
+  if (t.dataset.opcor && cfgEdit) {
+    const [i, campo] = t.dataset.opcor.split(':'), o = cfgEdit.operadores[+i]; if (!o || !perfilEditavel(o)) return;
+    if (campo === 'rgb') { o.corRgb = t.value.toLowerCase(); const hx = $(`[data-opcor="${i}:hex"]`); if (hx) hx.value = o.corRgb; }
+    else if (campo === 'hex') { const v = t.value.startsWith('#') ? t.value : '#' + t.value; if (!hexValido(v)) return; o.corRgb = v.toLowerCase(); const rg = $(`[data-opcor="${i}:rgb"]`); if (rg) rg.value = o.corRgb; }
+    else { o.corAlfa = 100 - Number(t.value); const e = $(`[data-opteco="${i}"]`); if (e) e.textContent = t.value + '%'; }
+    marcarSujo(); $$(`[data-opprev="${i}"]`).forEach(e => e.setAttribute('style', estiloOp(o))); return;
+  }
   if (t.dataset.cfg !== undefined && cfgEdit) { setCfg(t); return; }
   if (t.dataset.filtro) {
     const q = norm(t.value), alvo = t.dataset.filtro === 'cl' ? '#listaCl .cl-item' : '#tabCod tbody tr';
@@ -3785,10 +3885,20 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
-  if (t.id === 'operador') { LS.set('operadorId', t.value); render(); return; }
+  if (t.id === 'operador') {
+    const op = cfg.operadores.find(x => x.id === t.value);
+    if (op && op.senhaHash && Senha.autenticado() !== op.id) {
+      M = { tipo: 'senha', opId: op.id };
+      abrirModal({ titulo: 'Senha do operador', sub: op.nome, icone: 'lock', tamanho: 'p', aoFechar: () => render(),
+        corpo: `<label class="lbl" for="senhaIn">Senha de ${esc(op.nome)}</label><input type="password" id="senhaIn" data-enter="senhaOk" autocomplete="current-password" autofocus>`,
+        rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="senhaOk">${ic('check')}Entrar</button>` });
+      render(); return;
+    }
+    LS.set('operadorId', t.value); render(); return;
+  }
   if (t.id === 'arquivoEml') { const f = t.files[0]; t.value = ''; if (f) abrirArquivo(f); return; }
   if (t.id === 'arqConc') { try { await conciliarEmails([...t.files]); } catch (err) { toast('Erro ao ler: ' + err.message, 'bad'); } return; }
-  if (t.id === 'painelDia' || t.id === 'painelMes') { acoes.atualizarPainel(); return; }
+  if (t.id === 'painelDia' || t.id === 'painelMes' || t.id === 'painelSemana') { acoes.atualizarPainel(); return; }
   if (t.id === 'impCfg') {
     const f = t.files[0]; if (!f) return;
     try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); const keep = cfgEdit; cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
@@ -3812,7 +3922,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'cartUsada') { g.carteiraUsada = normCart(t.value); persistir(); render(); return; }
   if (t.dataset.cpcampo) { g.itensEditados = true; persistir(); return; }
   if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
-  if (t.dataset.neg) { const r = g.resultado; if (t.checked) r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
+  if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
   if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return; }
   if (t.dataset.resf) {
     if (t.dataset.resf === 'usarCorrecao') { g.usarCorrecao = t.checked; g.respEdit = null; }
@@ -3832,6 +3942,12 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dragover', e => { if (aba === 'atend' && !S) e.preventDefault(); });
 document.addEventListener('drop', e => { if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
 window.addEventListener('beforeunload', e => { if (cfgDirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// Ao voltar para a janela, relê o config.json da pasta (operadores e senhas de colegas) se não houver edição em curso
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !Pasta.ok || cfgDirty || M) return;
+  try { const antes = JSON.stringify(cfg.operadores); await carregarConfig(); if (JSON.stringify(cfg.operadores) !== antes) { if (cfgEdit) iniciarCfgEdit(); render(); } } catch (e) { }
+});
 
 async function init() {
   Tema.aplicar();

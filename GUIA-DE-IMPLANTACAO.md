@@ -96,6 +96,18 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 
 ---
 
+### Perfis, cores e senha
+- Em Configurações > Perfil cada operador escolhe nome, animal, **cor (RGB)** e **transparência**; o botão do operador no topo e as etiquetas usam essa cor.
+- Cada operador pode definir uma **senha**, pedida ao trocar para ele. Perfis com senha só são editados pelo próprio operador.
+- Atenção: é uma trava de uso, não segurança forte. O código (hash) fica no `config.json` da pasta compartilhada, e quem tem acesso à pasta pode alterá-lo.
+- Ao salvar, o `config.json` da pasta é regravado, preservando operadores criados ou protegidos por colegas desde que a tela foi aberta. Outras máquinas releem o arquivo ao voltar para a janela.
+
+### Visões do Painel
+Dia, **Semana** (segunda a domingo) e Mês. A coluna Clínica mostra quem gerou a guia.
+
+### Glosas
+Em guias autorizadas e **parcialmente autorizadas** responda "Retirou alguma glosa?". Na parcial, os serviços negados não entram na lista. A glosa é escolhida entre as cadastradas em Configurações.
+
 ## 7. Regras de alertas
 
 Os alertas e seus comportamentos padrão estão em **Configurações › Alertas e regras de validação**. Em resumo: falta de beneficiário, serviço, quantidade, médico, carteira inválida e código incorreto ou repetido são **bloqueios**; o restante é **aviso de atenção**. Anexo não é alerta: apenas o primeiro atendimento sem parametrização gera um aviso, e as divergências em relação a uma parametrização existente também. Não há mais prazos de duplicidade nem de emissão antiga.
