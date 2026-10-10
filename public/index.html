@@ -126,6 +126,10 @@ button.chip:active{transform:translateY(1px)}
 .btn.so{font-size:0;gap:0;padding:0 9px;min-width:var(--h-ctl)}
 .btn.sm.so,.btn.cp{min-width:var(--h-sm);padding:0 8px}
 .btn.so .ic{font-size:var(--fs-sm)}
+.prog{display:none;width:30px;height:30px;border-radius:50%;flex:none;align-items:center;justify-content:center;position:relative;background:conic-gradient(var(--c-solid,var(--primary)) calc(var(--p,0)*1%),var(--surface-3) 0)}
+.prog::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--surface)}
+.prog b{position:relative;font-size:8px;font-weight:700;line-height:1;color:var(--text-2);font-variant-numeric:tabular-nums}
+body.topo-mini .prog{display:inline-flex;margin-right:auto}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -150,9 +154,9 @@ body.topo-mini .chip select{max-width:46vw}
   .topo-acoes{gap:5px;width:100%;justify-content:flex-end}
   .chip select{min-width:80px;max-width:36vw}
 }
-.avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:50%;background:var(--c-bg,var(--surface-3));color:var(--c-fg,var(--text-2));border:1px solid var(--c-br,var(--border))}
-.avatar .emoji{font-size:13px;line-height:1}.avatar.lg .emoji{font-size:21px}.tag .emoji{font-size:12px;line-height:1}.av-op .emoji{font-size:20px;line-height:1}
-.avatar.lg{width:34px;height:34px}.avatar.lg .ic{width:19px;height:19px}
+.avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:50%;background:var(--c-bg,var(--surface-3));color:var(--c-fg,var(--text-2));border:1px solid var(--c-br,var(--border))}
+.avatar .emoji{font-size:18px;line-height:1}.avatar.lg .emoji{font-size:29px}.tag .emoji{font-size:15px;line-height:1}.av-op .emoji{font-size:27px;line-height:1}
+.avatar.lg{width:44px;height:44px}.avatar.lg .ic{width:19px;height:19px}
 .sq{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:6px;background:var(--c-bg);color:var(--c-fg);border:1px solid var(--c-br);font-size:10.5px;font-weight:750;letter-spacing:.02em}
 .sq.lg{width:34px;height:34px;font-size:13px;border-radius:9px}
 
@@ -489,7 +493,7 @@ pre.simples{white-space:pre-wrap;font-family:var(--font-sans);margin:0}
 .sw button.on{border-color:var(--text);box-shadow:0 0 0 2px var(--surface) inset}
 .sw button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .av-op{display:flex;flex-wrap:wrap;gap:6px}
-.av-op button{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.av-op button{width:46px;height:46px;border-radius:50%;border:2px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
 .av-op button:hover{background:var(--surface-3)}
 .av-op button.on{border-color:var(--primary);background:var(--soft);color:var(--soft-fg)}
 .av-op button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -561,6 +565,7 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
         <p class="sub">Núcleo Gestão de Terapias</p>
       </div>
     </div>
+    <span class="prog" id="topoProg" role="img"></span>
     <div class="topo-acoes" id="topoAcoes"></div>
   </div>
 </header>
@@ -2282,6 +2287,14 @@ function renderTopo() {
   document.body.classList.toggle('topo-mini', mini);
   cab.style.cssText = mini && op ? estiloOp(op) : '';
   const nivel = !Pasta.suportado ? 'bad' : Pasta.ok ? 'ok' : Pasta.handle ? 'warn' : 'bad';
+  // Progresso do atendimento (só no topo compacto): 33% lendo o pedido, 66% gerando a guia, 100% respondendo/anexando
+  const pg = $('#topoProg');
+  if (pg) {
+    const v = aba === 'atend' && S ? S.vista : 0, p = v === 1 || v === 2 ? 33 : v === 3 ? 66 : v === 4 ? 100 : 0;
+    pg.style.setProperty('--p', p); pg.innerHTML = `<b>${p}</b>`;
+    pg.title = p ? `Atendimento: ${p}% (${p === 33 ? 'lendo o pedido' : p === 66 ? 'gerando a guia' : 'anexando e respondendo'})` : 'Sem atendimento em andamento';
+    pg.setAttribute('aria-label', pg.title);
+  }
   if (mini) {
     $('#topoAcoes').innerHTML = `
     <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
