@@ -104,7 +104,7 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 
 ### Topo compacto e telas estreitas
 - O botão pequeno ao lado de Claro/Escuro oculta o menu de seções e o topo. Fica uma barra fina na cor do operador com o nome, uma luz da pasta (verde conectada, amarela reautorizar, vermelha sem pasta) e o botão para voltar. A escolha fica salva neste computador.
-- No canto esquerdo do topo compacto há uma bolinha de progresso na cor do operador: 33% lendo o pedido, 66% gerando a guia, 100% anexando e respondendo; cinza (0) fora do atendimento.
+- No canto esquerdo do topo compacto há uma bolinha por operador com atendimento em andamento (inclusive colegas, lidos da pasta compartilhada e atualizados a cada 20 s): anel na cor e com o animal do operador, 33% lendo o pedido, 66% gerando a guia, 100% anexando e respondendo. Ao passar o mouse aparecem o paciente e a clínica. Sem atendimento, uma bolinha cinza.
 - Botões secundários (copiar, atualizar, corrigir, excluir etc.) mostram só o ícone, com o nome na dica ao passar o mouse. Há um botão de copiar ao lado da carteira usada no sistema.
 - A página foi ajustada para funcionar até 320 px de largura, sem rolagem horizontal.
 

@@ -126,10 +126,12 @@ button.chip:active{transform:translateY(1px)}
 .btn.so{font-size:0;gap:0;padding:0 9px;min-width:var(--h-ctl)}
 .btn.sm.so,.btn.cp{min-width:var(--h-sm);padding:0 8px}
 .btn.so .ic{font-size:var(--fs-sm)}
-.prog{display:none;width:30px;height:30px;border-radius:50%;flex:none;align-items:center;justify-content:center;position:relative;background:conic-gradient(var(--c-solid,var(--primary)) calc(var(--p,0)*1%),var(--surface-3) 0)}
-.prog::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--surface)}
-.prog b{position:relative;font-size:8px;font-weight:700;line-height:1;color:var(--text-2);font-variant-numeric:tabular-nums}
-body.topo-mini .prog{display:inline-flex;margin-right:auto}
+.progs{display:none;gap:6px;align-items:center;margin-right:auto;min-width:0}
+body.topo-mini .progs{display:flex}
+.prog{width:32px;height:32px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;position:relative;cursor:help;background:conic-gradient(var(--c-solid,var(--primary)) calc(var(--p,0)*1%),var(--surface-3) 0)}
+.prog::before{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--surface)}
+.prog .pe{position:relative;display:inline-flex;line-height:1}
+.prog .emoji{font-size:17px}.prog .ic{color:var(--text-3)}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -565,7 +567,7 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
         <p class="sub">Núcleo Gestão de Terapias</p>
       </div>
     </div>
-    <span class="prog" id="topoProg" role="img"></span>
+    <div class="progs" id="topoProg"></div>
     <div class="topo-acoes" id="topoAcoes"></div>
   </div>
 </header>
@@ -2275,6 +2277,29 @@ const tagItem = est => ({
 const nomeGuia = g => `${g.pedido.beneficiario || 'Beneficiário não informado'}`;
 
 /* ---------- Topo e abas ---------- */
+/* ---------- Progresso dos operadores (topo compacto) ---------- */
+const ROT_ETAPA = { 33: 'lendo o pedido', 66: 'gerando a guia', 100: 'anexando e respondendo' };
+function listaProgresso() {
+  const lim = cfg.preferencias.acoesMinutos || 60, idade = r => (Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000;
+  const mapa = new Map();
+  Reg.doDia(isoDia(new Date())).filter(r => !r.tipo && r.status === 'em_andamento' && idade(r) <= lim).forEach(r => mapa.set(r.id, r));
+  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => mapa.set(g.id, montarRegistro(g, 'em_andamento')));
+  const porOp = new Map();
+  [...mapa.values()].sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1)).forEach(r => { const k = r.operadorId || r.operador || '?'; if (!porOp.has(k)) porOp.set(k, r); });
+  return [...porOp.values()].map(r => {
+    const o = cfg.operadores.find(x => x.id === r.operadorId) || cfg.operadores.find(x => x.nome === r.operador) || null;
+    const v = r.vista || r.etapa || 2, p = v <= 2 ? 33 : v >= 4 ? 100 : 66;
+    const tip = `${r.operador || (o && o.nome) || 'Operador'}: ${r.paciente || r.pacienteIni || 'paciente'} × ${r.clinica || r.remetente || 'clínica não identificada'}${(r.totalGuias || 1) > 1 ? ` (guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias})` : ''} · ${ROT_ETAPA[p]} (${p}%)`;
+    return { o, p, tip };
+  });
+}
+function pintarProgresso() {
+  const el = $('#topoProg'); if (!el) return;
+  const L = listaProgresso();
+  el.innerHTML = L.length ? L.map(x => `<span class="prog" role="img" style="--p:${x.p};${x.o ? estiloOp(x.o) : ''}" title="${esc(x.tip)}" aria-label="${esc(x.tip)}"><span class="pe">${x.o ? glifo(x.o.icone) : ic('user', 'sm')}</span></span>`).join('')
+    : `<span class="prog" role="img" style="--p:0" title="Nenhum atendimento em andamento" aria-label="Nenhum atendimento em andamento"><span class="pe">${ic('user', 'sm')}</span></span>`;
+}
+setInterval(async () => { if (document.hidden || !LS.get('topoMini', false)) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
   const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : painelModo === 'semana' ? 'Semana: ' + rotuloSemana(painelSemana) : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
@@ -2287,14 +2312,7 @@ function renderTopo() {
   document.body.classList.toggle('topo-mini', mini);
   cab.style.cssText = mini && op ? estiloOp(op) : '';
   const nivel = !Pasta.suportado ? 'bad' : Pasta.ok ? 'ok' : Pasta.handle ? 'warn' : 'bad';
-  // Progresso do atendimento (só no topo compacto): 33% lendo o pedido, 66% gerando a guia, 100% respondendo/anexando
-  const pg = $('#topoProg');
-  if (pg) {
-    const v = aba === 'atend' && S ? S.vista : 0, p = v === 1 || v === 2 ? 33 : v === 3 ? 66 : v === 4 ? 100 : 0;
-    pg.style.setProperty('--p', p); pg.innerHTML = `<b>${p}</b>`;
-    pg.title = p ? `Atendimento: ${p}% (${p === 33 ? 'lendo o pedido' : p === 66 ? 'gerando a guia' : 'anexando e respondendo'})` : 'Sem atendimento em andamento';
-    pg.setAttribute('aria-label', pg.title);
-  }
+  if (mini) pintarProgresso();
   if (mini) {
     $('#topoAcoes').innerHTML = `
     <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
