@@ -343,9 +343,16 @@ table.t{border-collapse:collapse;width:100%}
 .sit.on.nao{border-color:var(--bad-solid);background:var(--bad-bg)}
 .sit.on .ic{color:currentColor}
 .negados{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:10px}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden}
+.seg button{border:0;background:var(--soft);color:var(--soft-fg);padding:5px 16px;font-size:var(--fs-sm);font-weight:650;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.seg button+button{border-left:1px solid var(--border-strong)}
+.seg button:hover{background:var(--soft-2)}
+.seg button.on{background:var(--primary);color:var(--on-primary)}
+.seg button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .negado{display:grid;grid-template-columns:auto 1fr minmax(180px,260px);gap:10px;align-items:center;padding:9px 12px}
 .negado + .negado{border-top:1px solid var(--border)}
 .negado.on{background:var(--bad-bg)}
+.negado.gl.on{background:var(--warn-bg)}
 @media (max-width:700px){.negado{grid-template-columns:auto 1fr}.negado select{grid-column:1/-1}}
 .rodape-guia{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
@@ -1655,7 +1662,7 @@ const MOTIVOS_PADRAO = [
   { id: 'sem-direito-local', nome: 'Sem direito no local ou prestador', modelo: 'sem_direito_local' },
   { id: 'outro', nome: 'Outro motivo (descrever nas observações)', modelo: '' }
 ];
-const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false };
+const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10 };
 
 /* Motor de modelos: campos entre chaves → texto/HTML. Falta de valor fica visível. */
 function modeloHtmlBruto(k) { return (cfg.modelos[k] || {}).html || ''; }
@@ -1688,7 +1695,7 @@ function configPadrao() {
     clinicas: [],
     modelos: Object.fromEntries(Object.entries(MODELOS_PADRAO).map(([k, m]) => [k, { nome: m.nome, html: padraoHtml(m.texto), uso: (MODELOS_META[k] || {}).custom ? MODELOS_META[k].uso : undefined }])),
     alertas: Object.fromEntries(Object.entries(ALERTAS).map(([k, a]) => [k, { modo: a.modo, dest: 'guia', texto: '' }])),
-    motivos: clonar(MOTIVOS_PADRAO),
+    motivos: clonar(MOTIVOS_PADRAO), glosas: [],
     preferencias: { ...PREFS_PADRAO }
   };
 }
@@ -1724,7 +1731,9 @@ function mesclarConfig(base, c) {
     if (typeof p.conferenciaCega === 'boolean') r.preferencias.conferenciaCega = p.conferenciaCega;
     if (Number.isInteger(p.qtdMax) && p.qtdMax >= 1 && p.qtdMax <= 99) r.preferencias.qtdMax = p.qtdMax;
     if (typeof p.obsParametrizadoAuto === 'boolean') r.preferencias.obsParametrizadoAuto = p.obsParametrizadoAuto;
+    if (Number.isInteger(p.acoesMinutos) && p.acoesMinutos >= 0 && p.acoesMinutos <= 1440) r.preferencias.acoesMinutos = p.acoesMinutos;
   }
+  if (Array.isArray(c.glosas)) r.glosas = unicos(c.glosas.map(g => String(g).trim()).filter(Boolean));
   return r;
 }
 let cfg = configPadrao();
@@ -1739,7 +1748,7 @@ function configParaSalvar(c) {
     operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, cor: o.cor })),
     clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', codigos: cl.codigos || {} })),
     modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
-    alertas: c.alertas, motivos: c.motivos, preferencias: c.preferencias
+    alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], preferencias: c.preferencias
   };
 }
 async function salvarConfig(novo) {
@@ -1839,9 +1848,13 @@ const Reg = {
   doDia(dia) { return this.cache.filter(r => r.dia === dia); },
   /* Histórico completo (sem limite de dias): guia gerada mais recente de cada carteira */
   hist: {}, histPronto: false,
+  todos: {},
   mesclarHist(regs) {
     regs.forEach(r => {
-      if (r.tipo || r.status !== 'concluido' || !r.guia || !r.carteira) return;
+      if (r.tipo || !r.id) return;
+      this.todos[r.id] = r;
+      Object.values(this.hist).forEach(l => { const i = l.findIndex(x => x.id === r.id); if (i >= 0 && (r.status !== 'concluido' || r.carteira !== l[i].carteira)) l.splice(i, 1); });
+      if (r.status !== 'concluido' || !r.guia || !r.carteira) return;
       const lista = (this.hist[r.carteira] = this.hist[r.carteira] || []);
       const i = lista.findIndex(x => x.id === r.id); if (i >= 0) lista[i] = r; else lista.push(r);
     });
@@ -1854,8 +1867,20 @@ const Reg = {
       try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
     }
     for (const k of LS.chaves('reg.')) { const d = LS.get(k, null); if (d) docs.push(d); }
-    this.hist = {}; this.mesclarHist(docs.flatMap(d => d.registros || []));
+    this.hist = {}; this.todos = {};
+    const mapa = new Map();
+    docs.flatMap(d => d.registros || []).forEach(r => { const a = mapa.get(r.id); if (!a || (r.atualizadoEm || '') >= (a.atualizadoEm || '')) mapa.set(r.id, r); });
+    this.mesclarHist([...mapa.values()]);
     await this.carregar(); this.mesclarHist(this.cache); this.histPronto = true;
+  },
+  doMes(ym) { const m = new Map(Object.values(this.todos).filter(r => r.dia && r.dia.startsWith(ym)).map(r => [r.id, r])); this.cache.filter(r => !r.tipo && r.dia && r.dia.startsWith(ym)).forEach(r => m.set(r.id, r)); return [...m.values()]; },
+  async excluir(id) {
+    const r = this.cache.find(x => x.id === id) || this.todos[id]; if (!r) return false;
+    for (const k of LS.chaves('reg.' + r.dia)) { const d = LS.get(k, null); if (d && (d.registros || []).some(x => x.id === id)) { d.registros = d.registros.filter(x => x.id !== id); LS.set(k, d); } }
+    if (Pasta.ok) { const partes = ['registros', r.dia.slice(0, 7)]; for (const [n] of await Pasta.listar(partes)) { if (!n.startsWith(r.dia) || !n.endsWith('.json')) continue; const doc = await Pasta.ler(partes, n); if (doc && (doc.registros || []).some(x => x.id === id)) { doc.registros = doc.registros.filter(x => x.id !== id); await Pasta.gravar(partes, n, doc); } } }
+    this.cache = this.cache.filter(x => x.id !== id); delete this.todos[id];
+    Object.values(this.hist).forEach(l => { const i = l.findIndex(x => x.id === id); if (i >= 0) l.splice(i, 1); });
+    return true;
   },
   ultimaGuia(carteira, atendId) {
     const l = (this.hist[carteira] || []).filter(r => r.atendimentoId !== atendId).sort((a, b) => ((a.concluidoEm || '') < (b.concluidoEm || '') ? 1 : -1));
@@ -1900,7 +1925,7 @@ function novaGuia(bloco, idx, st) {
     copiados: {}, itensEditados: false, editandoItens: false,
     cega: { iniciada: false, tentativas: 0, linhas: '', entradas: [], resultado: null, ok: false, historico: [] },
     numero: '',
-    resultado: { situacao: null, motivoId: '', motivoTxt: '', naoAut: {}, obsAdicionais: '', emailPrestador: (e.responderPara && e.responderPara.email) || e.remetente.email || '' },
+    resultado: { situacao: null, motivoId: '', motivoTxt: '', naoAut: {}, obsAdicionais: '', glosa: { resp: null, itens: {} }, emailPrestador: (e.responderPara && e.responderPara.email) || e.remetente.email || '' },
     usarCorrecao: /^\s*(re|res)\s*:/i.test(e.assunto),
     respEdit: null, respExtras: [], respInc: [], obsEdit: null, obsExtras: [], obsInc: [],
     param: null, semGuia: null, semGuiaCopiado: false, conf: {}
@@ -2016,7 +2041,7 @@ function avaliar(g) {
     if (!n && p.itens.length) add('clinica-sem-codigos', `${cl.nome} ainda não tem códigos cadastrados; as descrições exibidas vêm do e-mail.`);
     p.itens.forEach(it => {
       const cad = descCadastro(cl, it.codigo);
-      if (cad === undefined) add('cod-sem-cadastro', `Código ${it.codigo} sem cadastro para ${cl.nome}. A descrição do e-mail ("${it.desc || 'sem descrição'}") é usada como referência provisória.`, { sub: it.codigo });
+      if (cad === undefined) add('cod-sem-cadastro', `Código ${it.codigo} sem cadastro para ${cl.nome}. A descrição do e-mail ("${it.desc || 'sem descrição'}") é usada como referência provisória.`, { sub: it.codigo, cadastrarCodigo: it.codigo });
       else if (divergeDesc(cad, it.desc)) add('cod-divergente', `Código ${it.codigo}: o e-mail descreve "${it.desc}", mas o cadastro de ${cl.nome} diz "${cad}". O código solicitado foi mantido.`, { sub: it.codigo });
     });
   }
@@ -2046,6 +2071,7 @@ const pedeConferi = a => a.modo === 'atencao' && a.nivel !== 'info';
 const atencaoPendente = (g, st) => st.A.filter(a => pedeConferi(a) && !(g.conf && g.conf[a.key]));
 const cegaExigida = () => !!cfg.preferencias.conferenciaCega;
 const podeFinal = (g, st) => st.pode && (!cegaExigida() || g.cega.ok);
+const glosaDe = g => (g.resultado.glosa = g.resultado.glosa || { resp: null, itens: {} });
 const guiasAtivas = () => S.guias.filter(x => x.status !== 'descartado');
 const usaConsolidada = () => guiasAtivas().length > 1;
 const ehUltima = g => S.guias.every(x => x === g || guiaTerminal(x));
@@ -2075,7 +2101,8 @@ function aplicarParametrizacao(g) {
 }
 
 /* ---------- Registro gravado (sem nome, CID ou médico) ---------- */
-function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut }; }
+function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; const gl = glosaDe(g), temGlosa = r.situacao === 'autorizada' && gl.resp === 'sim';
+  return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut, glosaResp: r.situacao === 'autorizada' ? gl.resp : null, glosas: temGlosa ? Object.entries(gl.itens).map(([c, x]) => ({ c, g: x.glosa || '', m: x.motivo || '' })) : [] }; }
 function montarRegistro(g, status, extra = {}) {
   const p = g.pedido, cl = clinicaDe(S), A = avaliar(g), op = operadorObj();
   const neg = negadosDe(g).map(x => x.it.codigo);
@@ -2083,7 +2110,7 @@ function montarRegistro(g, status, extra = {}) {
     id: g.id, atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.guias.length, versao: VERSAO,
     messageId: S.email.messageId, recebidoEm: S.email.data, assunto: S.email.assunto, remetente: S.email.remetente.email,
     clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: op ? op.nome : '', operadorId: op ? op.id : null, abertoPor: g.abertoPor || (op ? op.nome : ''), dia: S.dia,
-    abertoEm: g.abertoEm, vista: g.vista, pacienteIni: iniciais(g.pedido.beneficiario || ''), atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
+    abertoEm: g.abertoEm, vista: g.vista, pacienteIni: iniciais(g.pedido.beneficiario || ''), paciente: status === 'em_andamento' ? (g.pedido.beneficiario || '') : null, atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
     carteira: g.carteiraUsada || p.carteira || null,
     itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' && !g.semGuia ? !neg.includes(i.codigo) : null })),
     guia: g.semGuia ? null : (g.numero || null), resultado: status === 'concluido' ? resultadoParaRegistro(g) : null,
@@ -2096,9 +2123,7 @@ function montarRegistro(g, status, extra = {}) {
 }
 async function gravarGuia(g, status, extra) { g.status = status; await Reg.salvar(montarRegistro(g, status, extra)); }
 async function gravarTodas(status, soPendentes) { for (const g of S.guias) { if (soPendentes && guiaTerminal(g)) continue; await gravarGuia(g, status === 'descartado' ? 'descartado' : g.status); } }
-const STATUS = { em_andamento: 'Em andamento', concluido: 'Concluída', aguardando_clinica: 'Aguardando clínica', devolvido: 'Devolvido (legado)', descartado: 'Descartada' };
-const MOTIVOS_CORRECAO = ['Serviço omitido', 'Quantidade errada', 'Código errado', 'Serviço a mais', 'Cabeçalho (executante, local, data, médico, CID)', 'Beneficiário/carteira errada', 'Outro'];
-const DETECTADO_POR = ['Clínica', 'Apoio (amostragem)', 'Faturamento', 'Atendimento', 'Próprio operador', 'Outro'];
+const STATUS = { em_andamento: 'Em andamento', concluido: 'Concluída', cancelado: 'Cancelada', aguardando_clinica: 'Aguardando clínica', devolvido: 'Devolvido (legado)', descartado: 'Descartada' };
 
 /* ---------- Textos gerados ---------- */
 function problemasDe(g) { return avaliar(g).filter(a => a.modo === 'bloqueio').map(a => '• ' + (a.clinica || a.texto)).join('\n') || '• (descreva a pendência)'; }
@@ -2136,7 +2161,7 @@ function observacaoDaGuia(g) {
    Interface: componentes comuns, topo, abas, entrada e visão do e-mail
    ==================================================================== */
 const TAG_STATUS = {
-  em_andamento: ['info', 'clip'], concluido: ['ok', 'check'], aguardando_clinica: ['warn', 'mail'], descartado: ['', 'x'], devolvido: ['', 'x']
+  em_andamento: ['info', 'clip'], concluido: ['ok', 'check'], cancelado: ['bad', 'ban'], aguardando_clinica: ['warn', 'mail'], descartado: ['', 'x'], devolvido: ['', 'x']
 };
 const tagStatus = s => { const [c, i] = TAG_STATUS[s] || ['', 'info']; return `<span class="tag ${c}">${ic(i, 'sm')}${esc(STATUS[s] || s)}</span>`; };
 const TAG_RES = { autorizada: ['ok', 'check'], parcial: ['warn', 'halfcircle'], nao: ['bad', 'x'], sem_guia: ['obs', 'mail'] };
@@ -2155,7 +2180,7 @@ const nomeGuia = g => `${g.pedido.beneficiario || 'Beneficiário não informado'
 /* ---------- Topo e abas ---------- */
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
-  const dataTxt = aba === 'painel' ? 'Dia: ' + diaBR(painelDia) : fmtData(hoje);
+  const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
   const pasta = !Pasta.suportado ? { c: 'alerta', i: 'alert', t: 'Use o Chrome ou Edge', d: 'Este navegador não permite acessar a pasta compartilhada.' }
     : Pasta.ok ? { c: 'ok', i: 'folder', t: 'Pasta: ' + Pasta.handle.name, d: 'Pasta compartilhada conectada. Configurações e registros ficam nela.' }
       : Pasta.handle ? { c: 'alerta', i: 'folder', t: 'Reautorizar pasta', d: 'A pasta lembrada precisa de autorização (um clique por dia).' }
@@ -2221,9 +2246,10 @@ function htmlUmAlerta(a, g) {
   let extra = '';
   if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button>`;
   if (a.acaoCarteira) extra += `<button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button>`;
+  if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
   const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
   if (pedeConferi(a)) extra += `<label class="chk conferi"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label>`;
-  if (a.modo === 'obs') extra += `<span class="muted" style="font-size:var(--fs-xs)">Texto em “Incluir observação” (${a.dest === 'prestador' ? 'resposta ao prestador' : 'observação da guia'}).</span>`;
+  if (a.modo === 'obs') extra += `<span class="muted" style="font-size:var(--fs-xs)">Texto em “Incluir observação” (observações adicionais da resposta).</span>`;
   const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
   return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico, 'sm')}</span><div class="tx"><b class="al-t">${a.modo === 'bloqueio' ? 'Bloqueio:' : a.modo === 'obs' ? 'Aviso com observação:' : a.nivel === 'info' ? 'Informativo:' : 'Atenção:'}</b> ${esc(a.texto)}</div>${extra ? `<div class="acoes-al">${extra}</div>` : ''}</div>`;
 }
@@ -2376,7 +2402,7 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
     return `<tr><td class="c">${i + 1}</td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${cpCod}</div></td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd">${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
-      <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria && ref.texto ? `<span class="tag obs" title="Sem cadastro para esta clínica: a descrição do e-mail está sendo usada como referência provisória.">Provisória</span>` : ''}</td>
+      <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria ? `<span class="tag obs" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Provisória</span> <button class="btn sm" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar</button>` : ''}</td>
       <td class="muted">${esc(it.desc) || '—'}</td>
       <td>${tagItem(est)}</td></tr>`;
   }).join('') || `<tr><td colspan="6" class="muted">Nenhum item lido.</td></tr>`}
@@ -2570,6 +2596,15 @@ function pendenciasConclusao(g, st) {
   if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
   if (!/^[TS]\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
+  if (r.situacao === 'autorizada') {
+    const gl = glosaDe(g);
+    if (!gl.resp) P.push('Responda: houve alguma glosa?');
+    else if (gl.resp === 'sim') {
+      const its = Object.entries(gl.itens);
+      if (!its.length) P.push('Selecione o(s) item(ns) em que houve glosa.');
+      its.forEach(([c, x]) => { if (!(x.glosa || '').trim()) P.push(`Informe a glosa do item ${c}.`); if (!(x.motivo || '').trim()) P.push(`Informe por que a glosa do item ${c} foi retirada.`); });
+    }
+  }
   if (r.situacao === 'parcial') {
     const n = Object.keys(r.naoAut).length;
     if (!n) P.push('Marque os itens que não foram autorizados.');
@@ -2588,6 +2623,11 @@ function htmlSituacao(g) {
   if (r.situacao === 'parcial') {
     extra = `<div class="negados">${g.pedido.itens.map(it => { const neg = r.naoAut[it.codigo] != null; const ref = descRefItem(g, it); return `<div class="negado ${neg ? 'on' : ''}"><input type="checkbox" id="neg-${it.codigo}" data-neg="${it.codigo}" ${neg ? 'checked' : ''}><label for="neg-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label><select data-negmot="${it.codigo}" ${neg ? '' : 'disabled'} aria-label="Motivo da não autorização de ${it.codigo}">${optsMotivos(r.naoAut[it.codigo])}</select></div>`; }).join('')}</div>`;
   }
+  if (r.situacao === 'autorizada') {
+    const gl = glosaDe(g);
+    extra = `<div class="glosa"><div class="linha-flex" style="margin-top:10px"><b>Houve alguma glosa?</b><div class="seg" role="radiogroup" aria-label="Houve alguma glosa?"><button type="button" role="radio" aria-checked="${gl.resp === 'sim'}" class="${gl.resp === 'sim' ? 'on igual' : ''}" data-act="setGlosa" data-v="sim">Sim</button><button type="button" role="radio" aria-checked="${gl.resp === 'nao'}" class="${gl.resp === 'nao' ? 'on igual' : ''}" data-act="setGlosa" data-v="nao">Não</button></div>${gl.resp ? '' : '<span class="tag warn">Obrigatório</span>'}</div>
+      ${gl.resp === 'sim' ? `<div class="negados">${g.pedido.itens.map(it => { const x = gl.itens[it.codigo], ref = descRefItem(g, it); return `<div class="negado gl ${x ? 'on' : ''}" style="grid-template-columns:auto 1fr"><input type="checkbox" id="gl-${it.codigo}" data-gl="${it.codigo}" ${x ? 'checked' : ''}><label for="gl-${it.codigo}"><b class="num">${it.codigo}</b> — Qtd. ${it.qtd ?? '?'} — ${esc(ref.texto || it.desc)}</label>${x ? `<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr;gap:8px"><input type="text" list="glosasList" data-glf="glosa" data-c="${it.codigo}" value="${esc(x.glosa || '')}" placeholder="Glosa" aria-label="Glosa do item ${it.codigo}"><input type="text" data-glf="motivo" data-c="${it.codigo}" value="${esc(x.motivo || '')}" placeholder="Por que a glosa foi retirada" aria-label="Motivo da retirada do item ${it.codigo}"></div>` : ''}</div>`; }).join('')}</div><datalist id="glosasList">${(cfg.glosas || []).map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}</div>`;
+  }
   if (r.situacao === 'nao') {
     extra = `<div class="form-grid" style="margin-top:12px"><div><label class="lbl" for="rMotivo">Motivo da não autorização</label><select id="rMotivo" data-resf="motivoId">${optsMotivos(r.motivoId)}</select></div><div><label class="lbl" for="rMotivoTxt">Detalhe do motivo (opcional)</label><input type="text" id="rMotivoTxt" data-resf="motivoTxt" value="${esc(r.motivoTxt)}"></div></div>`;
   }
@@ -2600,7 +2640,7 @@ function htmlCardObs(g) {
   const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
   return `<div class="card">
   <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
-    <button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div>
+</div>
   <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
   <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
@@ -2631,7 +2671,7 @@ function renderFinal(alvo, g) {
         </div>
         <h3>Situação da autorização</h3>
         ${htmlSituacao(g)}
-        <div style="margin-top:12px"><label class="lbl" for="rObs">Observações adicionais (entram na resposta ao prestador)</label><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
+        <div style="margin-top:12px"><div class="linha-flex" style="justify-content:space-between;margin-bottom:3px"><label class="lbl" for="rObs" style="margin:0">Observações adicionais (entram na resposta ao prestador)</label><button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
       </div>
       ${htmlCardObs(g)}
     </div>
@@ -2715,33 +2755,25 @@ function abrirRespostaEmail() {
 /* ---------- Incluir observação ---------- */
 function opcoesObservacao(g, st) {
   const L = [];
-  st.obs.forEach(a => L.push({ id: 'a:' + a.key, dest: a.dest, titulo: ALERTAS[a.tipo].nome, texto: a.obsTexto, modo: 'obs', pre: true }));
+  st.obs.forEach(a => L.push({ id: 'a:' + a.key, titulo: ALERTAS[a.tipo].nome, texto: a.obsTexto, pre: true }));
   if (g.param) {
-    L.push({ id: 'p:obs', dest: 'guia', titulo: 'Atendimento parametrizado', texto: renderModelo('obs_parametrizado', ctxDe(g)).texto, pre: !!cfg.preferencias.obsParametrizadoAuto });
-    const prm = Param.porId(g.param.id); if (prm && prm.texto) L.push({ id: 'p:txt', dest: 'guia', titulo: 'Dados da parametrização', texto: prm.texto, pre: false });
+    L.push({ id: 'p:obs', titulo: 'Atendimento parametrizado', texto: renderModelo('obs_parametrizado', ctxDe(g)).texto, pre: !!cfg.preferencias.obsParametrizadoAuto });
+    const prm = Param.porId(g.param.id); if (prm && prm.texto) L.push({ id: 'p:txt', titulo: 'Dados da parametrização', texto: prm.texto, pre: false });
   }
-  if (g.pedido.obs) L.push({ id: 'o:ped', dest: 'guia', titulo: 'Observações do pedido (e-mail)', texto: g.pedido.obs, pre: false });
+  if (g.pedido.obs) L.push({ id: 'o:ped', titulo: 'Observações do pedido (e-mail)', texto: g.pedido.obs, pre: false });
   return L;
 }
-function textoDestino(M0, dest) {
-  return M0.itens.filter(i => i.dest === dest && M0.sel.has(i.id)).map(i => i.texto).join('\n');
-}
+const textoSelObs = () => M.itens.filter(i => M.sel.has(i.id) && !M.g.obsInc.includes(i.id)).map(i => i.texto).join('\n');
 function htmlModalObs() {
-  const sec = (dest, titulo, aviso) => {
-    const it = M.itens.filter(i => i.dest === dest);
-    return `<div class="card" style="box-shadow:none"><div class="card-h"><h3 style="margin:0">${titulo}</h3></div><p class="dica">${aviso}</p>
-      ${it.length ? it.map(i => { const ja = (dest === 'guia' ? M.g.obsInc : M.g.respInc).includes(i.id); return `<label class="chk" style="margin:8px 0;${ja ? 'opacity:.6' : ''}"><input type="checkbox" data-obssel="${esc(i.id)}" ${M.sel.has(i.id) && !ja ? 'checked' : ''} ${ja ? 'disabled' : ''}><span><b>${esc(i.titulo)}</b> ${i.modo ? tagModo('obs') : ''} ${ja ? `<span class="tag ok">${ic('check', 'sm')}Já incluída</span>` : ''}<br><span class="muted" style="font-size:var(--fs-sm)">${esc(i.texto)}</span></span></label>`; }).join('') : '<p class="muted">Nenhuma observação pertinente disponível para esta guia.</p>'}
-      <label class="lbl" for="obsTxt-${dest}" style="margin-top:10px">Texto que será inserido (editável)</label>
-      <textarea id="obsTxt-${dest}" data-obstxt="${dest}" rows="4">${esc(M.txt[dest])}</textarea></div>`;
-  };
-  return sec('guia', 'Observação da guia (interna, texto simples)', 'Vai para o campo de observação da guia no sistema oficial.') + '<div style="height:10px"></div>' + sec('prestador', 'Mensagem ao prestador (resposta por e-mail)', 'Vai para o texto da resposta enviada à clínica. Não se mistura com a observação da guia.');
+  return `${M.itens.length ? M.itens.map(i => { const ja = M.g.obsInc.includes(i.id); return `<label class="chk" style="margin:6px 0;${ja ? 'opacity:.6' : ''}"><input type="checkbox" data-obssel="${esc(i.id)}" ${M.sel.has(i.id) && !ja ? 'checked' : ''} ${ja ? 'disabled' : ''}><span><b>${esc(i.titulo)}</b> ${ja ? `<span class="tag ok">${ic('check', 'sm')}Já incluída</span>` : ''}<br><span class="muted" style="font-size:var(--fs-sm)">${esc(i.texto)}</span></span></label>`; }).join('') : '<p class="muted">Nenhuma observação disponível para esta guia. Escreva abaixo se quiser.</p>'}
+    <label class="lbl" for="obsTxt" style="margin-top:10px">Texto a inserir (editável)</label><textarea id="obsTxt" data-obstxt="txt" rows="4">${esc(M.txt)}</textarea>`;
 }
 function abrirModalObs() {
   const g = guiaAtiva(), st = situacaoGuia(g), itens = opcoesObservacao(g, st);
-  M = { tipo: 'obs', g, itens, sel: new Set(itens.filter(i => i.pre).map(i => i.id)), txt: { guia: '', prestador: '' }, editado: { guia: false, prestador: false } };
-  M.txt.guia = textoDestino(M, 'guia'); M.txt.prestador = textoDestino(M, 'prestador');
-  abrirModal({ titulo: 'Incluir observação', sub: 'Selecione o que deseja incluir e revise o texto', icone: 'message', tamanho: 'g', corpo: htmlModalObs(),
-    rodape: `<span class="dica">Textos já incluídos não são repetidos.</span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="inserirObs">${ic('check')}Inserir nos campos</button>` });
+  M = { tipo: 'obs', g, itens, sel: new Set(itens.filter(i => i.pre).map(i => i.id)), txt: '', editado: false };
+  M.txt = textoSelObs();
+  abrirModal({ titulo: 'Incluir observação', sub: 'Vai para as observações adicionais da resposta ao prestador', icone: 'message', tamanho: 'g', corpo: htmlModalObs(),
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="inserirObs">${ic('check')}Inserir</button>` });
 }
 
 /* ---------- Parametrização ---------- */
@@ -2778,14 +2810,48 @@ function abrirModalParam(g, prm, livre) {
     rodape: `${M.id ? `<button class="btn dng" data-act="pmExcluir">${ic('trash')}Excluir parametrização</button>` : ''}<span class="esp" style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="pmSalvar">${ic('save')}Salvar parametrização</button>` });
 }
 
+/* ---------- Cadastrar código (descrição provisória → cadastro da clínica) ---------- */
+function abrirModalCadCodigo(codigo) {
+  const g = guiaAtiva(), it = g.pedido.itens.find(x => x.codigo === codigo);
+  M = { tipo: 'codcad', codigo };
+  abrirModal({ titulo: 'Cadastrar código', sub: codigo, icone: 'tag', tamanho: 'p',
+    corpo: `<div class="form-grid"><div style="grid-column:1/-1"><label class="lbl" for="ccClinica">Clínica</label><select id="ccClinica"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${esc(c.id)}" ${S.clinicaId === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
+      <div style="grid-column:1/-1"><label class="lbl" for="ccDesc">Descrição da terapia</label><input type="text" id="ccDesc" value="${esc((it && it.desc) || '')}" autofocus></div></div>`,
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cadCodigoOk">${ic('check')}Cadastrar</button>` });
+}
+
+function htmlModalCorrigir() {
+  return `<div class="form-grid"><div><label class="lbl" for="cgCart">Carteira</label><input type="text" id="cgCart" class="num" data-cgc="1" value="${esc(M.carteira)}" maxlength="20"></div></div>
+    <div class="card-h" style="margin-top:12px"><h3 style="margin:0">Serviços e quantidades</h3><span class="esp"></span><button class="btn sm line" data-act="cgAdd">${ic('plus', 'sm')}Adicionar serviço</button></div>
+    <div class="tabela-scroll"><table class="t"><thead><tr><th style="width:140px">Código</th><th>Descrição</th><th style="width:80px">Qtd.</th><th style="width:48px"></th></tr></thead><tbody>
+    ${M.itens.map((i, k) => `<tr><td><input type="text" inputmode="numeric" data-cgi="c" data-i="${k}" value="${esc(i.c)}" maxlength="8" aria-label="Código ${k + 1}"></td><td><input type="text" data-cgi="d" data-i="${k}" value="${esc(i.d)}" aria-label="Descrição ${k + 1}"></td><td><input type="text" inputmode="numeric" data-cgi="q" data-i="${k}" value="${esc(i.q)}" maxlength="2" aria-label="Quantidade ${k + 1}"></td><td class="c"><button class="btn sm ghost ico" data-act="cgRem" data-i="${k}" aria-label="Remover serviço" title="Remover serviço">${ic('trash', 'sm')}</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Nenhum serviço.</td></tr>'}
+    </tbody></table></div>`;
+}
+
 /* ====================================================================
    Painel do dia: visão operacional (sem caixa de pendências por operador)
    ==================================================================== */
 let painelDia = isoDia(new Date());
+let painelModo = 'dia';   // 'dia' | 'mes'
+let painelMes = isoDia(new Date()).slice(0, 7);
 let painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' };
 let conc = null;    // resultado da conciliação
 let amostra = null;
-const resultadoDe = r => (r.resultado && r.resultado.situacao) || (r.status === 'concluido' ? 'autorizada' : '');
+const resultadoDe = r => r.status === 'cancelado' ? '' : ((r.resultado && r.resultado.situacao) || (r.status === 'concluido' ? 'autorizada' : ''));
+const regPorId = id => Reg.cache.find(x => x.id === id) || Reg.todos[id] || null;
+function descDiv(d) { let m; if ((m = /^omitido:(.+)$/.exec(d))) return `Omitido na grade: ${m[1]}`; if ((m = /^qtd:(\d+)=(\d+)$/.exec(d))) return `Quantidade divergente em ${m[1]} (informado ${m[2]})`; if ((m = /^duplicado:(.+)$/.exec(d))) return `Duplicado na grade: ${m[1]}`; if ((m = /^indevida:(.+)$/.exec(d))) return `Inclusão indevida (final ${m[1]})`; return String(d).replace(/<[^>]+>/g, ''); }
+const descreverDivergencias = divs => divs.map((d, i) => `Tentativa ${i + 1}: ` + (Array.isArray(d) ? d : [d]).map(descDiv).join('; ')).join('\n');
+function obsCelula(r) {
+  const T = [], rs = r.resultado || {}, divs = (r.conferencia && r.conferencia.divergencias) || [];
+  if (r.parametrizado) T.push(tagParam(r.parametrizado));
+  if (divs.length) T.push(`<span class="tag warn" title="${esc(descreverDivergencias(divs))}">${ic('alert', 'sm')}${divs.length} divergência(s)</span>`);
+  const ao = (r.alertas || []).filter(a => a.m === 'obs'); if (ao.length) T.push(`<span class="tag obs" title="${esc(ao.map(a => a.t).join('\n'))}">${ic('message', 'sm')}Aviso c/ obs.</span>`);
+  if (rs.situacao === 'sem_guia') T.push(`<span class="tag obs" title="${esc('Sem guia gerada: ' + nomeModelo(rs.modelo) + ((r.bloqueios || []).length ? '\n' + r.bloqueios.join('\n') : ''))}">${ic('mail', 'sm')}Sem guia: ${esc(nomeModelo(rs.modelo))}</span>`);
+  if ((rs.glosas || []).length) T.push(`<span class="tag warn" title="${esc(rs.glosas.map(x => `${x.c}: glosa ${x.g || '—'}\nMotivo da retirada: ${x.m || '—'}`).join('\n\n'))}">${ic('check', 'sm')}Glosa retirada</span>`);
+  if (r.status === 'cancelado') T.push(`<span class="tag bad" title="${esc(r.canceladoMotivo ? 'Motivo: ' + r.canceladoMotivo : 'Guia cancelada')}">${ic('ban', 'sm')}Cancelada</span>`);
+  if (r.corrigida) T.push(`<span class="tag info" title="${esc('Corrigida em ' + fmtDH(r.corrigida.em) + ' por ' + (r.corrigida.por || '—') + '\nAntes: carteira ' + (r.corrigida.antes.carteira || '—') + '; itens ' + (r.corrigida.antes.itens || []).join(', '))}">${ic('edit', 'sm')}Corrigida</span>`);
+  return T.join(' ');
+}
 function proximoPasso(r) {
   if (r.status !== 'em_andamento') return '';
   const e = r.etapa || 2;
@@ -2805,48 +2871,52 @@ function filtrarRegs(regs) {
 }
 function csvRegistros(regs) {
   const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const cab = ['dia', 'abertura', 'conclusao', 'clinica', 'remetente', 'guia_n', 'guias_no_email', 'carteira', 'itens', 'numero_guia', 'status', 'resultado', 'itens_nao_autorizados', 'motivo_nao_autorizacao', 'parametrizado', 'alertas', 'bloqueios', 'tentativas_conferencia', 'divergencias_conferencia', 'editado_a_mao', 'duracao_min', 'registrado_por', 'aberto_por'];
+  const cab = ['dia', 'abertura', 'conclusao', 'clinica', 'remetente', 'guia_n', 'guias_no_email', 'carteira', 'itens', 'numero_guia', 'status', 'resultado', 'itens_nao_autorizados', 'motivo_nao_autorizacao', 'parametrizado', 'alertas', 'bloqueios', 'tentativas_conferencia', 'divergencias_conferencia', 'editado_a_mao', 'duracao_min', 'registrado_por', 'aberto_por', 'glosas_retiradas'];
   const linhas = regs.map(r => {
     const rs = r.resultado || {}, neg = (r.itens || []).filter(i => i.aut === false).map(i => i.c).join(' ');
     return [r.dia, fmtHora(r.abertoEm), r.concluidoEm ? fmtHora(r.concluidoEm) : '', r.clinica, r.remetente, (r.idxGuia ?? 0) + 1, r.totalGuias ?? 1, r.carteira, (r.itens || []).map(i => i.c + 'x' + (i.q ?? '?')).join(' '), r.guia, STATUS[r.status] || r.status, SIT_ROTULO[resultadoDe(r)] || '',
       neg, [motivoNome(rs.motivoId), rs.motivoTxt].filter(Boolean).join(' — '), r.parametrizado ? (r.parametrizado.origem || 'sim') : '', (r.alertas || []).map(a => (a.m || '') + ':' + (a.k || a.t)).join(' | '), (r.bloqueios || []).join(' | '),
-      r.conferencia?.tentativas ?? '', (r.conferencia?.divergencias || []).map(d => d.join ? d.join('; ') : d).join(' | '), r.editadoAMao ? 'sim' : '', ((r.duracaoSeg || 0) / 60).toFixed(1), r.operador, r.abertoPor || ''].map(c).join(';');
+      r.conferencia?.tentativas ?? '', (r.conferencia?.divergencias || []).map(d => d.join ? d.join('; ') : d).join(' | '), r.editadoAMao ? 'sim' : '', ((r.duracaoSeg || 0) / 60).toFixed(1), r.operador, r.abertoPor || '', ((rs.glosas || []).map(x => `${x.c}: ${x.g} — retirada: ${x.m}`).join(' | '))].map(c).join(';');
   });
   return '﻿' + [cab.join(';'), ...linhas].join('\r\n');
 }
 async function renderPainel(app) {
   app.innerHTML = '<p class="muted">Carregando registros…</p>';
-  const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5);
-  await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); await Param.carregar();
-  const todos = Reg.doDia(painelDia).filter(r => !r.tipo).sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1));
+  const mes = painelModo === 'mes';
+  if (mes) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
+  await Param.carregar();
+  const base = mes ? Reg.doMes(painelMes) : Reg.doDia(painelDia);
+  const todos = base.filter(r => !r.tipo).sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1));
   const regs = todos.filter(r => r.status !== 'descartado' && r.status !== 'devolvido');
+  const ativos = regs.filter(r => r.status !== 'cancelado');
   const lista = filtrarRegs(regs);
-  const corr = Reg.cache.filter(r => r.tipo === 'correcao');
-  const n = fn => regs.filter(fn).length;
-  const concl = regs.filter(r => r.status === 'concluido');
-  const emails = unicos(regs.map(r => r.atendimentoId || r.messageId)).length;
+  const n = fn => ativos.filter(fn).length;
+  const concl = ativos.filter(r => r.status === 'concluido');
+  const emails = unicos(ativos.map(r => r.atendimentoId || r.messageId)).length;
   const pegos = concl.filter(r => (r.conferencia?.divergencias || []).length).length;
   const tempo = concl.length ? (concl.reduce((s, r) => s + (r.duracaoSeg || 0), 0) / concl.length / 60).toFixed(1).replace('.', ',') + ' min' : '—';
-  const porClinica = {}; regs.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
+  const porClinica = {}; ativos.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
   const maxC = Math.max(1, ...Object.values(porClinica).map(x => x.n));
   const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean));
+  const per = mes ? 'mês' : 'dia';
   app.innerHTML = `
   <div class="card"><div class="linha-flex">
-    <div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>
+    <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!mes}" class="${!mes ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('layers', 'sm')} Mês</button></div>
+    ${mes ? `<div><label class="lbl" for="painelMes">Mês</label><input type="month" id="painelMes" value="${painelMes}" style="width:auto"></div>` : `<div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>`}
     <button class="btn" data-act="atualizarPainel" style="align-self:flex-end">${ic('refresh')}Atualizar</button>
     <span style="flex:1"></span>
-    <button class="btn apoio line" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (${lista.length})</button></div></div>
+    <button class="btn line" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (${lista.length})</button></div></div>
   <div class="kpis">${[
-    ['info', emails, 'E-mails com atendimento', true], ['', regs.length, 'Guias no dia', true],
+    ['info', emails, 'E-mails com atendimento', true], ['', ativos.length, 'Guias no ' + per, true],
     ['ok', n(r => resultadoDe(r) === 'autorizada'), 'Autorizadas'], ['warn', n(r => resultadoDe(r) === 'parcial'), 'Parcialmente autorizadas'], ['bad', n(r => resultadoDe(r) === 'nao'), 'Não autorizadas'],
     ['obs', n(r => resultadoDe(r) === 'sem_guia'), 'Sem guia gerada (pendência)'], ['info', n(r => r.status === 'em_andamento'), 'Em andamento'], ['ac', n(r => r.parametrizado), 'Parametrizadas'],
-    ['', pegos, 'Divergências pegas na conferência'], ['', concl.length ? tempo : 0, 'Tempo médio por guia']
+    ['bad', regs.filter(r => r.status === 'cancelado').length, 'Canceladas'], ['', pegos, 'Divergências pegas na conferência'], ['', concl.length ? tempo : 0, 'Tempo médio por guia']
   ].filter(k => k[3] || (k[1] && k[1] !== 0)).map(([c, v, t]) => `<div class="kpi ${c}"><b>${v}</b><span>${t}</span></div>`).join('')}
   </div>
   <div class="card"><div class="card-h"><h2>Guias por clínica</h2></div>
     ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste dia.</p>'}</div>
   <div class="card">
-    <div class="card-h"><h2>Guias do dia (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
+    <div class="card-h"><h2>Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
     <div class="filtros" style="margin-bottom:12px">
       <div><label class="lbl" for="fQ">Buscar</label><div class="busca">${ic('search', 'sm')}<input type="search" id="fQ" data-fp="q" value="${esc(painelFiltro.q)}" placeholder="Carteira, guia, clínica, código…"></div></div>
       <div><label class="lbl" for="fS">Status</label><select id="fS" data-fp="status"><option value="">Todos</option>${['em_andamento', 'concluido'].map(s => `<option value="${s}" ${painelFiltro.status === s ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select></div>
@@ -2855,21 +2925,20 @@ async function renderPainel(app) {
       <div><label class="lbl" for="fP">Parametrização</label><select id="fP" data-fp="param"><option value="">Todas</option><option value="sim" ${painelFiltro.param === 'sim' ? 'selected' : ''}>Parametrizadas</option><option value="nao" ${painelFiltro.param === 'nao' ? 'selected' : ''}>Não parametrizadas</option></select></div>
       <div><button class="btn ghost" data-act="limparFiltros" ${Object.values(painelFiltro).some(Boolean) ? '' : 'disabled'}>${ic('x', 'sm')}Limpar filtros</button></div>
     </div>
-    <div class="tabela-scroll"><table class="t"><thead><tr><th>Hora</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
+    <div class="tabela-scroll"><table class="t"><thead><tr><th>${mes ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
     ${lista.map(r => {
-      const cs = corr.filter(c => c.ref === r.id), tot = r.totalGuias || 1;
-      return `<tr><td class="c num">${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}</td>
+      const tot = r.totalGuias || 1, canc = r.status === 'cancelado';
+      return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${mes ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}</td>
       <td class="c">${tot > 1 ? `<span class="sq idc idc-${(r.idxGuia || 0) % 10}" title="Guia ${(r.idxGuia || 0) + 1} de ${tot}">${(r.idxGuia || 0) + 1}/${tot}</span>` : '—'}</td>
       <td class="num">${esc(r.carteira || '')}</td><td class="num">${(r.itens || []).map(i => `${i.c} × ${i.q ?? '?'}${i.aut === false ? ' <span class="tag bad">' + ic('x', 'sm') + 'negado</span>' : ''}`).join('<br>')}</td><td class="num"><b>${esc(r.guia || '')}</b></td>
-      <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}${cs.length ? `<br><span class="tag bad">${ic('alert', 'sm')}${cs.length} correção(ões)</span>` : ''}</td>
+      <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
       <td>${tagResultado(resultadoDe(r))}</td>
-      <td>${tagParam(r.parametrizado)} ${(r.conferencia?.divergencias || []).length ? `<span class="tag warn">${ic('alert', 'sm')}${r.conferencia.divergencias.length} divergência(s)</span>` : ''} ${(r.alertas || []).some(a => a.m === 'obs') ? `<span class="tag obs">${ic('message', 'sm')}Aviso c/ obs.</span>` : ''}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:nowrap">${r.status === 'concluido' ? `<button class="btn sm line" data-act="abrirCorrecao" data-id="${r.id}">Registrar correção</button>` : ''}</div></td></tr>
-      <tr class="oculto" id="corr-${r.id}"><td colspan="10">${htmlFormCorrecao(r)}</td></tr>`;
-    }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste dia.'}</td></tr>`}
+      <td>${obsCelula(r)}</td>
+      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
+    }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`}
     </tbody></table></div>
   </div>
-  <div class="card">
+  ${mes ? '' : `<div class="card">
     <div class="card-h"><h2>Amostragem do apoio</h2></div>
     <div class="acoes" style="margin-top:0"><button class="btn" data-act="sortear">${ic('refresh')}Sortear amostra</button></div>
     ${amostra ? `<div class="tabela-scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Guia</th><th>Resultado</th><th>Carteira</th><th>Itens (código × qtd.)</th></tr></thead><tbody>${amostra.map(r => `<tr><td class="num">${esc(r.guia)}</td><td>${tagResultado(resultadoDe(r))}</td><td class="num">${esc(r.carteira)}</td><td class="num">${r.itens.map(i => i.c + ' × ' + i.q).join(' · ')}</td></tr>`).join('')}</tbody></table></div>` : ''}
@@ -2890,14 +2959,7 @@ async function renderPainel(app) {
       </div>
     </div>
     <div id="resConc">${conc || ''}</div>
-  </div>`;
-}
-function htmlFormCorrecao(r) {
-  return `<div class="linha-flex" style="padding:6px 0">
-    <select data-cf="motivo" style="width:auto" aria-label="Motivo da correção">${MOTIVOS_CORRECAO.map(m => `<option>${m}</option>`).join('')}</select>
-    <select data-cf="detectado" style="width:auto" aria-label="Detectado por">${DETECTADO_POR.map(m => `<option>${m}</option>`).join('')}</select>
-    <input type="text" data-cf="obs" placeholder="Detalhe (opcional)" style="flex:1;min-width:200px;width:auto" aria-label="Detalhe">
-    <button class="btn sm pri" data-act="salvarCorrecao" data-id="${r.id}">${ic('save', 'sm')}Salvar correção</button></div>`;
+  </div>`}`;
 }
 async function conciliarEmails(files) {
   const emails = [];
@@ -2949,7 +3011,8 @@ async function renderQuadro(app) {
   await Reg.carregar();
   const hoje = isoDia(new Date());
   const mapa = new Map();
-  Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento').forEach(r => mapa.set(r.id, r));
+  const lim = cfg.preferencias.acoesMinutos, idade = r => (Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000;
+  Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento' && (!lim || idade(r) <= lim)).forEach(r => mapa.set(r.id, r));
   if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => mapa.set(g.id, montarRegistro(g, 'em_andamento')));   // o que está aberto aqui vale mais que o arquivo
   const lista = [...mapa.values()].sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
   const cols = [
@@ -2959,11 +3022,11 @@ async function renderQuadro(app) {
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
   app.innerHTML = `<div class="card"><div class="card-h"><h2>Ações em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? lista.length + ' guia(s)' : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar</button></div>
-    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está.</p></div>
+    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está.${lim ? ` Some da lista após ${lim} min sem movimento.` : ''}</p></div>
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
     ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
-      return `<div class="card-q"><div class="t1">${esc(r.pacienteIni || 'Paciente')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
+      return `<div class="card-q"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Paciente')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
       <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${(r.itens || []).length} item(ns) · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
       <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }
@@ -3010,6 +3073,7 @@ function validarCfg(c) {
   MODELOS_PERSONALIZADOS.forEach(k => { if (!(c.modelos[k].nome || '').trim()) add('modelos', 'Modelo personalizado: informe o nome.'); });
   const mots = new Set();
   c.motivos.forEach((m, i) => { const n = norm(m.nome); if (!n) add('prefs', `Motivo ${i + 1}: informe o texto.`); else if (mots.has(n)) add('prefs', `Motivo repetido: “${m.nome}”.`); mots.add(n); });
+  if (!Number.isInteger(c.preferencias.acoesMinutos) || c.preferencias.acoesMinutos < 0 || c.preferencias.acoesMinutos > 1440) add('prefs', 'O tempo para limpar a aba Ações deve ser um número de 0 a 1440 minutos.');
   if (!Number.isInteger(c.preferencias.qtdMax) || c.preferencias.qtdMax < 1 || c.preferencias.qtdMax > 99) add('prefs', 'A quantidade máxima por serviço deve ser um número de 1 a 99.');
   return E;
 }
@@ -3021,7 +3085,8 @@ function prepararSalvar(c) {
     cl.codigos = {}; cl._lista.forEach(x => { const k = x.c.trim(); if (k) cl.codigos[k] = x.d.trim(); });
   });
   c.motivos.forEach(m => { m.nome = m.nome.trim(); m.id = m.id || slug(m.nome); });
-  c.preferencias.qtdMax = Number(c.preferencias.qtdMax);
+  c.preferencias.qtdMax = Number(c.preferencias.qtdMax); c.preferencias.acoesMinutos = Number(c.preferencias.acoesMinutos);
+  c.glosas = unicos((c.glosas || []).map(g => String(g).trim()).filter(Boolean));
 }
 
 async function renderConfig(app) {
@@ -3160,8 +3225,7 @@ function cfgAlertas() {
   ${ALERTAS_GRUPOS.map(gr => `<h3>${esc(gr)}</h3>${Object.entries(ALERTAS).filter(([, a]) => a.grupo === gr).map(([k, a]) => { const c = cfgEdit.alertas[k];
     return `<div class="al-cfg"><div class="topo-al"><div><div class="n" title="${esc(a.desc)}">${esc(a.nome)}</div></div>
       <div><label class="sr" for="al-${k}">Comportamento de ${esc(a.nome)}</label><select id="al-${k}" data-cfg="alertas.${k}.modo" data-rr="1">${Object.entries(MODOS).map(([m, x]) => `<option value="${m}" ${c.modo === m ? 'selected' : ''}>${x.nome}</option>`).join('')}</select></div></div>
-      ${c.modo === 'obs' ? `<div class="extra"><div><label class="lbl" for="ald-${k}">Incluir em</label><select id="ald-${k}" data-cfg="alertas.${k}.dest"><option value="guia" ${c.dest !== 'prestador' ? 'selected' : ''}>Observação da guia</option><option value="prestador" ${c.dest === 'prestador' ? 'selected' : ''}>Resposta ao prestador</option></select></div>
-        <div><label class="lbl" for="alt-${k}">Texto da observação</label><textarea id="alt-${k}" data-cfg="alertas.${k}.texto" rows="2" placeholder="Se vazio, usa o texto do próprio alerta (com os detalhes da ocorrência).">${esc(c.texto)}</textarea></div></div>` : ''}</div>`; }).join('')}`).join('')}</div>`;
+      ${c.modo === 'obs' ? `<div class="extra" style="grid-template-columns:1fr"><div><label class="lbl" for="alt-${k}">Texto da observação (vai para “Observações adicionais” da resposta)</label><textarea id="alt-${k}" data-cfg="alertas.${k}.texto" rows="2" placeholder="Se vazio, usa o texto do próprio alerta.">${esc(c.texto)}</textarea></div></div>` : ''}</div>`; }).join('')}`).join('')}</div>`;
 }
 
 /* ---------- 8. Exportação ---------- */
@@ -3183,6 +3247,7 @@ function cfgPrefs() {
   return `<div class="card">${cabSecao('Preferências operacionais')}
     <div class="stack">
       <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência cega antes de finalizar</b></span></label>
+      <div style="max-width:300px"><label class="lbl" for="pAcoes">Limpar da aba Ações após (minutos sem movimento; 0 = não limpar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
     </div></div>
@@ -3191,6 +3256,9 @@ function cfgPrefs() {
       <select data-cfg="motivos.${i}.modelo" style="flex:1;min-width:200px;width:auto" aria-label="Modelo vinculado ao motivo ${i + 1}"><option value="">Sem modelo vinculado</option>${MODELOS_SITUACAO.map(k => `<option value="${k}" ${m.modelo === k ? 'selected' : ''}>${esc(MODELOS_PADRAO[k].nome)}</option>`).join('')}</select>
       <button class="btn sm ghost ico" data-act="motRem" data-i="${i}" aria-label="Remover motivo" title="Remover motivo">${ic('trash', 'sm')}</button></div>`).join('')}
     <div class="acoes" style="margin-top:6px"><button class="btn line" data-act="motAdd">${ic('plus')}Adicionar motivo</button></div></div>
+  <div class="card"><div class="card-h"><h2>Glosas (sugestões)</h2></div>
+    ${cfgEdit.glosas.map((g, i) => `<div class="linha-flex" style="margin-bottom:6px"><input type="text" data-cfg="glosas.${i}" value="${esc(g)}" style="flex:1;min-width:220px;width:auto" aria-label="Glosa ${i + 1}"><button class="btn sm ghost ico" data-act="glosaRem" data-i="${i}" aria-label="Remover glosa" title="Remover glosa">${ic('trash', 'sm')}</button></div>`).join('')}
+    <div class="acoes" style="margin-top:6px"><button class="btn line" data-act="glosaAdd">${ic('plus')}Adicionar glosa</button></div></div>
   <div class="card"><div class="card-h"><h2>Privacidade dos registros</h2></div>
     <button class="btn dng" data-act="limparAntigos">${ic('trash')}Apagar registros com mais de 180 dias</button></div>`;
 }
@@ -3263,6 +3331,11 @@ const alterarCampoGuia = (g, campo, v) => {
     case 'cid': p.cid = v.toUpperCase(); break;
   }
 };
+/* Reavalia o botão Concluir enquanto se digita (sem redesenhar a tela e perder o foco) */
+function atualizarConcluir(g) {
+  const pend = pendenciasConclusao(g, situacaoGuia(g)), bt = $('[data-act=concluirGuia]'); if (bt) bt.disabled = pend.length > 0;
+  const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
+}
 function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); b.innerHTML = ok ? `${ic('check', 'sm')}Copiado` : `${ic('copy', 'sm')}Copiar`; }
 
 /* ====================================================================
@@ -3412,6 +3485,7 @@ const acoes = {
   refazerCega() { const g = guiaAtiva(); g.cega.tentativas++; g.cega.resultado = null; g.cega.entradas = []; g.cega.linhas = ''; persistir(); render(); setTimeout(() => $('#cegaN')?.focus(), 30); },
 
   /* ---- etapa 4: resultado, observação e resposta ---- */
+  setGlosa(b) { const g = guiaAtiva(), gl = glosaDe(g); gl.resp = b.dataset.v; if (gl.resp === 'nao') gl.itens = {}; persistir(); render(); },
   setSit(b) { const g = guiaAtiva(), r = g.resultado; r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; g.respEdit = null; persistir(); render(); },
   async copiarEmail(b) {
     const g = guiaAtiva(), v = $('#emailPrest').value.trim();
@@ -3427,22 +3501,13 @@ const acoes = {
   resetObs() { const g = guiaAtiva(); g.obsEdit = null; g.obsExtras = []; g.obsInc = []; persistir(); render(); },
   incluirObs() { abrirModalObs(); },
   inserirObs() {
-    const g = M.g, ids = { guia: [], prestador: [] };
-    ['guia', 'prestador'].forEach(d => { M.itens.filter(i => i.dest === d && M.sel.has(i.id)).forEach(i => ids[d].push(i.id)); });
-    let n = 0;
-    const tg = (M.txt.guia || '').trim(), tp = (M.txt.prestador || '').trim();
-    if (tg) {
-      const atual = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
-      if (atual.includes(tg)) toast('Esse texto já está na observação da guia.', 'bad');
-      else { if (g.obsEdit != null) g.obsEdit += '\n' + tg; else g.obsExtras.push({ id: 'm' + Date.now(), texto: tg }); g.obsInc.push(...ids.guia); n++; }
-    }
-    if (tp) {
-      const atual = g.respEdit != null ? htmlPlano(g.respEdit) : respostaDaGuia(g, false).texto;
-      if (atual.includes(tp)) toast('Esse texto já está na resposta ao prestador.', 'bad');
-      else { const h = '<p>' + escH(tp) + '</p>'; if (g.respEdit != null) g.respEdit += h; else g.respExtras.push({ id: 'm' + Date.now(), html: h }); g.respInc.push(...ids.prestador); n++; }
-    }
-    if (!n) return;
-    fecharModal(true); persistir(); render(); toast('Observação incluída.');
+    const g = M.g, t = (M.txt || '').trim();
+    if (!t) { toast('Nada para inserir.', 'bad'); return; }
+    const atual = g.resultado.obsAdicionais || '';
+    if (atual.includes(t)) { toast('Esse texto já está nas observações adicionais.', 'bad'); return; }
+    g.resultado.obsAdicionais = atual.trim() ? atual.replace(/\s+$/, '') + '\n' + t : t;
+    g.obsInc.push(...M.sel); g.respEdit = null;
+    fecharModal(true); persistir(); render(); toast('Incluído nas observações adicionais.');
   },
   async copiarResp() {
     const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
@@ -3493,18 +3558,50 @@ const acoes = {
   },
   /* ---- painel do dia ---- */
   atualizarQuadro() { render(); },
-  atualizarPainel() { painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
+  atualizarPainel() { if ($('#painelMes')) painelMes = $('#painelMes').value || painelMes; if ($('#painelDia')) painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
+  painelModo(b) { painelModo = b.dataset.v; render(); },
   limparFiltros() { painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' }; render(); },
   exportarCsv() {
-    const regs = filtrarRegs(Reg.doDia(painelDia).filter(r => !r.tipo && r.status !== 'descartado' && r.status !== 'devolvido'));
+    const base = painelModo === 'mes' ? Reg.doMes(painelMes) : Reg.doDia(painelDia);
+    const regs = filtrarRegs(base.filter(r => !r.tipo && r.status !== 'descartado' && r.status !== 'devolvido'));
     if (!regs.length) { toast('Não há linhas para exportar com os filtros atuais.', 'bad'); return; }
-    baixar(nomeArquivo('Registros', painelDia, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8');
+    baixar(painelModo === 'mes' ? `Conferidor_Guias_Registros_Mes_${painelMes.split('-').reverse().join('-')}.csv` : nomeArquivo('Registros', painelDia, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8');
   },
-  abrirCorrecao(b) { $('#corr-' + b.dataset.id).classList.toggle('oculto'); },
-  async salvarCorrecao(b) {
-    const tr = $('#corr-' + b.dataset.id); const ref = Reg.cache.find(r => r.id === b.dataset.id);
-    const reg = { id: uid(), tipo: 'correcao', ref: ref.id, guia: ref.guia, operadorOriginal: ref.operador, motivo: $('[data-cf=motivo]', tr).value, detectadoPor: $('[data-cf=detectado]', tr).value, obs: $('[data-cf=obs]', tr).value.trim(), operador: operador() || 'Apoio', dia: isoDia(new Date()), registradoEm: agora() };
-    await Reg.salvar(reg); toast('Correção registrada.'); render();
+  /* ---- corrigir / cancelar / excluir guia (Painel) ---- */
+  corrigirGuia(b) {
+    const r = regPorId(b.dataset.id); if (!r) return;
+    M = { tipo: 'corrigir', id: r.id, carteira: r.carteira || '', itens: (r.itens || []).map(i => ({ c: i.c, d: i.d || '', q: i.q ?? '' })) };
+    abrirModal({ titulo: 'Corrigir guia', sub: r.guia || '', icone: 'edit', tamanho: 'g', corpo: htmlModalCorrigir(),
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cgSalvar">${ic('save')}Salvar correção</button>` });
+  },
+  cgAdd() { M.itens.push({ c: '', d: '', q: '' }); $('#modalCorpo').innerHTML = htmlModalCorrigir(); },
+  cgRem(b) { M.itens.splice(+b.dataset.i, 1); $('#modalCorpo').innerHTML = htmlModalCorrigir(); },
+  async cgSalvar() {
+    const r = regPorId(M.id), cart = normCart(M.carteira), E = [];
+    if (!cartValida(cart)) E.push('A carteira deve ter 17 caracteres (15 dígitos + 2).');
+    const its = M.itens.filter(i => i.c || i.q !== '' || i.d);
+    if (!its.length) E.push('Inclua ao menos um serviço.');
+    const vistos = new Set();
+    its.forEach((i, k) => { if (!/^\d{8}$/.test(i.c)) E.push(`Serviço ${k + 1}: o código deve ter 8 dígitos.`); else if (vistos.has(i.c)) E.push(`Código ${i.c} repetido.`); vistos.add(i.c); if (!/^\d{1,2}$/.test(String(i.q)) || Number(i.q) < 1) E.push(`Serviço ${k + 1}: quantidade inválida.`); });
+    if (E.length) { toast(E[0], 'bad'); return; }
+    const novo = clonar(r), cl = cfg.clinicas.find(c => c.id === r.clinicaId);
+    novo.corrigida = { em: agora(), por: operador(), antes: { carteira: r.carteira, itens: (r.itens || []).map(i => `${i.c}×${i.q ?? '?'}`) } };
+    novo.carteira = cart;
+    novo.itens = its.map(i => { const antes = (r.itens || []).find(x => x.c === i.c); return { c: i.c, q: Number(i.q), d: i.d || (antes && antes.d) || '', dc: descCadastro(cl, i.c) ?? null, aut: antes ? antes.aut : true }; });
+    novo.atualizadoEm = agora();
+    fecharModal(true); await Reg.salvar(novo); Reg.mesclarHist([novo]); render(); toast('Guia corrigida.');
+  },
+  async cancelarGuia(b) {
+    const r = regPorId(b.dataset.id); if (!r) return;
+    const motivo = prompt(`Cancelar a guia ${r.guia || ''}? Informe o motivo (opcional) e confirme:`, '');
+    if (motivo === null) return;
+    const novo = clonar(r); novo.status = 'cancelado'; novo.canceladoEm = agora(); novo.canceladoPor = operador(); novo.canceladoMotivo = motivo.trim(); novo.atualizadoEm = agora();
+    await Reg.salvar(novo); Reg.mesclarHist([novo]); render(); toast('Guia cancelada.');
+  },
+  async excluirGuia(b) {
+    const r = regPorId(b.dataset.id); if (!r) return;
+    if (!confirm(`Excluir definitivamente o registro${r.guia ? ' da guia ' + r.guia : ''}? Esta ação não pode ser desfeita.`)) return;
+    await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
@@ -3559,6 +3656,16 @@ const acoes = {
   clRemEmail(b) { cfgEdit.clinicas[+b.dataset.i].emails.splice(+b.dataset.j, 1); marcarSujo(); render(); },
   codAdd(b) { const cl = cfgEdit.clinicas[+b.dataset.i]; cl._lista.push({ c: '', d: '' }); marcarSujo(); render(); setTimeout(() => { const ins = $$('#tabCod tbody tr input[data-cfg$=".c"]'); ins[ins.length - 1]?.focus(); }, 30); },
   codRem(b) { cfgEdit.clinicas[+b.dataset.i]._lista.splice(+b.dataset.j, 1); marcarSujo(); render(); },
+  cadastrarCodigo(b) { abrirModalCadCodigo(b.dataset.codigo); },
+  async cadCodigoOk() {
+    const id = $('#ccClinica').value, desc = $('#ccDesc').value.trim(), codigo = M.codigo;
+    if (!id) { toast('Escolha a clínica.', 'bad'); return; }
+    if (!desc) { toast('Informe a descrição da terapia.', 'bad'); return; }
+    const cl = cfg.clinicas.find(c => c.id === id);
+    if (cl && cl.codigos[codigo] !== undefined && cl.codigos[codigo] !== desc && !confirm(`O código ${codigo} já está cadastrado em ${cl.nome} como “${cl.codigos[codigo]}”. Substituir a descrição?`)) return;
+    await alterarConfig(c => { const x = c.clinicas.find(y => y.id === id); if (x) x.codigos[codigo] = desc; });
+    fecharModal(true); persistir(); render(); toast(`Código ${codigo} cadastrado em ${cl ? cl.nome : 'clínica'}.`);
+  },
   codImportar(b) {
     M = { tipo: 'codimp', i: +b.dataset.i };
     abrirModal({ titulo: 'Colar lista de códigos', sub: 'Um código por linha: 80000001 - Descrição', icone: 'upload', tamanho: 'p',
@@ -3589,6 +3696,8 @@ const acoes = {
   modeloSel(b) { cfgModeloSel[b.dataset.c] = b.dataset.k; render(); },
   modeloRestaurar(b) { const k = b.dataset.k; if (!confirm('Restaurar o texto padrão deste modelo? Suas alterações nele serão perdidas (até você descartar as alterações).')) return; cfgEdit.modelos[k].html = padraoHtml(MODELOS_PADRAO[k].texto); marcarSujo(); render(); },
   inserirCampo(b) { const ed = $('#edModelo'); const f = CAMPO[b.dataset.k]; inserirNoEditor(ed, `<span class="tok" contenteditable="false" data-k="${f.k}" title="${esc(f.desc)}">${esc(f.nome)}</span>&nbsp;`); ed.dispatchEvent(new Event('input', { bubbles: true })); },
+  glosaAdd() { cfgEdit.glosas.push(''); marcarSujo(); render(); },
+  glosaRem(b) { cfgEdit.glosas.splice(+b.dataset.i, 1); marcarSujo(); render(); },
   motAdd() { cfgEdit.motivos.push({ id: 'm-' + Date.now().toString(36), nome: '', modelo: '' }); marcarSujo(); render(); },
   motRem(b) { cfgEdit.motivos.splice(+b.dataset.i, 1); marcarSujo(); render(); },
   paramNova() { abrirParamLivre(); },
@@ -3643,9 +3752,14 @@ document.addEventListener('input', e => {
     }
     if (t.dataset.pt) { const tr = M.terapias[+t.dataset.i]; tr[t.dataset.pt] = t.dataset.pt === 'qtd' || t.dataset.pt === 'codigo' ? t.value.replace(/\D/g, '') : t.value; if (t.dataset.pt !== 'descricao' && t.value !== tr[t.dataset.pt]) t.value = tr[t.dataset.pt]; if (!M.textoEditado) { M.texto = textoParametrizacao(M); $('#pmTexto').value = M.texto; } return; }
   }
-  if (M && M.tipo === 'obs' && t.dataset.obstxt) { M.txt[t.dataset.obstxt] = t.value; M.editado[t.dataset.obstxt] = true; return; }
+  if (M && M.tipo === 'corrigir') {
+    if (t.dataset.cgc !== undefined) { M.carteira = t.value; return; }
+    if (t.dataset.cgi) { const x = M.itens[+t.dataset.i]; const v = t.dataset.cgi === 'd' ? t.value : t.value.replace(/\D/g, ''); x[t.dataset.cgi] = v; if (t.value !== v) t.value = v; return; }
+  }
+  if (M && M.tipo === 'obs' && t.dataset.obstxt) { M.txt = t.value; M.editado = true; return; }
   if (!S) return;
   const g = guiaAtiva();
+  if (t.dataset.glf) { const gl = glosaDe(g); if (gl.itens[t.dataset.c]) gl.itens[t.dataset.c][t.dataset.glf] = t.value; persistir(); atualizarConcluir(g); return; }
   if (t.dataset.cega) {
     const i = +t.dataset.i; g.cega.entradas[i] = { ...(g.cega.entradas[i] || {}), [t.dataset.cega]: t.value.replace(/\D/g, '') };
     if (t.value !== t.value.replace(/\D/g, '')) t.value = t.value.replace(/\D/g, '');
@@ -3674,7 +3788,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'operador') { LS.set('operadorId', t.value); render(); return; }
   if (t.id === 'arquivoEml') { const f = t.files[0]; t.value = ''; if (f) abrirArquivo(f); return; }
   if (t.id === 'arqConc') { try { await conciliarEmails([...t.files]); } catch (err) { toast('Erro ao ler: ' + err.message, 'bad'); } return; }
-  if (t.id === 'painelDia') { acoes.atualizarPainel(); return; }
+  if (t.id === 'painelDia' || t.id === 'painelMes') { acoes.atualizarPainel(); return; }
   if (t.id === 'impCfg') {
     const f = t.files[0]; if (!f) return;
     try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); const keep = cfgEdit; cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
@@ -3685,7 +3799,7 @@ document.addEventListener('change', async e => {
   if (M && M.tipo === 'param' && t.dataset.pm === 'clinicaId') { M.clinicaId = t.value; $('#modalCorpo').innerHTML = htmlModalParam(); return; }
   if (M && M.tipo === 'obs' && t.dataset.obssel) {
     t.checked ? M.sel.add(t.dataset.obssel) : M.sel.delete(t.dataset.obssel);
-    ['guia', 'prestador'].forEach(d => { if (!M.editado[d]) { M.txt[d] = textoDestino(M, d); const ta = $('#obsTxt-' + d); if (ta) ta.value = M.txt[d]; } }); return;
+    if (!M.editado) { M.txt = textoSelObs(); const ta = $('#obsTxt'); if (ta) ta.value = M.txt; } return;
   }
   if (!S) return;
   const g = guiaAtiva();
@@ -3697,6 +3811,7 @@ document.addEventListener('change', async e => {
   }
   if (t.id === 'cartUsada') { g.carteiraUsada = normCart(t.value); persistir(); render(); return; }
   if (t.dataset.cpcampo) { g.itensEditados = true; persistir(); return; }
+  if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
   if (t.dataset.neg) { const r = g.resultado; if (t.checked) r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
   if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return; }
   if (t.dataset.resf) {
