@@ -6,7 +6,7 @@ Página auxiliar para conferência de guias de autorização de terapias.
 
 - Roda inteiramente no navegador (Chrome ou Edge). Nenhum dado é enviado para a internet.
 - Este repositório contém **apenas o código da página**. Configurações (`config.json`), registros e e-mails ficam na pasta compartilhada da equipe, **nunca aqui**.
-- Site estático: tudo em `public/` (`index.html` e `logo-promedica.png`). Não há build.
+- Site estático: tudo em `public/` (`index.html`, `logo-promedica.png` e `fonts/`, com a fonte Inter sob licença OFL). Não há build.
 
 ## Publicação na Vercel
 
