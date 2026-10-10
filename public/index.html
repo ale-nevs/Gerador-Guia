@@ -6,7 +6,9 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light dark">
 <title>Conferidor de Guias · Promédica</title>
-<link rel="icon" type="image/png" href="logo-promedica.png">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <script>
 /* Tema aplicado antes da pintura, para não piscar. Preferência guardada neste computador. */
 (function () {
@@ -926,10 +928,10 @@ const ROTULOS = [
 const VALOR_SEM_SEPARADOR = {
   carteira: /^\s+\d[\d\s.\-]{9,}/, cid: /^\s+[A-Za-z]\d{2}/, emissao: /^\s+\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/
 };
-const CART_RE = /(?<![\dA-Za-z])\d{4}[ .\-]?\d{4}[ .\-]?\d{4}[ .\-]?\d{3}[ .\-]?[A-Za-z0-9]{2}(?![\dA-Za-z])/;
+const CART_RE = /(?<![\dA-Za-z])(?:\d[ ./\-]?){14}\d[ ./\-]?[A-Za-z0-9]{2}(?![\dA-Za-z])/;
 function normUnidades(l) { let s = ''; for (let i = 0; i < l.length; i++) { const n = semAcento(l[i]).toLowerCase(); s += n.length ? n[0] : l[i]; } return s; }
 function detectarRotulo(linhaOrig) {
-  const limpa = linhaOrig.replace(/[*_ ]/g, ' ').replace(/\((a|o|as|os|s)\)/gi, '').replace(/^\s*(?:[•·▪►]|\d{1,2}\s*[.)\-]|[-–—])\s*(?=\S)/, '').trim();
+  const limpa = linhaOrig.replace(/[*_ ]/g, ' ').replace(/\((a|o|as|os|s)\)/gi, '').replace(/^\s*(?:\d{1,2}\s*[.)\-]\s+)?[^\p{L}\p{N}]*/u, '').trim();
   const norm = normUnidades(limpa);
   for (const [k, re] of ROTULOS) {
     const m = norm.match(re);
@@ -951,7 +953,9 @@ function explodirLinha(l) {
   pos.forEach((ini, i) => out.push(l.slice(ini, i + 1 < pos.length ? pos[i + 1] : l.length).replace(/[\s|;,]+$/, '').trim()));
   return out;
 }
-const explodirTexto = t => t.split('\n').flatMap(explodirLinha).join('\n');
+/* links de e-mail ("[ https://… | CID ]" ou "[texto](https://…)") ficam só com o texto visível */
+const limparLinks = t => t.replace(/\[\s*https?:\/\/[^\]|]*\|\s*([^\]]*?)\s*\]/gi, '$1').replace(/\[([^\]]+)\]\(\s*https?:\/\/[^)]*\)/gi, '$1');
+const explodirTexto = t => limparLinks(t).split('\n').flatMap(explodirLinha).join('\n');
 function secionar(texto) {
   const secoes = [{ k: null, linhas: [] }];
   for (const l of texto.split('\n')) {
@@ -963,7 +967,8 @@ function secionar(texto) {
 }
 const primeiraLinha = s => ((s && s.linhas.find(x => x.trim())) || '').trim().replace(/[.;,]+$/, '').trim();
 function extrairItens(bloco) {
-  const ms = [...bloco.matchAll(/(?<!\d)(\d{8})(?!\d)/g)];
+  const ehData = c => /^(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])20\d\d$/.test(c);
+  const ms = [...bloco.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].filter(m => !ehData(m[1]));
   const SEM_FREQ = '(?!\\s*(?:por|\\/|ao|na)\\s*(?:semana|m[eê]s|dia))';
   const pats = [
     /\(?\s*(?:quantidades?|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
@@ -1014,22 +1019,44 @@ function lerPedido(texto, referencia) {
   const de = k => secoes.filter(s => s.k === k);
   const p = { itens: [], invalidos: [], soltos: [], qtdUnicaAplicada: false, semRotulo: false, herdados: [] };
   p.beneficiarios = de('beneficiario').map(primeiraLinha).filter(Boolean);
+  let cartDeLinha = false;
   p.beneficiario = p.beneficiarios[0] || '';
   p.carteiraBruta = primeiraLinha(de('carteira')[0]);
-  if (!cartValida(normCart(p.carteiraBruta))) { const m = p.carteiraBruta.match(CART_RE) || (!p.carteiraBruta ? texto.match(CART_RE) : null); if (m) p.carteiraBruta = m[0].trim(); }
+  if (!cartValida(normCart(p.carteiraBruta))) { const m = p.carteiraBruta.match(CART_RE) || (!p.carteiraBruta ? texto.match(CART_RE) : null); if (m) { if (!p.carteiraBruta) cartDeLinha = m[0]; p.carteiraBruta = m[0].trim(); } else if (!p.carteiraBruta) { const f = texto.match(/(?<![\dA-Za-z])\d{13,16}[A-Za-z]{0,3}(?![\dA-Za-z])/); if (f) { cartDeLinha = f[0]; p.carteiraBruta = f[0]; } } }
+  if (!p.beneficiario && cartDeLinha) {   // linha livre: "NOME  carteira  código  serviço"
+    const linha = texto.split('\n').find(l => l.includes(cartDeLinha)) || '';
+    const nome = linha.slice(0, linha.indexOf(cartDeLinha)).replace(/[^\p{L}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+    if (nome.replace(/[^\p{L}]/gu, '').length >= 3) { p.beneficiario = nome; p.beneficiarios = [nome]; }
+  }
   if (p.beneficiario) {   // carteira escrita na mesma linha do nome: separa
     const m = p.beneficiario.match(CART_RE);
     if (m) { if (!p.carteiraBruta) p.carteiraBruta = m[0].trim(); p.beneficiario = p.beneficiario.replace(CART_RE, '').replace(/[\s\-–—,;|:()]*(cart\w*\.?)?[\s\-–—,;|:()]*$/i, '').trim(); p.beneficiarios[0] = p.beneficiario; }
+  }
+  if (!p.beneficiario && de('carteira').length) {   // nome sozinho na linha acima de "Carteira:"
+    const L = texto.split('\n'); const i = L.findIndex(l => { const r = detectarRotulo(l); return r && r.k === 'carteira'; });
+    for (let j = i - 1; j >= 0; j--) {
+      const l = L[j].trim(); if (!l) continue; if (detectarRotulo(l)) break;
+      const nome = l.replace(/[^\p{L}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      if (nome.split(' ').filter(w => w.length > 1).length >= 2 && nome.length <= 70 && !/\d/.test(l)) { p.beneficiario = nome; p.beneficiarios = [nome]; }
+      break;
+    }
   }
   const lc = normCart(p.carteiraBruta);
   p.carteira = cartValida(lc) ? lc : null;
   let medicoTxt = primeiraLinha(de('medico')[0]);
   if (!medicoTxt) { const m = texto.match(/(?:^|\n)\s*(?:dr\.?|dra\.?|doutor(?:a)?)\s+([^\n]+)/i); if (m) medicoTxt = m[0].trim().replace(/^(dr\.?|dra\.?|doutor(a)?)\s+/i, ''); }
+  if (!medicoTxt) { const m = texto.match(/\bCRM\s*[:\-]?\s*(\d{3,7})[ \t]*([^\n]*)/i); if (m) medicoTxt = `${m[2].trim()} CRM ${m[1]}`.trim(); }
   p.medico = lerMedico(medicoTxt);
   let cidTxt = primeiraLinha(de('cid')[0]);
-  if (!cidTxt) { const m = texto.match(/\bCID(?:-?10)?\s*[:\-]?\s*([A-Z]\d{2}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1]; }
+  if (!cidTxt) { const m = texto.match(/\bCID(?:-?10)?\s*[:\-]?\s*([A-Za-z])\s?(\d{2,3}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1] + m[2]; }
+  cidTxt = cidTxt.replace(/\s+/g, '');
+  if (cidTxt && !/^[A-Za-z]\d{2}/.test(cidTxt) && /^\d{3,7}$/.test(cidTxt)) { // "CID : 31163" colado na linha do médico é, na verdade, o CRM
+    if (!p.medico.crm) { p.medico.crm = cidTxt; p.medico.bruto = `${p.medico.bruto} CRM ${cidTxt}`.trim(); } cidTxt = '';
+  }
   p.cid = cidTxt.toUpperCase();
   p.emissao = lerEmissao(primeiraLinha(de('emissao')[0]), referencia);
+  if (p.emissao.estado === 'ausente' && /sem\s+data/i.test(texto)) p.emissao = lerEmissao('SEM DATA', referencia);
+  if (p.emissao.estado === 'ausente') { const m = texto.replace(CART_RE, ' ').match(/(?<!\d)(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d\d)(?!\d)/); if (m) p.emissao = lerEmissao(`${m[1]}/${m[2]}/${m[3]}`, referencia); }
   p.local = primeiraLinha(de('local')[0]);
   p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
   const aplicarQtd = (lista, qsec) => {
@@ -1045,7 +1072,10 @@ function lerPedido(texto, referencia) {
     p.itens.push(...r.itens);
   }
   if (!de('servico').length) {
-    const livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*(?:[-•·*]|\d{1,2}[.)])?\s*\d{8}(?!\d)/.test(l));
+    let livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*[^\p{L}\p{N}]*(?:\d{1,2}[.)]\s*)?\d{8}(?!\d)/u.test(l));
+    if (!livres.length && p.carteiraBruta) {   // código solto na mesma linha da carteira ("NOME carteira 50000616 FONO")
+      livres = texto.split('\n').map(l => l.replace(CART_RE, ' ')).filter(l => /(?<![\dA-Za-z])\d{8}(?!\d)/.test(l)).map(l => l.slice(l.search(/(?<![\dA-Za-z])\d{8}(?!\d)/)));
+    }
     const r = extrairItens(livres.join('\n'));
     if (r.itens.length) { p.semRotulo = true; p.itens = r.itens; }
   }
@@ -1053,7 +1083,7 @@ function lerPedido(texto, referencia) {
   if (qLivre.length === 1 && p.itens.filter(i => i.qtd == null).length) aplicarQtd(p.itens, qLivre[0]);
   const usados = new Set(p.itens.map(i => i.codigo));
   const textoLivre = secoes.filter(s => !['carteira', 'medico', 'emissao', 'cid'].includes(s.k)).flatMap(s => s.linhas).join('\n');
-  p.soltos = [...new Set([...textoLivre.matchAll(/(?<!\d)(\d{8})(?!\d)/g)].map(m => m[1]).filter(c => !usados.has(c)))];
+  p.soltos = [...new Set([...textoLivre.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].map(m => m[1]).filter(c => !usados.has(c)))];
   p.secoesEncontradas = [...new Set(secoes.map(s => s.k).filter(Boolean))];
   return p;
 }
@@ -1076,7 +1106,14 @@ function dividirPor(linhas, ks, tipos, cabecalhoCompartilhado) {
   if (!repetidos.length) return null;
   const primeiro = ks.findIndex(k => repetidos.includes(k));
   const abridor = ks[primeiro];
-  const inicios = ks.map((k, i) => (k === abridor ? i : -1)).filter(i => i >= 0);
+  let inicios = ks.map((k, i) => (k === abridor ? i : -1)).filter(i => i >= 0);
+  if (abridor === 'carteira') {   // nome do paciente sozinho na linha logo acima de "Carteira:" pertence ao bloco que começa nela
+    inicios = inicios.map((ini, n) => {
+      let j = ini - 1; while (j >= 0 && !linhas[j].trim()) j--;
+      if (j >= 0 && (n > 0 || true) && ks[j] == null && !/\d/.test(linhas[j]) && linhas[j].trim().split(/\s+/).length >= 2 && linhas[j].length <= 70 && !(n > 0 && j <= inicios[n - 1])) return j;
+      return ini;
+    });
+  }
   const cab = linhas.slice(0, inicios[0]);
   return { cab, blocos: inicios.map((ini, j) => linhas.slice(ini, j + 1 < inicios.length ? inicios[j + 1] : linhas.length)) };
 }
@@ -1097,7 +1134,15 @@ function lerPedidos(texto, referencia) {
   comDados.forEach(c => {
     const ks = rotulosDe(c);
     const div = dividirPor(c, ks, ['beneficiario', 'carteira'], true);
-    if (div) { if (div.cab.some(l => l.trim())) compartilhado.push(div.cab); pacientes.push(...div.blocos); } else pacientes.push(c);
+    if (div) {
+      const ksc = rotulosDe(div.cab), ib = ksc.indexOf('beneficiario');
+      if (ib >= 0) {   // beneficiário escrito uma vez, antes de várias carteiras/pedidos: vale para todos os blocos
+        const nomeLinhas = div.cab.slice(ib).filter(l => l.trim());
+        div.blocos = div.blocos.map(b => rotulosDe(b).includes('beneficiario') ? b : [...nomeLinhas, ...b]);
+        div.cab = div.cab.slice(0, ib);
+      }
+      if (div.cab.some(l => l.trim())) compartilhado.push(div.cab); pacientes.push(...div.blocos);
+    } else pacientes.push(c);
   });
   if (!pacientes.length) pacientes = [L];
   /* 3) mesmo paciente com vários pedidos (médico ou data repetidos): cabeçalho do paciente replicado em cada pedido */
@@ -1488,7 +1533,7 @@ const CAMPOS = [
   { k: 'OBS_ADICIONAIS', cat: 'Situação da autorização', nome: 'Observações adicionais', desc: 'Texto livre digitado na etapa Finalizar. Se vazio, a linha some.', ex: 'Favor reenviar o pedido médico atualizado.', opc: true, fn: c => c.g.resultado.obsAdicionais },
   // Alertas
   { k: 'PROBLEMAS', cat: 'Alertas e observações', nome: 'Pendências identificadas', desc: 'Lista dos bloqueios do pedido, em linguagem para a clínica.', ex: '• Quantidade não informada para o serviço 80000004.', fn: c => c.extra.problemas },
-  { k: 'TEXTO_ORIGINAL', cat: 'Alertas e observações', nome: 'Pedido original', desc: 'Texto do pedido deste beneficiário, como recebido (sem mensagens anteriores).', ex: 'Beneficiário: Maria... Serviço: 80000004...', fn: c => c.g.textoBloco },
+  { k: 'TEXTO_ORIGINAL', cat: 'Alertas e observações', nome: 'Pedido original', desc: 'Texto do e-mail como recebido, sem as mensagens anteriores. É o mesmo para todas as guias do e-mail.', ex: 'Beneficiário: Maria... Serviço: 80000004...', fn: c => c.S.email.textoPrincipal },
   // Parametrização
   { k: 'PARAM_MEDICO', cat: 'Dados de parametrização', nome: 'Médico da parametrização', desc: 'Nome do médico informado no modal Parametrizar.', ex: 'Dr. João Pereira', fn: c => (c.extra.param || {}).medico },
   { k: 'PARAM_DATA', cat: 'Dados de parametrização', nome: 'Data da parametrização', desc: 'Data de emissão do pedido médico parametrizado.', ex: '15/09/2026', fn: c => (c.extra.param || {}).data },
@@ -2484,6 +2529,16 @@ function htmlSituacao(g) {
     ${op('parcial', 'halfcircle', 'Parcialmente autorizada', 'Somente parte dos itens foi autorizada.')}
     ${op('nao', 'x', 'Não autorizada', 'A guia foi gerada, mas a autorização não foi concedida.')}</div>${extra}`;
 }
+function htmlCardObs(g) {
+  const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
+  return `<div class="card">
+  <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
+    <button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div>
+  <p class="dica">Observação interna da guia no sistema oficial. É diferente da mensagem ao prestador, ao lado.</p>
+  <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
+  <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
+      </div>`;
+}
 function renderFinal(alvo, g) {
   const r = g.resultado, st = situacaoGuia(g), guiaOk = /^T\d{8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
@@ -2511,13 +2566,7 @@ function renderFinal(alvo, g) {
         ${htmlSituacao(g)}
         <div style="margin-top:12px"><label class="lbl" for="rObs">Observações adicionais (entram na resposta ao prestador)</label><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
       </div>
-      <div class="card">
-        <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
-          <button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div>
-        <p class="dica">Observação interna da guia no sistema oficial. É diferente da mensagem ao prestador, ao lado.</p>
-        <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
-        <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
-      </div>
+      ${htmlCardObs(g)}
     </div>
     ${showResp ? `<div class="stack">
       <div class="card">
@@ -2559,7 +2608,7 @@ function renderConcluida(alvo, g) {
       ${r.situacao === 'nao' && (r.motivoId || r.motivoTxt) ? `<dt>Motivo</dt><dd>${esc([motivoNome(r.motivoId), r.motivoTxt].filter(Boolean).join(' — '))}</dd>` : ''}</dl>
       <div class="acoes"><button class="btn line" data-act="reabrirGuia">${ic('edit')}Reabrir para correção</button><span class="esp"></span>
         ${prox >= 0 ? `<button class="btn pri" data-act="selGuia" data-i="${prox}">Próxima guia pendente${ic('right')}</button>` : ''}
-        ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div></div>
+        ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${htmlCardObs(g)}</div>
     ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta ao prestador${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
       <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
