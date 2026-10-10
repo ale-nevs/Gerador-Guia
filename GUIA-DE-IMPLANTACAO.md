@@ -102,6 +102,11 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 - Atenção: é uma trava de uso, não segurança forte. O código (hash) fica no `config.json` da pasta compartilhada, e quem tem acesso à pasta pode alterá-lo.
 - Ao salvar, o `config.json` da pasta é regravado, preservando operadores criados ou protegidos por colegas desde que a tela foi aberta. Outras máquinas releem o arquivo ao voltar para a janela.
 
+### Topo compacto e telas estreitas
+- O botão pequeno ao lado de Claro/Escuro oculta o menu de seções e o topo. Fica uma barra fina na cor do operador com o nome, uma luz da pasta (verde conectada, amarela reautorizar, vermelha sem pasta) e o botão para voltar. A escolha fica salva neste computador.
+- Botões secundários (copiar, atualizar, corrigir, excluir etc.) mostram só o ícone, com o nome na dica ao passar o mouse. Há um botão de copiar ao lado da carteira usada no sistema.
+- A página foi ajustada para funcionar até 320 px de largura, sem rolagem horizontal.
+
 ### Visões do Painel
 Dia, **Semana** (segunda a domingo) e Mês. A coluna Clínica mostra quem gerou a guia.
 

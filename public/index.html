@@ -121,6 +121,35 @@ button.chip:active{transform:translateY(1px)}
 .chip.pasta.alerta .ic{color:var(--warn-solid)}
 :root[data-theme=dark] .chip.pasta.alerta{color:var(--warn-fg)}
 .chip.tema{padding:0 10px}
+.luz{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--border)}
+.luz.ok{background:#16a34a}.luz.warn{background:#eab308}.luz.bad{background:#dc2626}
+.btn.so{font-size:0;gap:0;padding:0 9px;min-width:var(--h-ctl)}
+.btn.sm.so,.btn.cp{min-width:var(--h-sm);padding:0 8px}
+.btn.so .ic{font-size:var(--fs-sm)}
+.chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
+/* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
+body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
+body.topo-mini .marca{display:none}
+body.topo-mini .topo-in{padding-top:3px;padding-bottom:3px;justify-content:flex-end;flex-wrap:nowrap}
+body.topo-mini .topo-acoes{flex-wrap:nowrap;gap:6px}
+body.topo-mini .chip{min-height:28px;padding:0 8px}
+body.topo-mini .chip.mini-btn{min-width:28px;padding:0 6px}
+body.topo-mini .chip.chip-op{background:transparent;border-color:transparent}
+body.topo-mini nav.abas{display:none}
+body.topo-mini .chip select{max-width:46vw}
+.chip .txt-fino{display:inline}
+@media (max-width:560px){
+  .chip .txt-fino,nav.abas button .txt-fino{display:none}
+  .chip.ctx{padding:0 8px}
+  nav.abas{gap:4px;padding:6px}
+  nav.abas button{padding:0 12px;flex:1;justify-content:center}
+  .topo-in{padding-top:6px;padding-bottom:6px;gap:6px 10px}
+  .marca .logo{height:30px}
+  .marca h1{font-size:var(--fs-lg)}
+  .marca .sub{font-size:10px;letter-spacing:.06em}
+  .topo-acoes{gap:5px;width:100%;justify-content:flex-end}
+  .chip select{min-width:80px;max-width:36vw}
+}
 .avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:50%;background:var(--c-bg,var(--surface-3));color:var(--c-fg,var(--text-2));border:1px solid var(--c-br,var(--border))}
 .avatar .emoji{font-size:13px;line-height:1}.avatar.lg .emoji{font-size:21px}.tag .emoji{font-size:12px;line-height:1}.av-op .emoji{font-size:20px;line-height:1}
 .avatar.lg{width:34px;height:34px}.avatar.lg .ic{width:19px;height:19px}
@@ -329,7 +358,8 @@ table.t{border-collapse:collapse;width:100%}
 /* ===== Conferência cega ===== */
 .cega{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
 .cega-linhas{display:grid;grid-template-columns:60px 170px 110px;gap:8px 12px;align-items:center;margin-top:12px}
-.cega-linhas input{font-size:var(--fs-lg);text-align:center;font-variant-numeric:tabular-nums}
+.cega-linhas{max-width:100%}@media (max-width:420px){.cega-linhas{grid-template-columns:40px minmax(0,1fr) 70px;gap:8px}}
+.cega-linhas input{min-width:0;font-size:var(--fs-lg);text-align:center;font-variant-numeric:tabular-nums}
 .cega-linhas .h{font-size:var(--fs-xs);color:var(--text-2);text-transform:uppercase;font-weight:700}
 .res-ok{display:flex;gap:8px;align-items:center;background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-br);border-radius:var(--r-sm);padding:10px 12px;font-weight:600}
 .res-bad{background:var(--bad-bg);color:var(--bad-fg);border:1px solid var(--bad-br);border-radius:var(--r-sm);padding:10px 12px}
@@ -512,6 +542,12 @@ footer.rodape .ver{font-size:var(--fs-xs);color:var(--text-3);margin-left:6px}
   .card{box-shadow:none}
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* Largura mínima (320px): nada pode forçar rolagem horizontal da página */
+main,.card,.card-h,.email-meta dd,.cp-campos,.form-grid>*,.grid2>*{min-width:0}
+.card-h{flex-wrap:wrap}
+.email-meta dd,.email-meta dd .num{overflow-wrap:anywhere}
+pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:560px){.btn{white-space:normal;max-width:100%;text-align:left;padding-top:5px;padding-bottom:5px}.btn.so{text-align:center}.linha-flex{flex-wrap:wrap}.email-meta{grid-template-columns:1fr}.email-meta dt{margin-top:4px}}
 </style>
 </head>
 <body>
@@ -638,6 +674,8 @@ const ICONES = {
   folderx: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="m9.5 10.5 5 5M14.5 10.5l-5 5"/>',
   layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V22h16"/>',
+  chevup: '<path d="m18 15-6-6-6 6"/>',
+  chevdown: '<path d="m6 9 6 6 6-6"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>'
 };
 const ic = (n, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n] || ''}</svg>`;
@@ -2240,14 +2278,28 @@ function renderTopo() {
       : Pasta.handle ? { c: 'alerta', i: 'folder', t: 'Reautorizar pasta', d: 'A pasta lembrada precisa de autorização (um clique por dia).' }
         : { c: 'alerta', i: 'folderx', t: 'Pasta não conectada', d: 'Sem a pasta, os registros ficam só neste computador e não há visão conjunta entre operadores.' };
   const escuro = Tema.efetivo() === 'dark';
+  const mini = !!LS.get('topoMini', false), cab = document.querySelector('header.topo');
+  document.body.classList.toggle('topo-mini', mini);
+  cab.style.cssText = mini && op ? estiloOp(op) : '';
+  const nivel = !Pasta.suportado ? 'bad' : Pasta.ok ? 'ok' : Pasta.handle ? 'warn' : 'bad';
+  if (mini) {
+    $('#topoAcoes').innerHTML = `
+    <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
+    <button class="chip mini-btn" data-act="pasta" title="${esc(pasta.t + ': ' + pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span></button>
+    <button class="chip mini-btn" data-act="topoMini" title="Mostrar menu e topo completo" aria-label="Mostrar menu e topo completo">${ic('chevdown', 'sm')}</button>`;
+    $('#abas').innerHTML = '';
+    document.title = 'Conferidor de Guias · Promédica';
+    return;
+  }
   $('#topoAcoes').innerHTML = `
     <span class="chip ctx" title="${aba === 'painel' ? 'Dia selecionado no Painel' : 'Data de hoje'}">${ic('calendar', 'sm')}${dataTxt}</span>
     <label class="chip chip-op" style="${op ? estiloOp(op) : ''}" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
-    <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}">${ic(pasta.i, 'sm')}${esc(pasta.t)}</button>
-    <button class="chip tema" data-act="alternarTema" title="Alternar entre modo claro e escuro" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span>${escuro ? 'Claro' : 'Escuro'}</span></button>`;
+    <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
+    <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
+    <button class="chip mini-btn" data-act="topoMini" title="Ocultar menu e topo (modo compacto)" aria-label="Ocultar menu e topo">${ic('chevup', 'sm')}</button>`;
   $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'layers', 'Ações'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
-    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}${t}</button>`).join('');
+    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
   $('#verRodape').textContent = 'v' + VERSAO;
   document.title = 'Conferidor de Guias · Promédica';
 }
@@ -2451,8 +2503,8 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
   return `<div class="tabela-scroll"><table class="t"><thead><tr><th>#</th><th>Código</th><th>Qtd.</th><th>Descrição ${cl ? '(cadastro da clínica)' : '(referência)'}</th><th>Descrição do e-mail</th><th>Situação</th></tr></thead><tbody>
   ${g.pedido.itens.map((it, i) => {
     const ref = descRefItem(g, it), est = estadoItem(g, it);
-    const cpCod = copiar ? `<button class="btn cp ${g.copiados['c:' + it.codigo] === it.codigo ? 'copiado' : ''}" data-act="copiarItem" data-tipo="c" data-codigo="${it.codigo}" aria-label="Copiar código ${it.codigo}">${g.copiados['c:' + it.codigo] === it.codigo ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button>` : '';
-    const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button>` : '';
+    const cpCod = copiar ? `<button class="btn cp ${g.copiados['c:' + it.codigo] === it.codigo ? 'copiado' : ''}" data-act="copiarItem" data-tipo="c" data-codigo="${it.codigo}" aria-label="Copiar código ${it.codigo}">${g.copiados['c:' + it.codigo] === it.codigo ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
+    const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
     return `<tr><td class="c">${i + 1}</td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${cpCod}</div></td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
@@ -2493,7 +2545,7 @@ function renderPedido(alvo, g) {
         <div class="form-grid">
           <div><label class="lbl" for="f-benef">Beneficiário</label><input type="text" id="f-benef" data-campo="beneficiario" value="${esc(p.beneficiario)}"></div>
           <div><label class="lbl">Carteira informada no e-mail</label><div style="min-height:34px;display:flex;align-items:center" class="num">${esc(p.carteiraBruta || '—')}</div></div>
-          <div><label class="lbl" for="cartUsada">Carteira usada no sistema</label><input type="text" id="cartUsada" class="num ${cartInvalida ? 'invalido' : ''}" value="${esc(g.carteiraUsada)}" maxlength="30" placeholder="17 caracteres, sem espaços" aria-describedby="cartAjuda">${cartInvalida ? `<div class="campo-erro" id="cartAjuda">${ic('alert', 'sm')}Carteira fora do padrão (15 dígitos + 2 caracteres).</div>` : ''}</div>
+          <div><label class="lbl" for="cartUsada">Carteira usada no sistema</label><div class="linha-flex" style="flex-wrap:nowrap;gap:6px"><input type="text" id="cartUsada" class="num ${cartInvalida ? 'invalido' : ''}" value="${esc(g.carteiraUsada)}" maxlength="30" placeholder="17 caracteres, sem espaços" aria-describedby="cartAjuda" style="flex:1;min-width:0">${btnCopiaCampo(g, 'carteira', 'cartUsada', 'carteira usada no sistema')}</div>${cartInvalida ? `<div class="campo-erro" id="cartAjuda">${ic('alert', 'sm')}Carteira fora do padrão (15 dígitos + 2 caracteres).</div>` : ''}</div>
           <div><label class="lbl" for="f-medico">Médico</label><input type="text" id="f-medico" data-campo="medico" value="${esc(p.medico.bruto)}"></div>
           <div><label class="lbl" for="f-cid">CID</label><input type="text" id="f-cid" data-campo="cid" value="${esc(p.cid)}"></div>
           <div><label class="lbl" for="f-em">Data do pedido médico</label><input type="text" id="f-em" data-campo="emissao" value="${esc(p.emissao.bruto)}" placeholder="dd/mm/aaaa ou SEM DATA"></div>
@@ -2535,7 +2587,7 @@ function valorCopia(g, campo) {
 }
 function btnCopiaCampo(g, campo, ref, rotulo) {
   const v = valorCopia(g, campo).trim(), ok = v !== '' && g.copiados[campo] === v;
-  return `<button class="btn cp ${ok ? 'copiado' : ''}" data-act="copiarCampo" data-campo="${campo}" data-ref="${ref}" aria-label="Copiar ${esc(rotulo)}">${ok ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button>`;
+  return `<button class="btn cp ${ok ? 'copiado' : ''}" data-act="copiarCampo" data-campo="${campo}" data-ref="${ref}" aria-label="Copiar ${esc(rotulo)}">${ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
 }
 function campoCopia(g, { campo, rot, sub, curto, mid, ph, mono }) {
   const id = 'cp-' + campo, v = valorCopia(g, campo);
@@ -2704,7 +2756,7 @@ function htmlCardObs(g) {
   <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
 </div>
   <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
-  <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
+  <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
 }
 function renderFinal(alvo, g) {
@@ -2728,7 +2780,7 @@ function renderFinal(alvo, g) {
             <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 8 dígitos.' : ''}</div></div>
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
-              <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button></div>
+              <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
             </div>` : ''}
         </div>
         <h3>Situação da autorização</h3>
@@ -2772,7 +2824,7 @@ function renderFinalSemGuia(alvo, g) {
   </div>
   ${showResp ? `<div class="card"><div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2><span class="esp"></span></div>
     <div class="cp-campo" style="margin-bottom:10px"><div class="wrapin"><label class="lbl" for="emailPrest">E-mail do prestador</label><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}"></div>
-      <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar'}</button></div>
+      <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
     ${resp && resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
     ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
     <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
@@ -3414,7 +3466,7 @@ function atualizarConcluir(g) {
   const pend = pendenciasConclusao(g, situacaoGuia(g)), bt = $('[data-act=concluirGuia]'); if (bt) bt.disabled = pend.length > 0;
   const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
 }
-function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); b.innerHTML = ok ? `${ic('check', 'sm')}Copiado` : `${ic('copy', 'sm')}Copiar`; }
+function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); b.innerHTML = ok ? `${ic('check', 'sm')}` : `${ic('copy', 'sm')}`; }
 
 /* ====================================================================
    Ações (data-act)
@@ -3433,6 +3485,7 @@ const acoes = {
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
+  topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
   fecharModal() { fecharModal(); },
@@ -3574,7 +3627,7 @@ const acoes = {
   async copiarObs(b) {
     const g = guiaAtiva(), v = $('#txtObs').value;
     if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
-    g.copiados.obs = v; persistir(); b.classList.add('copiado'); b.innerHTML = `${ic('check', 'sm')}Copiado`; toast('Observação copiada (texto simples).');
+    g.copiados.obs = v; persistir(); b.classList.add('copiado'); b.innerHTML = `${ic('check', 'sm')}`; toast('Observação copiada (texto simples).');
   },
   resetObs() { const g = guiaAtiva(); g.obsEdit = null; g.obsExtras = []; g.obsInc = []; persistir(); render(); },
   incluirObs() { abrirModalObs(); },
@@ -3949,7 +4002,24 @@ document.addEventListener('visibilitychange', async () => {
   try { const antes = JSON.stringify(cfg.operadores); await carregarConfig(); if (JSON.stringify(cfg.operadores) !== antes) { if (cfgEdit) iniciarCfgEdit(); render(); } } catch (e) { }
 });
 
+// Botões secundários viram só ícone (o texto vai para dica e leitor de tela)
+const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Sortear amostra|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
+function soIcone(raiz) {
+  raiz.querySelectorAll('.btn:not(.so):not(.pri)').forEach(b => {
+    if (!b.querySelector('svg.ic')) return;
+    const t = b.textContent.replace(/\s+/g, ' ').trim();
+    if (!t || !ROT_ICONE.test(t)) return;
+    b.classList.add('so'); if (!b.title) b.title = t; if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', t);
+  });
+}
+function iniciarSoIcone() {
+  const alvos = ['#app', '#modalRoot'].map(s => document.querySelector(s)).filter(Boolean);
+  const mo = new MutationObserver(() => alvos.forEach(soIcone));
+  alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); soIcone(a); });
+}
+
 async function init() {
+  iniciarSoIcone();
   Tema.aplicar();
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { }
   const hoje = new Date();
