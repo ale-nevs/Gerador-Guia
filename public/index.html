@@ -2004,7 +2004,10 @@ let S = null;          // atendimento em andamento
 let aba = 'atend';
 let ultimoConcluido = LS.get('ultimo', null);
 const guiaAtiva = () => (S ? S.guias[S.ativa] : null);
-function persistir() { if (S) LS.set('atual', S); else LS.del('atual'); }
+// Último médico lido por remetente, só neste computador: serve de sugestão quando um pedido da mesma clínica vem sem médico
+const chaveMedico = () => (S && S.email && S.email.remetente && S.email.remetente.email) ? 'medico.' + S.email.remetente.email.toLowerCase() : '';
+function lembrarMedico() { const k = chaveMedico(); if (!k) return; const g = S.guias.find(x => x.pedido.medico && x.pedido.medico.nome); if (g) LS.set(k, g.pedido.medico.bruto); }
+function persistir() { if (S) { LS.set('atual', S); lembrarMedico(); } else LS.del('atual'); }
 function clinicaDe(s) { return s && s.clinicaId ? cfg.clinicas.find(c => c.id === s.clinicaId) || null : null; }
 const PALAVRAS_VAZIAS = new Set(['clinica', 'clinicas', 'de', 'da', 'do', 'das', 'dos', 'e', 'autorizacao', 'convenio', 'contato', 'espaco', 're', 'res', 'enc', 'fw', 'fwd', 'pedido', 'guia', 'guias', 'terapia', 'terapias', 'integrada', 'multidisciplinar']);
 const tokens = s => semAcento(s).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !PALAVRAS_VAZIAS.has(w));
@@ -2587,7 +2590,7 @@ function renderPedido(alvo, g) {
           <div><label class="lbl" for="f-benef">Beneficiário</label><input type="text" id="f-benef" data-campo="beneficiario" value="${esc(p.beneficiario)}"></div>
           <div><label class="lbl">Carteira informada no e-mail</label><div style="min-height:34px;display:flex;align-items:center" class="num">${esc(p.carteiraBruta || '—')}</div></div>
           <div><label class="lbl" for="cartUsada">Carteira usada no sistema</label><div class="linha-flex" style="flex-wrap:nowrap;gap:6px"><input type="text" id="cartUsada" class="num ${cartInvalida ? 'invalido' : ''}" value="${esc(g.carteiraUsada)}" maxlength="30" placeholder="17 caracteres, sem espaços" aria-describedby="cartAjuda" style="flex:1;min-width:0">${btnCopiaCampo(g, 'carteira', 'cartUsada', 'carteira usada no sistema')}</div>${cartInvalida ? `<div class="campo-erro" id="cartAjuda">${ic('alert', 'sm')}Carteira fora do padrão (15 dígitos + 2 caracteres).</div>` : ''}</div>
-          <div><label class="lbl" for="f-medico">Médico</label><input type="text" id="f-medico" data-campo="medico" value="${esc(p.medico.bruto)}"></div>
+          <div><label class="lbl" for="f-medico">Médico</label><input type="text" id="f-medico" data-campo="medico" value="${esc(p.medico.bruto)}">${!p.medico.nome && LS.get(chaveMedico(), '') ? `<button type="button" class="btn sm line" style="margin-top:6px" data-act="usarMedicoAnterior" title="Médico do último pedido deste remetente (confira no anexo)">${ic('user', 'sm')}Usar ${esc(LS.get(chaveMedico(), ''))}</button>` : ''}</div>
           <div><label class="lbl" for="f-cid">CID</label><input type="text" id="f-cid" data-campo="cid" value="${esc(p.cid)}"></div>
           <div><label class="lbl" for="f-em">Data do pedido médico</label><input type="text" id="f-em" data-campo="emissao" value="${esc(p.emissao.bruto)}" placeholder="dd/mm/aaaa ou SEM DATA"></div>
           <div><label class="lbl" for="f-local">Local do pedido</label><input type="text" id="f-local" data-campo="local" value="${esc(p.local)}"></div>
@@ -3526,6 +3529,7 @@ const acoes = {
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
+  usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
   topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
