@@ -133,6 +133,11 @@ body.topo-mini .progs{display:flex}
 .prog::before{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--surface)}
 .prog .pe{position:relative;display:inline-flex;line-height:1}
 .prog .emoji{font-size:17px}.prog .ic{color:var(--text-3)}
+.guia-destaque{margin:4px 0 14px;padding:14px 16px;border:2px solid var(--warn-br);background:var(--warn-bg);border-radius:var(--r)}
+.guia-destaque.ok{border-color:var(--ok-solid);background:var(--ok-bg)}
+.guia-destaque.erro{border-color:var(--bad-solid);background:var(--bad-bg)}
+.guia-destaque .lbl{font-size:var(--fs-md);font-weight:750;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.guia-destaque input{font-size:28px;font-weight:750;letter-spacing:.09em;height:58px;max-width:420px;width:100%;text-transform:uppercase;font-variant-numeric:tabular-nums}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -1140,11 +1145,21 @@ function lerMedico(bruto) {
     .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim();
   return { bruto, nome, crm: dig.length >= 3 ? dig : '', conselho };
 }
+const MESES_EXT = { janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, mar: 3, abril: 4, abr: 4, maio: 5, mai: 5, junho: 6, jun: 6, julho: 7, jul: 7, agosto: 8, ago: 8, setembro: 9, set: 9, outubro: 10, out: 10, novembro: 11, nov: 11, dezembro: 12, dez: 12 };
+const RE_DATA_EXT = /(?<!\d)(\d{1,2})\s*(?:º|°|o)?\s*(?:de\s+|\/|-|\.|\s)\s*(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\s*(?:de\s+|\/|-|\.|\s)?\s*(\d{4}|\d{2})(?!\d)/i;
+/* "5 de fevereiro de 2026" → "05/02/2026" (devolve '' se não houver data por extenso) */
+function dataPorExtenso(t) {
+  const m = (t || '').match(RE_DATA_EXT); if (!m) return '';
+  const mes = MESES_EXT[semAcento(m[2]).toLowerCase()]; if (!mes) return '';
+  const a = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  return `${String(m[1]).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${a}`;
+}
 function lerEmissao(bruto, referencia) {
   const b = (bruto || '').trim();
   if (!b) return { estado: 'ausente', bruto: '' };
   if (/sem\s*data/i.test(b)) return { estado: 'sem_data', bruto: b };
-  const m = b.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  const ext = dataPorExtenso(b);
+  const m = (ext || b).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
   if (!m) return { estado: 'invalida', bruto: b };
   let [, d, mo, a] = m.map(Number); if (a < 100) a += 2000;
   const dt = new Date(a, mo - 1, d);
@@ -1205,6 +1220,7 @@ function lerPedido(texto, referencia) {
   p.emissao = lerEmissao(primeiraLinha(de('emissao')[0]), referencia);
   if (p.emissao.estado === 'ausente' && /sem\s+data/i.test(texto)) p.emissao = lerEmissao('SEM DATA', referencia);
   if (p.emissao.estado === 'ausente') { const m = texto.replace(CART_RE, ' ').match(/(?<!\d)(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d\d)(?!\d)/); if (m) p.emissao = lerEmissao(`${m[1]}/${m[2]}/${m[3]}`, referencia); }
+  if (p.emissao.estado === 'ausente') { const ext = dataPorExtenso(texto.replace(CART_RE, ' ').split('\n').filter(l => !/escreveu|enviad[oa]|\bsent\b|\bàs\s+\d{1,2}:\d{2}|\bem\s+(seg|ter|qua|qui|sex|s[aá]b|dom)/i.test(l)).join('\n')); if (ext) p.emissao = lerEmissao(ext, referencia); }
   p.local = primeiraLinha(de('local')[0]);
   p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
   const aplicarQtd = (lista, qsec) => {
@@ -2648,7 +2664,7 @@ function valorCopia(g, campo) {
   const p = g.pedido, cl = clinicaDe(S);
   return ({
     executante: g.executante ?? (cl ? cl.executante : '') ?? '', medico_nome: p.medico.nome || '', medico_crm: p.medico.crm || '',
-    local: p.local || '', data: dataPedidoTxt(p), carteira: g.carteiraUsada || '', benef: p.beneficiario || '', cid: p.cid || ''
+    local: p.local || '', data: dataPedidoTxt(p), carteira: g.carteiraUsada || '', benef: p.beneficiario || '', cid: (p.cid || '').replace(/\./g, '')
   })[campo] ?? '';
 }
 function btnCopiaCampo(g, campo, ref, rotulo) {
@@ -2841,9 +2857,10 @@ function renderFinal(alvo, g) {
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
+        <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
+          <input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
+          <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 8 dígitos.' : ''}</div></div>
         <div class="form-grid">
-          <div><label class="lbl" for="guia">Número da guia</label><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
-            <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 8 dígitos.' : ''}</div></div>
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
               <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
