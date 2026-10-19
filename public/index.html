@@ -3558,7 +3558,7 @@ const PRINTS_GEO = {
   guia: [541, 99, 657, 113], credNome: [14, 151, 257, 165], credCgc: [260, 151, 364, 165],
   ident: [48, 301, 160, 317], paciente: [163, 301, 317, 317], cid: [16, 445, 62, 459],
   faixaGuia: [10, 118, 330, 134], faixaProc: [10, 60, 52, 78],
-  linhas: { topo: 88, passo: 18, max: 6, item: [14, 36], cod: [484, 556], qtd: [560, 574] }
+  linhas: { topo: 88, passo: 18, max: 6, item: [14, 36], cod: [484, 556], qtd: [557, 575] }
 };
 const PRINTS_MEM = new Map();   // guia.id -> { leituras: [{tipo, campos, itens}], crops } (só em memória)
 
@@ -3599,19 +3599,20 @@ async function abrirImagem(file) {
 }
 /* acha as barras amarelas do cabeçalho (255,224,128) e devolve deslocamento e escala em relação ao print de referência */
 function acharAncora(cv) {
-  const W = cv.width, H = Math.min(cv.height, 55), d = cv.getContext('2d').getImageData(0, 0, W, H).data;
-  const col = new Uint16Array(W), lin = new Uint16Array(H); let n = 0;
-  for (let y = 26; y < H; y++) for (let x = 250; x < Math.min(W, 740); x++) {
-    const i = (y * W + x) * 4;
-    if (Math.abs(d[i] - 255) < 8 && Math.abs(d[i + 1] - 224) < 16 && Math.abs(d[i + 2] - 128) < 34) { col[x]++; lin[y]++; n++; }
-  }
-  if (n < 800) return null;
-  let x0 = -1, x1 = -1, y0 = -1;
-  for (let x = 0; x < W; x++) if (col[x] >= 6) { if (x0 < 0) x0 = x; x1 = x; }
-  for (let y = 0; y < H; y++) if (lin[y] >= 100) { y0 = y; break; }
-  if (x0 < 0 || y0 < 0) return null;
-  const esc = (x1 - x0 + 1) / PRINTS_GEO.ancora.w;
+  const W = cv.width, H = Math.min(cv.height, 110), d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const amarelo = i => Math.abs(d[i] - 255) < 14 && Math.abs(d[i + 1] - 224) < 26 && Math.abs(d[i + 2] - 128) < 46;   // tolera a compressão do print
+  const X1 = Math.min(W, 740), lin = new Uint16Array(H);
+  for (let y = 20; y < H; y++) for (let x = 250; x < X1; x++) if (amarelo((y * W + x) * 4)) lin[y]++;
+  let y0 = -1; for (let y = 20; y < H; y++) if (lin[y] >= 100) { y0 = y; break; }      // topo das barras amarelas
+  if (y0 < 0) return null;
+  const col = new Uint16Array(W);
+  for (let y = y0; y < Math.min(H, y0 + 14); y++) for (let x = 250; x < X1; x++) if (amarelo((y * W + x) * 4)) col[x]++;
+  let x0 = -1, x1 = -1; for (let x = 0; x < W; x++) if (col[x] >= 3) { if (x0 < 0) x0 = x; x1 = x; }
+  if (x0 < 0) return null;
+  let esc = (x1 - x0 + 1) / PRINTS_GEO.ancora.w;
   if (esc < 0.5 || esc > 3) return null;
+  const xRef = PRINTS_GEO.ancora.x + PRINTS_GEO.ancora.w - 1;
+  if (Math.abs(esc - 1) < 0.04) return { esc: 1, dx: x1 - xRef, dy: y0 - PRINTS_GEO.ancora.y };   // print em 100%: alinha pela borda direita (a esquerda borra na compressão)
   return { esc, dx: x0 - PRINTS_GEO.ancora.x * esc, dy: y0 - PRINTS_GEO.ancora.y * esc };
 }
 /* recorta uma caixa (em coordenadas do print de referência), amplia, equilibra contraste e inverte se o fundo for escuro */
