@@ -111,6 +111,15 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 ### Extensão do Chrome (botão "Abrir no conferidor")
 No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada". Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
 
+### Conferência pelos prints (etapa 3)
+No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de Senhas" do sistema oficial, por OCR no próprio navegador (arquivos em `public/ocr/`, sem IA externa e sem enviar imagens).
+- **Colar:** copie o print da aba *Dados da Guia* e o da aba *Procedimentos* e use Ctrl+V, ou o botão **Colar print** (também aceita escolher ou arrastar arquivos). Se houver mais de 6 itens, cole um print rolado até o fim. A leitura usa a posição fixa dos campos (âncora nas barras amarelas do topo) e funciona com prints em 100%.
+- **O que confere:** nº da guia, nome do paciente, credenciado executante, carteira (identificação), CID e, item a item, código e quantidade × pedido. Cada valor lido aparece com o recorte da imagem para você ver.
+- **Número da guia:** vai sozinho para a etapa 4 (aceita T ou S + 7 ou 8 dígitos).
+- **Ignorar:** ao lado de "Diverge" (e "Conferir") o botão **Ignorar** aceita a divergência: o item com quantidade menor vira "Autorizado a menor", os demais "Ignorado". A conferência passa com ressalva, o texto-base entra nas **observações adicionais** da resposta ao prestador (sem nome, CID ou carteira) e a etapa 4 mostra um alerta para detalhar o motivo, sem bloquear. **Desfazer** reverte.
+- Sem prints: o botão "conferir a grade manualmente (conferência cega)" continua disponível.
+- O recurso precisa do site publicado (não funciona abrindo o arquivo direto) e baixa cerca de 14 MB de arquivos de leitura na primeira vez.
+
 ### Visões do Painel
 Dia, **Semana** (segunda a domingo) e Mês. A coluna Clínica mostra quem gerou a guia.
 

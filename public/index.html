@@ -138,6 +138,10 @@ body.topo-mini .progs{display:flex}
 .guia-destaque.erro{border-color:var(--bad-solid);background:var(--bad-bg)}
 .guia-destaque .lbl{font-size:var(--fs-md);font-weight:750;display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .guia-destaque input{font-size:28px;font-weight:750;letter-spacing:.09em;height:58px;max-width:420px;width:100%;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.zona-prints{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border:2px dashed var(--border-strong);border-radius:var(--r);background:var(--surface-2);color:var(--text-2);cursor:pointer;text-align:center}
+.zona-prints:hover,.zona-prints.sobre{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-fg)}
+table.prints-t td{vertical-align:middle}
+img.mini{display:block;max-width:240px;max-height:34px;image-rendering:auto;border:1px solid var(--border);border-radius:4px;background:#fff}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -2179,7 +2183,7 @@ function avaliar(g) {
   /* duplicidade */
   Reg.cache.filter(r => !r.tipo && r.messageId === e.messageId && r.atendimentoId !== S.atendId && r.status !== 'descartado').slice(0, 1).forEach(r =>
     add('mesmo-email', `Este e-mail já tem registro de outro atendimento: ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)} (${STATUS[r.status] || r.status}).`));
-  if (/^[TS]\d{8}$/.test(g.numero)) {
+  if (/^[TS]\d{7,8}$/.test(g.numero)) {
     const o = Reg.cache.find(r => !r.tipo && r.guia === g.numero && r.id !== g.id);
     if (o) add('guia-repetida', `A guia ${g.numero} já foi registrada por ${o.operador || 'operador'} em ${fmtDH(o.atualizadoEm)} (${o.clinica || 'sem clínica'}). Confira o número.`);
   }
@@ -2265,7 +2269,7 @@ function montarRegistro(g, status, extra = {}) {
     parametrizado: g.param ? { id: g.param.id, origem: g.param.origem } : null,
     alertas: A.filter(a => a.modo !== 'bloqueio').map(a => ({ k: a.tipo, m: a.modo, t: a.texto, c: !!(g.conf && g.conf[a.key]) })),
     bloqueios: A.filter(a => a.modo === 'bloqueio').map(a => a.texto),
-    conferencia: { tentativas: g.cega.tentativas, divergencias: g.cega.historico },
+    conferencia: { tentativas: g.cega.tentativas, divergencias: g.cega.historico, ...(g.prints ? { prints: { ok: g.prints.ok, em: g.prints.em, divergencias: g.prints.divergencias } } : {}) },
     editadoAMao: g.itensEditados, obsIncluidas: g.obsInc.length + g.respInc.length, duracaoSeg: Math.round((Date.now() - new Date(g.abertoEm)) / 1000), ...extra
   };
 }
@@ -2701,9 +2705,10 @@ function renderGuia(alvo, g) {
       <button class="btn sm" data-act="parametrizar">${ic('layers', 'sm')}Parametrizar</button></div>
     ${g.editandoItens ? htmlEditarItens(g) : !g.cega.iniciada ? `
     ${htmlTabelaItens(g, { copiar: true })}
-    <div class="acoes">${cegaExigida() ? `<button class="btn pri" data-act="iniciarCega" ${p.itens.length ? '' : 'disabled'}>${ic('eye')}Lancei todos os itens: conferir a grade</button>` : ''}</div>` :
+    <div class="acoes">${cegaExigida() ? `<button class="btn pri" data-act="iniciarCega" ${p.itens.length ? '' : 'disabled'}>${ic('eye')}Sem prints: conferir a grade manualmente (conferência cega)</button>` : ''}</div>` :
       `<p class="muted">Lista oculta durante a conferência cega. <button class="btn sm line" data-act="verItens">${ic('refresh', 'sm')}Ver itens de novo (reinicia a conferência)</button></p>`}
   </div>
+  ${htmlCartaoPrints(g)}
   ${g.cega.iniciada && cegaExigida() ? `
   <div class="card">
     <div class="card-h"><h2>Conferência cega</h2>${g.cega.ok ? `<span class="tag ok">${ic('check', 'sm')}Conferido</span>` : ''}${g.cega.tentativas > 1 ? `<span class="tag warn">${ic('alert', 'sm')}Tentativa ${g.cega.tentativas}</span>` : ''}</div>
@@ -2782,7 +2787,7 @@ function htmlResultadoCega(r) {
 function pendenciasConclusao(g, st) {
   const P = [], r = g.resultado;
   if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
-  if (!/^[TS]\d{8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 8 dígitos).');
+  if (!/^[TS]\d{7,8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 7 ou 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
   if (r.situacao === 'autorizada' || r.situacao === 'parcial') {
     const gl = glosaDe(g);
@@ -2843,7 +2848,7 @@ function htmlCardObs(g) {
 }
 function renderFinal(alvo, g) {
   if (g.semGuia) return renderFinalSemGuia(alvo, g);
-  const r = g.resultado, st = situacaoGuia(g), guiaOk = /^[TS]\d{8}$/.test(g.numero);
+  const r = g.resultado, st = situacaoGuia(g), guiaOk = /^[TS]\d{7,8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
   const showResp = mostraResposta(g), multi = usaConsolidada(), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
   const resp = showResp && (r.situacao || multi) ? respostaDaGuia(g, true) : null;
@@ -2857,9 +2862,10 @@ function renderFinal(alvo, g) {
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
+        ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> Detalhe o motivo nas <b>observações adicionais</b> abaixo: o texto-base já foi gerado e vai para a resposta ao prestador. Você pode finalizar normalmente.</div></div>` : ''}
         <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
           <input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
-          <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 8 dígitos.' : ''}</div></div>
+          <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
         <div class="form-grid">
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
@@ -3197,7 +3203,7 @@ async function conciliarEmails(files) {
 }
 function conciliarGuias() {
   const txt = $('#txtRelatorio').value.toUpperCase();
-  const doRel = new Set([...txt.matchAll(/([TS])\s?(\d{8})/g)].map(m => m[1] + m[2]));
+  const doRel = new Set([...txt.matchAll(/([TS])\s?(\d{7,8})/g)].map(m => m[1] + m[2]));
   const regs = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
   const daPag = new Set(regs.map(r => r.guia));
   const soRel = [...doRel].filter(g => !daPag.has(g)), soPag = regs.filter(r => !doRel.has(r.guia));
@@ -3459,7 +3465,7 @@ function cfgPrefs() {
   const p = cfgEdit.preferencias;
   return `<div class="card">${cabSecao('Preferências operacionais')}
     <div class="stack">
-      <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência cega antes de finalizar</b></span></label>
+      <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência da grade antes de finalizar (pelos prints ou, sem prints, a conferência cega)</b></span></label>
       <div style="max-width:300px"><label class="lbl" for="pAcoes">Limpar da aba Ações após (minutos sem movimento; 0 = não limpar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
@@ -3486,6 +3492,324 @@ function cfgInfo() {
     <dt>Preferência de tema</dt><dd>Neste computador (${Tema.pref() === 'auto' ? 'automático' : Tema.pref()}).</dd>
     <dt>Operadores / clínicas</dt><dd>${cfg.operadores.length} / ${cfg.clinicas.length}</dd>
     <dt>Dados guardados</dt><dd>Registros: carteira, códigos, quantidades, número e resultado da guia. Sem nome do beneficiário, CID ou médico. Parametrizações incluem o nome do médico informado por você.</dd></dl></div>`;
+}
+/* ====================================================================
+   Conferência pelos prints do sistema oficial ("Liberação de Senhas")
+   Leitura por OCR dentro do navegador (Tesseract hospedado em /ocr), sem IA de visão e sem enviar nada para fora.
+   A tela tem layout fixo: ancoramos pelas barras amarelas do topo e lemos campo por campo.
+   As imagens ficam só na memória desta aba; o que é salvo são os resultados (sem nome, CID ou imagens).
+   ==================================================================== */
+const PRINTS_GEO = {
+  ancora: { x: 307, y: 36, w: 402 },            // barras amarelas "Benef.:" e "Nº Solic." (referência: print 100%)
+  guia: [541, 99, 657, 113], credNome: [14, 151, 257, 165], credCgc: [260, 151, 364, 165],
+  ident: [48, 301, 160, 317], paciente: [163, 301, 317, 317], cid: [16, 445, 62, 459],
+  faixaGuia: [10, 118, 330, 134], faixaProc: [10, 60, 52, 78],
+  linhas: { topo: 88, passo: 18, max: 6, item: [14, 36], cod: [484, 556], qtd: [560, 574] }
+};
+const PRINTS_MEM = new Map();   // guia.id -> { leituras: [{tipo, campos, itens}], crops } (só em memória)
+
+const OCR = {
+  worker: null, carregando: null, tarefa: Promise.resolve(),
+  async iniciar(aviso) {
+    if (this.worker) return this.worker;
+    if (this.carregando) return this.carregando;
+    this.carregando = (async () => {
+      if (location.protocol === 'file:') throw new Error('A leitura de prints precisa do site publicado (não funciona abrindo o arquivo direto).');
+      if (aviso) aviso('Carregando o leitor de imagens (só na primeira vez, alguns segundos)…');
+      if (!window.Tesseract) await new Promise((ok, erro) => { const s = document.createElement('script'); s.src = 'ocr/tesseract.min.js'; s.onload = ok; s.onerror = () => erro(new Error('Não consegui carregar o leitor de imagens (pasta ocr).')); document.head.appendChild(s); });
+      this.worker = await Tesseract.createWorker('por', 1, { workerPath: 'ocr/worker.min.js', corePath: 'ocr/', langPath: 'ocr/', gzip: false });
+      return this.worker;
+    })();
+    try { return await this.carregando; } finally { this.carregando = null; }
+  },
+  /* uma leitura por vez (o worker é sequencial) */
+  ler(canvas, { psm = '7', lista = '' } = {}) {
+    const rodar = async () => {
+      const w = await this.iniciar();
+      await w.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: lista, preserve_interword_spaces: '1' });
+      const { data } = await w.recognize(canvas);
+      return { texto: (data.text || '').replace(/\s+/g, ' ').trim(), conf: data.confidence };
+    };
+    const p = this.tarefa.then(rodar, rodar); this.tarefa = p.catch(() => { }); return p;
+  }
+};
+
+/* ---------- imagem: âncora, recorte e preparo ---------- */
+function desenharImagem(img) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0); return c;
+}
+async function abrirImagem(file) {
+  if (window.createImageBitmap) return desenharImagem(await createImageBitmap(file));
+  return new Promise((ok, erro) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { ok(desenharImagem(i)); URL.revokeObjectURL(u); }; i.onerror = () => erro(new Error('imagem inválida')); i.src = u; });
+}
+/* acha as barras amarelas do cabeçalho (255,224,128) e devolve deslocamento e escala em relação ao print de referência */
+function acharAncora(cv) {
+  const W = cv.width, H = Math.min(cv.height, 55), d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+  const col = new Uint16Array(W), lin = new Uint16Array(H); let n = 0;
+  for (let y = 26; y < H; y++) for (let x = 250; x < Math.min(W, 740); x++) {
+    const i = (y * W + x) * 4;
+    if (Math.abs(d[i] - 255) < 8 && Math.abs(d[i + 1] - 224) < 16 && Math.abs(d[i + 2] - 128) < 34) { col[x]++; lin[y]++; n++; }
+  }
+  if (n < 800) return null;
+  let x0 = -1, x1 = -1, y0 = -1;
+  for (let x = 0; x < W; x++) if (col[x] >= 6) { if (x0 < 0) x0 = x; x1 = x; }
+  for (let y = 0; y < H; y++) if (lin[y] >= 100) { y0 = y; break; }
+  if (x0 < 0 || y0 < 0) return null;
+  const esc = (x1 - x0 + 1) / PRINTS_GEO.ancora.w;
+  if (esc < 0.5 || esc > 3) return null;
+  return { esc, dx: x0 - PRINTS_GEO.ancora.x * esc, dy: y0 - PRINTS_GEO.ancora.y * esc };
+}
+/* recorta uma caixa (em coordenadas do print de referência), amplia, equilibra contraste e inverte se o fundo for escuro */
+function prepararCampo(cv, an, caixa, ampl = 4) {
+  const [a, b, c, d] = caixa, s = an.esc;
+  const sx = Math.round(an.dx + a * s), sy = Math.round(an.dy + b * s), sw = Math.max(2, Math.round((c - a) * s)), sh = Math.max(2, Math.round((d - b) * s));
+  const o = document.createElement('canvas'); o.width = sw * ampl; o.height = sh * ampl;
+  const x = o.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(cv, sx, sy, sw, sh, 0, 0, o.width, o.height);
+  const im = x.getImageData(0, 0, o.width, o.height), p = im.data, n = o.width * o.height, g = new Uint8Array(n);
+  let soma = 0, mn = 255, mx = 0;
+  for (let i = 0; i < n; i++) { const v = (p[i * 4] * 0.299 + p[i * 4 + 1] * 0.587 + p[i * 4 + 2] * 0.114) | 0; g[i] = v; soma += v; if (v < mn) mn = v; if (v > mx) mx = v; }
+  const invertido = soma / n < 128, faixa = Math.max(1, mx - mn);
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) { let v = ((g[i] - mn) * 255 / faixa) | 0; if (invertido) v = 255 - v; g[i] = v; hist[v]++; }
+  let tot = n, sB = 0; for (let t = 0; t < 256; t++) sB += t * hist[t];
+  let wB = 0, sumB = 0, melhor = 0, lim = 128;
+  for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = tot - wB; if (!wF) break; sumB += t * hist[t]; const mB = sumB / wB, mF = (sB - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > melhor) { melhor = v; lim = t; } }
+  const W = o.width, Hh = o.height, bin = new Uint8Array(n);
+  for (let i = 0; i < n; i++) bin[i] = g[i] > lim ? 255 : 0;
+  // apaga as linhas de grade (colunas/linhas quase inteiras pretas), que o OCR confunde com dígitos
+  const borda = ampl * 3;   // nas bordas do recorte, coluna escura quase inteira é a moldura do campo
+  for (let cx = 0; cx < W; cx++) { let k = 0; for (let cy = 0; cy < Hh; cy++) if (!bin[cy * W + cx]) k++; const lim = (cx < borda || cx >= W - borda) ? 0.75 : 0.93; if (k >= Hh * lim) for (let cy = 0; cy < Hh; cy++) bin[cy * W + cx] = 255; }
+  for (let cy = 0; cy < Hh; cy++) { let k = 0; for (let cx = 0; cx < W; cx++) if (!bin[cy * W + cx]) k++; if (k >= W * 0.93) for (let cx = 0; cx < W; cx++) bin[cy * W + cx] = 255; }
+  for (let i = 0; i < n; i++) { const v = bin[i]; p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v; p[i * 4 + 3] = 255; }
+  x.putImageData(im, 0, 0);
+  // moldura branca ao redor: ajuda o reconhecimento de linhas curtas
+  const f = document.createElement('canvas'); f.width = o.width + 24; f.height = o.height + 24;
+  const fx = f.getContext('2d'); fx.fillStyle = '#fff'; fx.fillRect(0, 0, f.width, f.height); fx.drawImage(o, 12, 12);
+  return { canvas: f, vazio: mx - mn < 40 && !invertido, tinta: (() => { let t = 0; for (let i = 0; i < n; i++) if (p[i * 4] === 0) t++; return t / n; })() };
+}
+/* recorte pequeno, colorido, só para o operador conferir com os próprios olhos */
+function miniatura(cv, an, caixa, ampl = 2) {
+  const [a, b, c, d] = caixa, s = an.esc;
+  const o = document.createElement('canvas'), sw = Math.round((c - a) * s), sh = Math.round((d - b) * s); o.width = sw * ampl; o.height = sh * ampl;
+  o.getContext('2d').drawImage(cv, Math.round(an.dx + a * s), Math.round(an.dy + b * s), sw, sh, 0, 0, o.width, o.height);
+  return o.toDataURL('image/png');
+}
+
+/* ---------- limpeza do que o OCR devolve ---------- */
+const soAlfaNum = t => (t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const soDigitos = t => (t || '').replace(/\D/g, '');
+function limparGuia(t) {
+  let s = soAlfaNum(t); const m = s.match(/[TS]\d{7,8}/); if (m) return m[0];
+  if (/^[1I7L]\d{8}$/.test(s)) return 'T' + s.slice(1);   // "T" lido como outro caractere
+  return s;
+}
+function limparCid(t) {
+  const s = soAlfaNum(t); let m = s.match(/[A-Z]\d{2,4}/); if (m) return m[0];
+  if (/^\d{3,4}$/.test(s)) { const f = { 2: 'Z', 0: 'O', 8: 'B', 5: 'S', 1: 'I', 6: 'G' }[s[0]]; if (f) return f + s.slice(1); }   // letra inicial lida como dígito
+  return s;
+}
+const limparNome = t => semAcento((t || '').toUpperCase()).replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/* ---------- leitura de um print ---------- */
+async function lerPrintTela(file, aviso) {
+  const cv = await abrirImagem(file), an = acharAncora(cv);
+  if (!an) return { erro: 'Não reconheci a tela "Liberação de Senhas" neste print (não achei as barras amarelas do topo).' };
+  await OCR.iniciar(aviso);
+  const G = PRINTS_GEO, ler = async (caixa, opc) => { const c = prepararCampo(cv, an, caixa); return { ...(await OCR.ler(c.canvas, opc)), tinta: c.tinta, vazio: c.vazio }; };
+  const faixa = (await ler(G.faixaGuia, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ' })).texto;
+  let tipo = /credenc|executant/i.test(faixa) ? 'guia' : null;
+  if (!tipo) { const t = (await ler(G.faixaProc, { lista: 'ItemtemIT' })).texto; if (/item|tem/i.test(t)) tipo = 'proc'; }
+  if (!tipo) return { erro: 'Esse print não parece ser a aba "Dados da Guia" nem "Procedimentos".' };
+  const crops = {};
+  if (tipo === 'guia') {
+    const campos = {};
+    const def = [['guia', G.guia, { lista: 'TS0123456789' }, limparGuia], ['credNome', G.credNome, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-/&' }, limparNome],
+      ['ident', G.ident, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }, soAlfaNum], ['paciente', G.paciente, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' }, limparNome], ['cid', G.cid, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }, limparCid]];
+    for (const [k, caixa, opc, fn] of def) { const r = await ler(caixa, opc); campos[k] = { valor: fn(r.texto), bruto: r.texto, conf: r.conf }; crops[k] = miniatura(cv, an, caixa); }
+    return { tipo, campos, crops };
+  }
+  // números curtos: linha normal primeiro; se não vier nada (um "1" isolado), tenta o modo de linha crua
+  const lerCurto = async caixa => { let r = await ler(caixa, { lista: '0123456789' }); if (!soDigitos(r.texto) && !r.vazio) { const r2 = await ler(caixa, { psm: '13', lista: '0123456789' }); if (soDigitos(r2.texto)) r = r2; } return r; };
+  const L = G.linhas, itens = [];
+  for (let i = 0; i < L.max; i++) {
+    const y0 = L.topo + L.passo * i, y1 = y0 + L.passo, cx = [L.cod[0], y0 + 3, L.cod[1], y1 - 2];
+    const pre = prepararCampo(cv, an, cx);
+    if (pre.tinta < 0.015) continue;   // linha vazia
+    const cod = await ler(cx, { lista: '0123456789' }), qtd = await lerCurto([L.qtd[0], y0 + 3, L.qtd[1], y1 - 2]), num = await lerCurto([L.item[0], y0 + 3, L.item[1], y1 - 2]);
+    let codigo = soDigitos(cod.texto); if (codigo.length > 8) codigo = codigo.slice(-8);
+    if (codigo.length < 5 && !soDigitos(num.texto)) continue;
+    itens.push({ fila: i, n: Number(soDigitos(num.texto)) || null, codigo, qtd: soDigitos(qtd.texto) === '' ? null : Number(soDigitos(qtd.texto)), conf: Math.min(cod.conf, qtd.conf),
+      img: miniatura(cv, an, [L.cod[0] - 2, y0 + 2, L.qtd[1] + 2, y1 - 1], 2) });
+  }
+  // numeração: as linhas são consecutivas; vale o deslocamento mais frequente entre o nº lido e a posição na grade
+  const cont = new Map(); itens.forEach(it => { if (it.n) cont.set(it.n - it.fila, (cont.get(it.n - it.fila) || 0) + 1); });
+  const desl = [...cont.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (desl) itens.forEach(it => { it.n = desl[0] + it.fila; });
+  return { tipo, itens, crops };
+}
+
+/* ---------- comparação com o pedido ---------- */
+function distancia(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+function similaridade(a, b) {
+  a = limparNome(a).replace(/ /g, ''); b = limparNome(b).replace(/ /g, '');
+  if (!a || !b) return 0;
+  return 1 - distancia(a, b) / Math.max(a.length, b.length);
+}
+const prefixo = (a, b) => { a = limparNome(a).replace(/ /g, ''); b = limparNome(b).replace(/ /g, ''); return a.length >= 8 && b.length >= 8 && (a.startsWith(b) || b.startsWith(a)); };
+const ROT_PRINT = { guia: 'Nº da guia', paciente: 'Nome do paciente', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
+
+function avaliarPrints(g) {
+  const mem = PRINTS_MEM.get(g.id); if (!mem) return null;
+  const campos = {}, itensSis = new Map();
+  mem.leituras.forEach(l => { if (l.tipo === 'guia') Object.assign(campos, l.campos); else l.itens.forEach((it, k) => itensSis.set(it.n || ('x' + it.codigo + k), it)); });
+  const p = g.pedido, C = [];
+  const add = (k, ped, lido, st, nota = '') => C.push({ k, rot: ROT_PRINT[k], ped, lido, st, nota });   // st: ok | warn | bad | info
+  if (campos.guia) {
+    const v = campos.guia.valor, ok8 = /^[TS]\d{7,8}$/.test(v);
+    if (!g.numero) add('guia', '—', v, ok8 ? 'ok' : 'warn', ok8 ? 'Preenchido na etapa 4.' : 'Fora do padrão do app (T ou S + 7 ou 8 dígitos): confira.');
+    else add('guia', g.numero, v, g.numero === v ? 'ok' : 'bad', g.numero === v ? '' : 'Diferente do número já digitado.');
+  }
+  if (campos.paciente) {
+    const ped = p.beneficiario || '', s = similaridade(ped, campos.paciente.valor);
+    add('paciente', ped || '—', campos.paciente.valor, !ped ? 'info' : s >= 0.93 ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? '' : s >= 1 ? '' : s >= 0.93 ? 'Pequena diferença de leitura da imagem (ignorada): confira a imagem.' : s >= 0.8 ? 'Quase igual: veja a imagem ao lado.' : 'Nomes diferentes.');
+  }
+  if (campos.credNome) {
+    const ped = valorCopia(g, 'executante'), lido = campos.credNome.valor;
+    if (!ped) add('credNome', '—', lido, 'info', 'Credenciado não cadastrado para comparar.');
+    else { const s = similaridade(ped, lido), ok = s >= 0.9 || prefixo(ped, lido); add('credNome', ped, lido, ok ? 'ok' : s >= 0.7 ? 'warn' : 'bad', ok ? '' : 'Diferente do credenciado cadastrado.'); }
+  }
+  if (campos.ident) {
+    const ped = soAlfaNum(g.carteiraUsada), lido = campos.ident.valor;
+    if (!ped) add('ident', '—', lido, 'info');
+    else { const igual = ped === lido, dif = distancia(ped, lido); const fino = s => s.replace(/[IL1]/g, ''), soFino = !igual && dif === 1 && fino(ped) === fino(lido); add('ident', ped, lido, igual || soFino ? 'ok' : dif <= 1 ? 'warn' : 'bad', igual ? '' : soFino ? 'Letra fina (I, L ou 1) não lida na imagem: ignorada.' : dif <= 1 ? 'Um caractere diferente: pode ser leitura da imagem.' : 'Diferente da carteira usada.'); }
+  }
+  if (campos.cid) {
+    const ped = (p.cid || '').replace(/\./g, '').toUpperCase(), lido = campos.cid.valor;
+    if (!ped) add('cid', '—', lido, 'info', 'Pedido sem CID.');
+    else { const ok = lido === ped || lido.startsWith(ped) || ped.startsWith(lido); add('cid', ped, lido, ok ? 'ok' : 'bad', ok ? '' : 'CID diferente do pedido.'); }
+  }
+  // itens: pedido × sistema
+  const sis = [...itensSis.values()].sort((a, b) => (a.n || 99) - (b.n || 99));
+  const usados = new Set(), linhas = [];
+  p.itens.forEach(it => {
+    const i = sis.findIndex((s, k) => !usados.has(k) && s.codigo === it.codigo); if (i >= 0) usados.add(i);
+    const s = i >= 0 ? sis[i] : null, qOk = s && s.qtd === it.qtd;
+    linhas.push({ codigo: it.codigo, qPed: it.qtd, qSis: s ? s.qtd : null, img: s ? s.img : null, st: !s ? 'bad' : qOk ? 'ok' : 'bad', nota: !s ? 'Não aparece nos prints.' : qOk ? '' : 'Quantidade diferente.' });
+  });
+  sis.forEach((s, k) => { if (!usados.has(k)) linhas.push({ codigo: s.codigo, qPed: null, qSis: s.qtd, img: s.img, st: 'bad', nota: 'Está no sistema e não está no pedido.' }); });
+  const temProc = mem.leituras.some(l => l.tipo === 'proc'), temGuia = mem.leituras.some(l => l.tipo === 'guia');
+  const faltam = linhas.filter(l => l.nota === 'Não aparece nos prints.').length, sobram = linhas.filter(l => l.nota.startsWith('Está')).length, qtdDif = linhas.filter(l => l.nota === 'Quantidade diferente.').length;
+  const avisos = [];
+  if (!temGuia) avisos.push('Falta o print da aba "Dados da Guia".');
+  if (!temProc) avisos.push('Falta o print da aba "Procedimentos".');
+  if (temProc && faltam && sis.length >= PRINTS_GEO.linhas.max) avisos.push('A grade mostra até 6 itens por vez: se há mais, envie outro print com a barra de rolagem no fim da lista.');
+  const ign = (g.prints && g.prints.ign) || {};
+  const checks = C.map(({ k, rot, ped, lido, st, nota }) => ({ k, rot, ped, lido, st, nota, chave: 'c:' + k, crop: (mem.leituras.find(l => l.tipo === 'guia') || {}).crops && mem.leituras.find(l => l.tipo === 'guia').crops[k] }));
+  linhas.forEach(l => { l.chave = 'i:' + l.codigo; });
+  [...checks, ...linhas].forEach(x => { x.ign = (x.st === 'bad' || x.st === 'warn') && ign[x.chave] ? ign[x.chave] : null; x.sit = x.ign ? 'ign' : x.st; });
+  const todos = [...checks.map(c => c.sit), ...linhas.map(l => l.sit)];
+  const completo = temGuia && temProc;
+  const ok = completo && !todos.includes('bad') && !todos.includes('warn') && p.itens.length > 0 && linhas.length > 0;
+  return { checks, linhas, avisos, completo, ok, ressalvas: todos.filter(t => t === 'ign').length, faltam, sobram, qtdDif, nPedido: p.itens.length, nSistema: sis.length };
+}
+
+/* resumo que fica salvo no atendimento (sem nomes nem imagens) */
+function resumoPrints(av, ign) {
+  return { em: agora(), ok: av.ok, completo: av.completo, itens: av.nSistema, ign: ign || {}, ressalvas: av.ressalvas,
+    divergencias: [...av.checks.filter(c => c.sit === 'bad' || c.sit === 'warn').map(c => c.rot + (c.sit === 'bad' ? ': diverge' : ': conferir')), ...av.linhas.filter(l => l.sit !== 'ok' && l.sit !== 'ign').map(l => `${l.codigo}: ${l.nota}`)] };
+}
+/* texto que vai para as observações adicionais da resposta ao prestador (sem nome, CID ou carteira) */
+function linhaIgnorada(x) {
+  const q = (a, b) => `${a ?? '—'} (solicitado ${b ?? '—'})`;
+  if (x.chave.startsWith('i:')) {
+    if (x.nota === 'Não aparece nos prints.') return { t: 'menor', linha: `Item ${x.codigo}: não consta na guia gerada (solicitado ${x.qPed ?? '—'}).` };
+    if (x.nota === 'Quantidade diferente.') return { t: x.qSis != null && x.qPed != null && x.qSis < x.qPed ? 'menor' : 'ign', linha: `Item ${x.codigo}: guia com quantidade ${q(x.qSis, x.qPed)}.` };
+    return { t: 'ign', linha: `Item ${x.codigo}: consta na guia gerada (quantidade ${x.qSis ?? '—'}) e não estava no pedido.` };
+  }
+  const T = { guia: 'Número da guia diferente do digitado.', paciente: 'Nome do beneficiário no sistema difere do informado no pedido.', credNome: 'Credenciado executante no sistema difere do cadastrado.', ident: 'Carteira no sistema difere da carteira usada.', cid: 'CID no sistema difere do informado no pedido.' };
+  return { t: 'ign', linha: T[x.chave.slice(2)] || (x.rot + ': diferente do pedido.') };
+}
+function sincronizarObsPrints(g) {
+  const ign = (g.prints && g.prints.ign) || {}, linhas = Object.values(ign).map(x => x.linha);
+  const novo = linhas.length ? 'Conferência da guia pelo sistema:\n' + linhas.join('\n') : '';
+  const r = g.resultado; let atual = r.obsAdicionais || '';
+  if (g.obsPrintsTxt && atual.includes(g.obsPrintsTxt)) atual = atual.replace(g.obsPrintsTxt, '').replace(/\n{2,}/g, '\n').trim();
+  r.obsAdicionais = novo ? (atual ? atual.replace(/\s+$/, '') + '\n' + novo : novo) : atual;
+  g.obsPrintsTxt = novo; g.respEdit = null;
+}
+/* aplica a avaliação ao atendimento: resumo salvo, conferência da grade, número da guia e observação */
+function aplicarPrints(g) {
+  const av = avaliarPrints(g); if (!av) return null;
+  const ign = (g.prints && g.prints.ign) || {};
+  const lido = ((PRINTS_MEM.get(g.id).leituras.find(l => l.tipo === 'guia')) || {}).campos;
+  if (lido && lido.guia && !g.numero && /^[TS]\d{7,8}$/.test(lido.guia.valor)) g.numero = lido.guia.valor;
+  g.prints = resumoPrints(av, ign);
+  if (av.ok) { if (!g.cega.ok) { g.cega.ok = true; g.cega.via = 'prints'; } }
+  else if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; }
+  sincronizarObsPrints(g);
+  return av;
+}
+
+async function processarPrints(files) {
+  const g = guiaAtiva(); if (!g) return;
+  const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; };
+  const erros = [];
+  const mem = PRINTS_MEM.get(g.id) || { leituras: [] }; PRINTS_MEM.set(g.id, mem);
+  for (const f of files) {
+    try {
+      msg('Lendo ' + (f.name || 'imagem colada') + '…');
+      const r = await lerPrintTela(f, msg);
+      if (r.erro) { erros.push(r.erro); continue; }
+      if (r.tipo === 'guia') { const i = mem.leituras.findIndex(l => l.tipo === 'guia'); if (i >= 0) mem.leituras.splice(i, 1); }
+      mem.leituras.push(r);
+    } catch (e) { console.error(e); erros.push(e.message || 'Falha ao ler a imagem.'); }
+  }
+  msg('');
+  aplicarPrints(g);
+  persistir(); render();
+  if (erros.length) toast(erros[0], 'bad');
+}
+const prontoPrints = g => !!PRINTS_MEM.get(g.id);
+
+/* ---------- cartão da etapa 3 (no lugar da conferência cega) ---------- */
+function htmlCartaoPrints(g) {
+  const av = prontoPrints(g) ? avaliarPrints(g) : null, res = g.prints;
+  const nIgn = res && res.ign ? Object.keys(res.ign).length : 0;
+  const tag = av ? (av.ok ? `<span class="tag ok">${ic('check', 'sm')}Conferido pelos prints${av.ressalvas ? ' (com ressalva)' : ''}</span>` : `<span class="tag warn">${ic('alert', 'sm')}Há pontos para conferir</span>`)
+    : res ? `<span class="tag ${res.ok ? 'ok' : 'warn'}">${ic(res.ok ? 'check' : 'alert', 'sm')}${res.ok ? 'Conferido pelos prints' + (nIgn ? ' (com ressalva)' : '') : 'Prints com divergência'} em ${fmtHora(res.em)}</span>` : (cegaExigida() ? '<span class="tag warn">Obrigatório</span>' : '<span class="tag">Opcional</span>');
+  const st = { ok: ['ok', 'check', 'Confere'], warn: ['warn', 'alert', 'Conferir'], bad: ['bad', 'x', 'Diverge'], info: ['', 'info', 'Sem base'] };
+  const tg = x => {
+    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span> <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>`;
+    const [c, i, t] = st[x.st];
+    return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>` + (x.st === 'bad' || x.st === 'warn' ? ` <button class="btn sm line" data-act="ignorarPrint" data-key="${esc(x.chave)}" title="Aceita esta divergência, gera a observação para o prestador e deixa continuar">${ic('shield', 'sm')}Ignorar</button>` : '');
+  };
+  const corpo = av ? `
+    ${av.avisos.map(a => `<div class="aviso" style="margin:8px 0">${ic('info')}<div>${esc(a)}</div></div>`).join('')}
+    ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${av.ressalvas} divergência(s) ignorada(s).</b> A observação para o prestador foi gerada nas <b>observações adicionais</b> (etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
+    <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Campo</th><th>Pedido</th><th>Lido no print</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
+      ${av.checks.map(c => `<tr><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>
+    <h3>Itens: pedido × sistema (${av.nPedido} no pedido, ${av.nSistema} nos prints)</h3>
+    <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Código</th><th>Qtd. pedido</th><th>Qtd. no sistema</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
+      ${av.linhas.map(l => `<tr><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
+    </tbody></table></div>
+    <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button></div>` : '';
+  return `<div class="card" id="cartaoPrints">
+    <div class="card-h"><h2>Conferência pelos prints do sistema</h2>${tag}<span class="esp"></span><span id="printsEstado"></span></div>
+    <p class="dica" style="margin:0 0 10px">Copie os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b> da tela "Liberação de Senhas" e use <b>Ctrl+V</b> aqui (ou o botão <b>Colar</b>). Se a grade tiver mais de 6 itens, cole também um print rolado até o fim. A leitura é feita neste navegador; as imagens não são salvas. O número da guia vai sozinho para a etapa 4.</p>
+    <div class="acoes" style="margin-top:0">
+      <button class="btn pri" data-act="colarPrint" title="Cola o print que está na área de transferência (o mesmo que Ctrl+V)">${ic('clip')}Colar print</button>
+      <label class="btn line" for="arqPrints" id="zonaPrints" title="Ou escolha/arraste os arquivos de imagem">${ic('upload')}Escolher arquivos</label>
+      <input type="file" id="arqPrints" accept="image/*" multiple class="oculto">
+    </div>
+    ${corpo}</div>`;
 }
 
 /* ====================================================================
@@ -3599,6 +3923,25 @@ const acoes = {
       rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button><a class="btn pri" href="extensao/conferidor-guias-extensao.zip" download>${ic('download')}Baixar extensão (.zip)</a>` });
   },
   usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
+  async colarPrint() {
+    try {
+      const itens = await navigator.clipboard.read(), fs = [];
+      for (const it of itens) for (const t of it.types) if (/^image\//.test(t)) fs.push(new File([await it.getType(t)], 'print-colado.png', { type: t }));
+      if (!fs.length) { toast('Não há imagem na área de transferência. Copie o print e clique em Colar (ou use Ctrl+V).', 'bad'); return; }
+      processarPrints(fs);
+    } catch (e) { toast('O navegador não liberou a área de transferência. Use Ctrl+V com a página selecionada.', 'bad'); }
+  },
+  ignorarPrint(b) {
+    const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
+    const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
+    g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {}; g.prints.ign[x.chave] = linhaIgnorada(x);
+    aplicarPrints(g); persistir(); render(); toast('Divergência ignorada: a observação para o prestador foi incluída na etapa 4.');
+  },
+  desfazerPrint(b) {
+    const g = guiaAtiva(); if (!g.prints || !g.prints.ign) return; delete g.prints.ign[b.dataset.key];
+    aplicarPrints(g); persistir(); render();
+  },
+  limparPrints() { const g = guiaAtiva(); PRINTS_MEM.delete(g.id); g.prints = null; sincronizarObsPrints(g); if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; } persistir(); render(); },
   topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
@@ -3717,7 +4060,7 @@ const acoes = {
     if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
     g.copiados[b.dataset.tipo + ':' + it.codigo] = v; persistir(); estadoCopiaBtn(b, true); toast('Copiado: ' + v);
   },
-  iniciarCega() { const g = guiaAtiva(); g.cega.iniciada = true; g.cega.tentativas = Math.max(1, g.cega.tentativas); persistir(); render(); setTimeout(() => $('#cegaN')?.focus(), 30); },
+  iniciarCega() { const g = guiaAtiva(); g.cega.iniciada = true; g.cega.tentativas = Math.max(1, g.cega.tentativas); persistir(); render(); $('#cegaN')?.focus(); },
   verItens() { const g = guiaAtiva(); g.cega = { ...g.cega, iniciada: false, linhas: '', entradas: [], resultado: null, ok: false }; persistir(); render(); },
   conferir() {
     const g = guiaAtiva(), n = parseInt(g.cega.linhas, 10);
@@ -3727,7 +4070,7 @@ const acoes = {
     if (!r.ok && !r.incompleto) g.cega.historico.push([...r.erros, ...r.porItem.filter(x => x.st !== 'ok').map(x => `${x.st}:${x.it.codigo}${x.informado ? '=' + x.informado : ''}`), ...r.extras.map(x => 'indevida:' + x.fim)]);
     persistir(); render();
   },
-  refazerCega() { const g = guiaAtiva(); g.cega.tentativas++; g.cega.resultado = null; g.cega.entradas = []; g.cega.linhas = ''; persistir(); render(); setTimeout(() => $('#cegaN')?.focus(), 30); },
+  refazerCega() { const g = guiaAtiva(); g.cega.tentativas++; g.cega.resultado = null; g.cega.entradas = []; g.cega.linhas = ''; persistir(); render(); $('#cegaN')?.focus(); },
 
   /* ---- etapa 4: resultado, observação e resposta ---- */
   setGlosa(b) { const g = guiaAtiva(), gl = glosaDe(g); gl.resp = b.dataset.v; if (gl.resp === 'nao') gl.itens = {}; persistir(); render(); },
@@ -4063,6 +4406,7 @@ document.addEventListener('change', async e => {
     }
     LS.set('operadorId', t.value); render(); return;
   }
+  if (t.id === 'arqPrints') { const fs = [...t.files]; t.value = ''; if (fs.length) processarPrints(fs); return; }
   if (t.id === 'arquivoEml') { const f = t.files[0]; t.value = ''; if (f) abrirArquivo(f); return; }
   if (t.id === 'arqConc') { try { await conciliarEmails([...t.files]); } catch (err) { toast('Erro ao ler: ' + err.message, 'bad'); } return; }
   if (t.id === 'painelDia' || t.id === 'painelMes' || t.id === 'painelSemana') { acoes.atualizarPainel(); return; }
@@ -4109,6 +4453,20 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dragover', e => { if (aba === 'atend' && !S) e.preventDefault(); });
 document.addEventListener('drop', e => { if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
 window.addEventListener('beforeunload', e => { if (cfgDirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* prints colados (Ctrl+V) ou arrastados na etapa 3 */
+document.addEventListener('paste', e => {
+  if (aba !== 'atend' || !S || S.vista !== 3 || !$('#arqPrints')) return;
+  const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (!fs.length) return;
+  e.preventDefault(); processarPrints(fs);
+});
+document.addEventListener('dragover', e => { if (e.target.closest && e.target.closest('#zonaPrints')) { e.preventDefault(); e.target.closest('#zonaPrints').classList.add('sobre'); } });
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#zonaPrints'); if (z) z.classList.remove('sobre'); });
+document.addEventListener('drop', e => {
+  const z = e.target.closest && e.target.closest('#zonaPrints'); if (!z) return;
+  e.preventDefault(); z.classList.remove('sobre');
+  const fs = [...e.dataTransfer.files].filter(f => /^image\//.test(f.type)); if (fs.length) processarPrints(fs);
+});
 
 // Ao voltar para a janela, relê o config.json da pasta (operadores e senhas de colegas) se não houver edição em curso
 document.addEventListener('visibilitychange', async () => {
