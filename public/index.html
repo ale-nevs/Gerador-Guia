@@ -132,6 +132,9 @@ body.topo-mini .progs{display:flex}
 .prog::before{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--surface)}
 .prog .pe{position:relative;display:inline-flex;line-height:1}
 .prog .emoji{font-size:17px}.prog .ic{color:var(--text-3)}
+.barra-webmail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px auto 0;max-width:1600px;padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-br);border-radius:var(--r);width:calc(100% - 24px)}
+.barra-webmail[hidden]{display:none}
+.barra-webmail .bw-txt{font-weight:650;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 140px}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -575,6 +578,7 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
   <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
 <div class="wrap print-wrap"><div class="print-head"><img src="logo-promedica.png" alt="Promédica"><b>Conferidor de Guias · <span>Núcleo Gestão de Terapias</span></b><small id="printData"></small></div></div>
+<div id="barraWebmail" class="barra-webmail" hidden></div>
 <main id="app"></main>
 <footer class="rodape">
   <span>© <span id="anoRodape"></span> Promédica · Conferidor de Guias<span class="ver" id="verRodape" title="Versão do sistema"></span></span>
@@ -998,6 +1002,25 @@ function emailDeTexto(texto, remetenteTxt) {
     messageId: 'colado-' + hashTexto(texto), data: new Date().toISOString(), remetente: endereco(remetenteTxt || ''), responderPara: null,
     assunto: '(colado manualmente)', textoCompleto: texto, textoPrincipal: corte.principal, restante: corte.restante, cortado: corte.cortado,
     anexos: [], origem: 'colado'
+  };
+}
+
+/* E-mail aberto no webmail (extensão do Chrome): mesmo formato devolvido por lerEml */
+function emailDeWebmail(m) {
+  const html = m.html || '';
+  let texto = (m.plain && m.plain.trim()) ? m.plain : (html ? htmlParaTexto(html) : '');
+  texto = limparTexto(texto);
+  const corte = cortarHistorico(texto);
+  const remetente = endereco(m.fromEmail ? `${m.fromNome || ''} <${m.fromEmail}>` : (m.fromNome || ''));
+  const cand = [m.data, ...(m.datas || [])].filter(Boolean);
+  let d = null; for (const c of cand) { const x = new Date(c); if (!isNaN(x)) { d = x; break; } }
+  if (!d && m.dataTexto) { const t = m.dataTexto.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); if (t) d = new Date(+t[3], +t[2] - 1, +t[1], +t[4], +t[5]); }
+  const assunto = m.assunto || '';
+  const messageId = m.messageId || ('sm-' + hashTexto((m.folder || '') + '|' + (m.uid || '') + '|' + remetente.email + assunto + texto.slice(0, 300)));
+  return {
+    messageId, data: (d || new Date()).toISOString(), remetente, responderPara: null, assunto,
+    textoCompleto: texto, textoPrincipal: corte.principal, restante: corte.restante, cortado: corte.cortado,
+    anexos: (m.anexos || []).map(String), origem: 'webmail'
   };
 }
 
@@ -2448,6 +2471,7 @@ function htmlPassos(g) {
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
   renderTopo();
+  if (typeof pintarOfertaWebmail === 'function') pintarOfertaWebmail();
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
@@ -3465,6 +3489,16 @@ function avisoEmailJaAtendido(email) {
   const quem = unicos(outros.map(r => `${r.operador || 'um operador'} (${r.status === 'concluido' ? 'concluído' : 'em andamento'} em ${fmtDH(r.atualizadoEm)})`));
   return `Este e-mail já foi aberto por: ${quem.join('; ')}.\n\nAbrir mesmo assim?`;
 }
+/* Webmail (extensão): o e-mail aberto fica "oferecido" numa barra; o operador decide quando abrir */
+let webmailOferta = null;
+function pintarOfertaWebmail() {
+  const el = document.getElementById('barraWebmail'); if (!el) return;
+  const e = webmailOferta, aberto = e && S && S.email && S.email.messageId === e.messageId;
+  if (!e || aberto) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<span class="tag info">${ic('mail', 'sm')}Webmail</span><span class="bw-txt" title="${esc(e.assunto)}">${esc(e.assunto || '(sem assunto)')}</span><span class="bw-de muted">${esc(e.remetente.nome || e.remetente.email)}</span><button class="btn pri sm" data-act="abrirWebmail">${ic('filecheck', 'sm')}Abrir no conferidor</button>`;
+}
+function ofertarWebmail(m) { try { webmailOferta = emailDeWebmail(m); } catch (e) { console.error(e); return; } pintarOfertaWebmail(); }
 async function iniciar(email) {
   await Reg.carregarTudo(); await Param.carregar();
   const aviso = avisoEmailJaAtendido(email);
@@ -3529,6 +3563,7 @@ const acoes = {
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
+  async abrirWebmail() { if (!webmailOferta) return; if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; } if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return; aba = 'atend'; try { await iniciar(webmailOferta); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); } pintarOfertaWebmail(); },
   usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
   topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },

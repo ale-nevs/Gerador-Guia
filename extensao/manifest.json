@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Conferidor de Guias · Promédica",
+  "short_name": "Conferidor",
+  "description": "Painel lateral do Conferidor de Guias ligado ao webmail da Promédica: lê o e-mail aberto e oferece abri-lo no conferidor.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "painel/favicon.ico", "48": "painel/icon-192.png", "128": "painel/icon-192.png" },
+  "action": { "default_title": "Abrir o Conferidor de Guias" },
+  "side_panel": { "default_path": "painel/painel.html" },
+  "background": { "service_worker": "fundo.js" },
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["https://mail.promedica.com.br/*"],
+  "content_scripts": [
+    { "matches": ["https://mail.promedica.com.br/*"], "js": ["captura-main.js"], "run_at": "document_start", "world": "MAIN", "all_frames": false },
+    { "matches": ["https://mail.promedica.com.br/*"], "js": ["ponte.js"], "run_at": "document_start", "all_frames": false }
+  ]
+}
