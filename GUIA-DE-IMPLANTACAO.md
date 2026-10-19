@@ -36,7 +36,7 @@ O código da página fica no repositório `ale-nevs/gerador-guia`, no GitHub, e 
 
 ## 3. Preparar a pasta compartilhada
 
-1. Crie uma pasta na rede, por exemplo `\\servidor\Autorizacoes\Conferidor`. Thiago, Alípio, Rafael e o apoio precisam de **leitura e escrita**.
+1. Crie uma pasta na rede, por exemplo `\\servidor\Autorizacoes\Conferidor`. Tiago, Alípio, Rafael e o apoio precisam de **leitura e escrita**.
 2. Copie para dentro dela o arquivo `pasta-compartilhada/config.json` do pacote.
 3. Em **cada computador**, na primeira vez:
     - Abra a página e escolha seu nome em **Operador**.

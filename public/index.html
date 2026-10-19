@@ -142,6 +142,9 @@ body.topo-mini .progs{display:flex}
 .zona-prints:hover,.zona-prints.sobre{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-fg)}
 table.prints-t td{vertical-align:middle}
 img.mini{display:block;max-width:240px;max-height:34px;image-rendering:auto;border:1px solid var(--border);border-radius:4px;background:#fff}
+.barra-sync{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px auto 0;max-width:1600px;width:calc(100% - 24px);padding:9px 14px;background:var(--bad-bg);border:1px solid var(--bad-br);color:var(--bad-fg);border-radius:var(--r);font-size:var(--fs-sm);font-weight:600}
+.barra-sync[hidden]{display:none}
+.barra-sync .esp{flex:1 1 220px;min-width:0}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -585,6 +588,7 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
   <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
 <div class="wrap print-wrap"><div class="print-head"><img src="logo-promedica.png" alt="Promédica"><b>Conferidor de Guias · <span>Núcleo Gestão de Terapias</span></b><small id="printData"></small></div></div>
+<div id="barraSync" class="barra-sync" hidden role="alert"></div>
 <main id="app"></main>
 <footer class="rodape">
   <span>© <span id="anoRodape"></span> Promédica · Conferidor de Guias<span class="ver" id="verRodape" title="Versão do sistema"></span></span>
@@ -1062,12 +1066,12 @@ async function lerZip(buf) {
    ==================================================================== */
 const ROTULOS = [
   ['local', /^local(\s+d[aeo]s?\s+(emissao|pedido|atendimento|solicitacao))?\b/],
-  ['emissao', /^(data\s+(da\s+|de\s+|do\s+)?(emissao|pedido(\s+medico)?|solicitacao|encaminhamento|requisicao|receita)|emissao(\s+do\s+pedido)?|data)\b/],
-  ['beneficiario', /^(benefici[a]ri[oa]s?|pacientes?|usuari[oa]|segurad[oa]|nome(\s+(completo|d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa])))?)\b/],
+  ['emissao', /^(data\s+(da\s+|de\s+|do\s+)?(emissao(\s+d[oa]\s+(pedido|encaminhamento|solicitacao|requisicao|receita)(\s+medico)?)?|pedido(\s+medico)?|solicitacao|encaminhamento|requisicao|receita)|emissao(\s+do\s+pedido)?|data)\b/],
+  ['beneficiario', /^(benefici[a]ri[oa]s?|pacientes?|usuari[oa]|segurad[oa]|nome(\s+(completo(\s+d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa]))?|d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa])))?)\b/],
   ['carteira', /^((n[or°º.]*\s*)?(d[ao]s?\s+)?(carteir(a|inha)\b|cart\b\.?|matricula\b|cartao\b)(\s+(promedica|do\s+benefici[a]ri[oa]|do\s+paciente|do\s+plano))?|codigo\s+do\s+benefici[a]ri[oa])/],
-  ['servico', /^(servicos?|procedimentos?|terapias?|codigos?(\s+d[oa]s?\s+(servicos?|procedimentos?))?|tuss)(\s+(solicitad[oa]s?|autorizad[oa]s?|a\s+autorizar))?\b/],
-  ['quantidade', /^(quantidades?|qtd[es]?|quant|sess(oes|ao)|n[oru°º.]*\s*(de\s+)?sess(oes|ao))\b\.?/],
-  ['medico', /^(medic[oa]s?(\s+(solicitante|assistente|responsavel))?|dr[a]?\.?|doutor[a]?|solicitante|profissional(\s+solicitante)?|nome\s+do\s+medic[oa])\b/],
+  ['servico', /^(servicos?|procedimentos?|terapias?|codigos?(\s+(e\s+descricao\s+)?d[oa]s?\s+(servicos?|procedimentos?|terapias?))?|tuss)(\s+(solicitad[oa]s?|autorizad[oa]s?|a\s+autorizar))?\b/],
+  ['quantidade', /^(quantidades?(\s+(semanal|mensal|por\s+semana))?|qtd[es]?|quant|sess(oes|ao)|n[oru°º.]*\s*(de\s+)?sess(oes|ao))\b\.?/],
+  ['medico', /^(nome\s+e\s+(crm|registro)\s+d[oa]\s+medic[oa](\s+solicitante)?|medic[oa]s?(\s+(solicitante|assistente|responsavel))?|dr[a]?\.?|doutor[a]?|solicitante|profissional(\s+solicitante)?|nome\s+do\s+medic[oa])\b/],
   ['cid', /^(cid(-?10)?|diagnostico)\b/],
   ['obs', /^(obs|observac(ao|oes))\b\.?/]
 ];
@@ -1083,7 +1087,7 @@ function detectarRotulo(linhaOrig) {
   for (const [k, re] of ROTULOS) {
     const m = norm.match(re);
     if (!m) continue;
-    const resto = limpa.slice(m[0].length);
+    const resto = limpa.slice(m[0].length).replace(/^\s*\([^)]{1,60}\)/, '');   // "Número da carteira (sem traços ou pontos): …"
     if (/^\s*([:=\-–—]|$)/.test(resto)) return { k, valor: resto.replace(/^\s*[:=\-–—]\s*/, '').trim() };
     if (VALOR_SEM_SEPARADOR[k] && VALOR_SEM_SEPARADOR[k].test(resto)) return { k, valor: resto.trim() };
   }
@@ -1126,12 +1130,16 @@ function extrairItens(bloco) {
     /[-–—:|]\s*(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o))?\s*\.?\s*$/im,
     /\(\s*(\d{1,2})\s*\)\s*\.?\s*$/m
   ];
+  /* "DESCRIÇÃO - 80000001" (descrição antes do código, código no fim da linha): a descrição é o texto antes do código */
+  const lin = m => { const ini = bloco.lastIndexOf('\n', m.index - 1) + 1, fim = bloco.indexOf('\n', m.index); return { antes: bloco.slice(ini, m.index), depois: bloco.slice(m.index + 8, fim < 0 ? bloco.length : fim) }; };
+  const ctx = ms.map(lin);
+  const descPrimeiro = ms.length > 0 && ctx.every(x => /[A-Za-zÀ-ÿ]{3,}/.test(x.antes) && !/:\s*$/.test(x.antes.trim()) && !x.depois.replace(/[*_.\-–—\s]/g, ''));
   const itens = ms.map((m, k) => {
-    const seg = bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
+    const seg = descPrimeiro ? ctx[k].depois : bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
     let qtd = null, qm = null;
     for (const p of pats) { qm = seg.match(p); if (qm) { qtd = Number(qm[1]); break; } }
     let origem = qtd != null ? 'linha' : null;
-    let desc = (qm ? seg.slice(0, qm.index) : seg).split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+    let desc = descPrimeiro ? ctx[k].antes.replace(/^[\s*_\-–—•●·]+/, '') : ((qm ? seg.slice(0, qm.index) : seg).split('\n').map(x => x.trim()).filter(Boolean)[0] || '');
     if (qtd == null) {   // último recurso: número solto no fim da própria linha do serviço ("80000004 Terapia 2")
       const fim = desc.match(/^(.*\D)\s+(\d{1,2})$/);
       if (fim && fim[1].replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 3) { qtd = Number(fim[2]); desc = fim[1]; origem = 'fim-da-linha'; }
@@ -1405,7 +1413,7 @@ async function idbGet(k) { try { const db = await idbAbrir(); return await new P
 async function idbSet(k, v) { const db = await idbAbrir(); await new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
 
 const Pasta = {
-  handle: null, ok: false, suportado: 'showDirectoryPicker' in window,
+  handle: null, ok: false, erro: null, suportado: 'showDirectoryPicker' in window,
   async init() {
     if (!this.suportado) return;
     this.handle = await idbGet('pasta');
@@ -1422,8 +1430,16 @@ const Pasta = {
   async dir(partes, criar) { let d = this.handle; for (const p of partes) d = await d.getDirectoryHandle(p, { create: !!criar }); return d; },
   async ler(partes, nome) { try { const d = await this.dir(partes, false); const f = await (await d.getFileHandle(nome)).getFile(); return JSON.parse(await f.text()); } catch (e) { return null; } },
   async gravar(partes, nome, obj) {
-    const d = await this.dir(partes, true); const fh = await d.getFileHandle(nome, { create: true });
-    const w = await fh.createWritable(); await w.write(JSON.stringify(obj, null, 1)); await w.close();
+    try {
+      const d = await this.dir(partes, true); const fh = await d.getFileHandle(nome, { create: true });
+      const w = await fh.createWritable(); await w.write(JSON.stringify(obj, null, 1)); await w.close();
+      if (this.erro) { this.erro = null; if (typeof pintarSync === 'function') pintarSync(); }
+    } catch (e) { this.erro = e.message || 'falha ao gravar'; if (typeof pintarSync === 'function') pintarSync(); throw e; }
+  },
+  /* confere de novo se a permissão da pasta ainda vale (ela expira) */
+  async verificar() {
+    if (!this.suportado || !this.handle) return;
+    try { this.ok = (await this.handle.queryPermission({ mode: 'readwrite' })) === 'granted'; } catch (e) { this.ok = false; }
   },
   async listar(partes) { try { const d = await this.dir(partes, false); const out = []; for await (const [n, h] of d.entries()) out.push([n, h]); return out; } catch (e) { return []; } },
   async apagar(partes, nome) { try { const d = await this.dir(partes, false); await d.removeEntry(nome); return true; } catch (e) { return false; } }
@@ -1844,7 +1860,7 @@ function configPadrao() {
     operadores: [
       { id: 'alipio', nome: 'Alípio', icone: '🦊', corRgb: '#2563eb', corAlfa: 25 },
       { id: 'rafael', nome: 'Rafael', icone: '🐻', corRgb: '#0891b2', corAlfa: 25 },
-      { id: 'thiago', nome: 'Thiago', icone: '🦉', corRgb: '#0d9488', corAlfa: 25 },
+      { id: 'thiago', nome: 'Tiago', icone: '🦉', corRgb: '#0d9488', corAlfa: 25 },
       { id: 'apoio', nome: 'Apoio', icone: '🐧', corRgb: '#4f46e5', corAlfa: 25 }
     ],
     clinicas: [],
@@ -1861,7 +1877,7 @@ function normOperadores(lista) {
     const idx = CORES_ID.findIndex(x => x[0] === o.cor);
     const corRgb = hexValido(o.corRgb) ? o.corRgb.toLowerCase() : CORES_PADRAO_HEX[(idx >= 0 ? idx : i) % CORES_PADRAO_HEX.length];
     const corAlfa = Number.isFinite(Number(o.corAlfa)) && o.corAlfa !== undefined ? Math.min(100, Math.max(5, Math.round(Number(o.corAlfa)))) : 25;
-    const r = { id, nome: String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : AVATARES[(i * 3 + 2) % AVATARES.length], corRgb, corAlfa };
+    const r = { id, nome: /^thiago$/i.test(String(o.nome).trim()) ? 'Tiago' : String(o.nome).trim(), icone: AVATARES.includes(o.icone) ? o.icone : AVATARES[(i * 3 + 2) % AVATARES.length], corRgb, corAlfa };
     if (o.senhaHash && o.senhaSalt) { r.senhaHash = String(o.senhaHash); r.senhaSalt = String(o.senhaSalt); }
     return r;
   });
@@ -2355,6 +2371,18 @@ const tagItem = est => ({
 }[est]);
 const nomeGuia = g => `${g.pedido.beneficiario || 'Beneficiário não informado'}`;
 
+/* ---------- Aviso de pasta sem sincronizar (aparece em todas as telas até conectar) ---------- */
+function pintarSync() {
+  const el = document.getElementById('barraSync'); if (!el) return;
+  let msg = '', acao = '';
+  if (!Pasta.suportado) { msg = 'Este navegador não acessa a pasta compartilhada (use o Chrome ou o Edge). Nada está sincronizando com os colegas: os registros ficam só neste computador.'; }
+  else if (!Pasta.handle) { msg = 'Pasta compartilhada não conectada. Nada está sincronizando: colegas não veem este atendimento, o aviso de e-mail já atendido não funciona e os registros ficam só neste computador.'; acao = 'Conectar pasta'; }
+  else if (!Pasta.ok) { msg = 'A pasta compartilhada precisa ser reautorizada (um clique por dia). Enquanto isso nada está sincronizando com os colegas.'; acao = 'Reautorizar pasta'; }
+  else if (Pasta.erro) { msg = 'A última gravação na pasta compartilhada falhou (' + Pasta.erro + '). Este atendimento pode não ter sincronizado: confira a pasta e reautorize se preciso.'; acao = 'Reautorizar pasta'; }
+  el.hidden = !msg;
+  el.innerHTML = msg ? `${ic('folderx')}<span class="esp">${esc(msg)}</span>${acao ? `<button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${acao}</button>` : ''}` : '';
+}
+
 /* ---------- Topo e abas ---------- */
 /* ---------- Progresso dos operadores (topo compacto) ---------- */
 const ROT_ETAPA = { 33: 'lendo o pedido', 66: 'gerando a guia', 100: 'anexando e respondendo' };
@@ -2515,7 +2543,7 @@ function htmlPassos(g) {
 
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
-  renderTopo();
+  renderTopo(); pintarSync();
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
@@ -3688,6 +3716,21 @@ function similaridade(a, b) {
   if (!a || !b) return 0;
   return 1 - distancia(a, b) / Math.max(a.length, b.length);
 }
+/* O print não traz acentos nem o nome completo: confere por palavras (sem acento), aceitando só os primeiros nomes */
+function nomeConfere(ped, lido) {
+  const A = limparNome(ped).split(' ').filter(Boolean), B = limparNome(lido).split(' ').filter(Boolean), n = Math.min(A.length, B.length);
+  if (!n) return { ok: false };
+  if (A.join(' ') === B.join(' ')) return { ok: true, exato: true };
+  if (n < 2) return { ok: false };
+  for (let i = 0; i < n; i++) {
+    const a = A[i], b = B[i], ult = i === n - 1;
+    if (a === b) continue;
+    if (ult && Math.min(a.length, b.length) >= 3 && (a.startsWith(b) || b.startsWith(a))) continue;   // último nome cortado na tela
+    if (Math.min(a.length, b.length) >= 5 && distancia(a, b) <= 1) continue;                            // um caractere lido errado
+    return { ok: false };
+  }
+  return { ok: true, exato: false };
+}
 const prefixo = (a, b) => { a = limparNome(a).replace(/ /g, ''); b = limparNome(b).replace(/ /g, ''); return a.length >= 8 && b.length >= 8 && (a.startsWith(b) || b.startsWith(a)); };
 const ROT_PRINT = { guia: 'Nº da guia', paciente: 'Nome do paciente', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
 
@@ -3703,8 +3746,8 @@ function avaliarPrints(g) {
     else add('guia', g.numero, v, g.numero === v ? 'ok' : 'bad', g.numero === v ? '' : 'Diferente do número já digitado.');
   }
   if (campos.paciente) {
-    const ped = p.beneficiario || '', s = similaridade(ped, campos.paciente.valor);
-    add('paciente', ped || '—', campos.paciente.valor, !ped ? 'info' : s >= 0.93 ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? '' : s >= 1 ? '' : s >= 0.93 ? 'Pequena diferença de leitura da imagem (ignorada): confira a imagem.' : s >= 0.8 ? 'Quase igual: veja a imagem ao lado.' : 'Nomes diferentes.');
+    const ped = p.beneficiario || '', s = similaridade(ped, campos.paciente.valor), nc = nomeConfere(ped, campos.paciente.valor);
+    add('paciente', ped || '—', campos.paciente.valor, !ped ? 'info' : (nc.ok || s >= 0.93) ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? '' : nc.exato ? '' : nc.ok ? 'Confere pelos primeiros nomes, sem acentos (o sistema não mostra o nome completo).' : s >= 0.93 ? 'Pequena diferença de leitura da imagem (ignorada): confira a imagem.' : s >= 0.8 ? 'Quase igual: veja a imagem ao lado.' : 'Nomes diferentes.');
   }
   if (campos.credNome) {
     const ped = valorCopia(g, 'executante'), lido = campos.credNome.valor;
@@ -4496,6 +4539,7 @@ document.addEventListener('drop', e => {
 
 // Ao voltar para a janela, relê o config.json da pasta (operadores e senhas de colegas) se não houver edição em curso
 document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden) { const antes = Pasta.ok; await Pasta.verificar(); if (antes !== Pasta.ok) { pintarSync(); renderTopo(); } }
   if (document.hidden || !Pasta.ok || cfgDirty || M) return;
   try { const antes = JSON.stringify(cfg.operadores); await carregarConfig(); if (JSON.stringify(cfg.operadores) !== antes) { if (cfgEdit) iniciarCfgEdit(); render(); } } catch (e) { }
 });
