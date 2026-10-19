@@ -1171,6 +1171,23 @@ function lerEmissao(bruto, referencia) {
   const ref = referencia ? new Date(referencia) : new Date();
   return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: dt > ref, mesesAtras: (ref - dt) / (30.44 * 864e5) };
 }
+/* Formato de uma linha por beneficiário (ex.: MRA):
+     NOME  CARTEIRA  CÓDIGO
+     DESCRIÇÃO QTD  CRM-MÉDICO  [números soltos]  LOCAL
+   Só entra quando falta quantidade, médico e local, para não mexer nos outros formatos. */
+function lerDuasLinhas(texto, p) {
+  if (p.itens.length !== 1 || p.itens[0].qtd != null || p.medico.nome || p.local) return;
+  const L = texto.split('\n').map(l => l.replace(/[*_]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const i = L.findIndex(l => l.includes(p.itens[0].codigo)); if (i < 0 || !L[i + 1]) return;
+  const m = L[i + 1].match(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ ./()-]*?)\s+(\d{1,2})\s+(\d{3,7})\s*[-–]\s*(.+)$/); if (!m) return;
+  const [, desc, qtd, crm, resto] = m;
+  const r = resto.match(/^(\D+?)\s+[\d ]+?\s+(\D+)$/);   // "NOME  411 5 12 25  LOCAL": os números do meio separam o médico do local
+  const nome = (r ? r[1] : resto).trim(), local = r ? r[2].trim() : '';
+  p.medico = lerMedico(`${nome} CRM ${crm}`);
+  if (local) p.local = local;
+  p.itens[0].qtd = Number(qtd); p.itens[0].origemQtd = 'linha';
+  if (!p.itens[0].desc) p.itens[0].desc = desc.trim();
+}
 function lerPedido(texto, referencia) {
   texto = explodirTexto(texto);
   const secoes = secionar(texto);
@@ -1253,6 +1270,7 @@ function lerPedido(texto, referencia) {
   const textoLivre = secoes.filter(s => !['carteira', 'medico', 'emissao', 'cid'].includes(s.k)).flatMap(s => s.linhas).join('\n');
   p.soltos = [...new Set([...textoLivre.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].map(m => m[1]).filter(c => !usados.has(c)))];
   p.secoesEncontradas = [...new Set(secoes.map(s => s.k).filter(Boolean))];
+  lerDuasLinhas(texto, p);
   return p;
 }
 
@@ -1288,15 +1306,23 @@ function dividirPor(linhas, ks, tipos, cabecalhoCompartilhado) {
 function lerPedidos(texto, referencia) {
   const L = texto.split('\n').flatMap(explodirLinha);
   /* 1) separadores explícitos (linhas de traços, "Paciente 2") */
+  const comDados = [], compartilhado = [];
+  /* 0) linhas livres, sem rótulos (ex.: "NOME  CARTEIRA  CÓDIGO" + linha de detalhes): cada linha com carteira abre um paciente */
+  const reCart = new RegExp(CART_RE.source, 'i'), idxCart = L.map((l, i) => reCart.test(l) ? i : -1).filter(i => i >= 0);
+  const livres = idxCart.length >= 2 && !rotulosDe(L).some(k => k === 'beneficiario' || k === 'carteira');
+  if (livres) {
+    if (idxCart[0] > 0) compartilhado.push(L.slice(0, idxCart[0]));
+    idxCart.forEach((ini, k) => comDados.push(L.slice(ini, k + 1 < idxCart.length ? idxCart[k + 1] : L.length)));
+  } else {
   const chunks = [[]];
   L.forEach(l => { if (RE_SEPARADOR.test(l)) chunks.push([]); else chunks[chunks.length - 1].push(l); });
-  const comDados = [], compartilhado = [];
   chunks.forEach(c => {
     const ks = rotulosDe(c);
     if (ks.some(k => k === 'beneficiario' || k === 'carteira')) comDados.push(c);
     else if (ks.includes('servico') && comDados.length) comDados[comDados.length - 1].push(...c);   // serviços depois de um traço continuam o mesmo paciente
     else compartilhado.push(c);
   });
+  }
   /* 2) dentro de cada trecho, repetição de beneficiário/carteira abre um novo paciente */
   let pacientes = [];
   comDados.forEach(c => {
