@@ -3719,9 +3719,10 @@ function similaridade(a, b) {
 }
 /* O print não traz acentos nem o nome completo: confere por palavras (sem acento), aceitando só os primeiros nomes */
 function nomeConfere(ped, lido) {
-  const A = limparNome(ped).split(' ').filter(Boolean), B = limparNome(lido).split(' ').filter(Boolean), n = Math.min(A.length, B.length);
-  if (!n) return { ok: false };
-  if (A.join(' ') === B.join(' ')) return { ok: true, exato: true };
+  const A0 = limparNome(ped).split(' ').filter(Boolean), B0 = limparNome(lido).split(' ').filter(Boolean);
+  if (A0.join(' ') === B0.join(' ') && A0.length) return { ok: true, exato: true };
+  // o print corta o nome no fim do campo (e lê mal as últimas letras): vale conferir só os 3 primeiros nomes
+  const A = A0.slice(0, 3), B = B0.slice(0, 3), n = Math.min(A.length, B.length);
   if (n < 2) return { ok: false };
   for (let i = 0; i < n; i++) {
     const a = A[i], b = B[i], ult = i === n - 1;
@@ -3748,7 +3749,7 @@ function avaliarPrints(g) {
   }
   if (campos.paciente) {
     const ped = p.beneficiario || '', s = similaridade(ped, campos.paciente.valor), nc = nomeConfere(ped, campos.paciente.valor);
-    add('paciente', ped || '—', campos.paciente.valor, !ped ? 'info' : (nc.ok || s >= 0.93) ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? '' : nc.exato ? '' : nc.ok ? 'Confere pelos primeiros nomes, sem acentos (o sistema não mostra o nome completo).' : s >= 0.93 ? 'Pequena diferença de leitura da imagem (ignorada): confira a imagem.' : s >= 0.8 ? 'Quase igual: veja a imagem ao lado.' : 'Nomes diferentes.');
+    add('paciente', ped || '—', campos.paciente.valor, !ped ? 'info' : (nc.ok || s >= 0.93) ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? '' : nc.exato ? '' : nc.ok ? 'Confere pelos 3 primeiros nomes, sem acentos (o print não mostra o nome completo).' : s >= 0.93 ? 'Pequena diferença de leitura da imagem (ignorada): confira a imagem.' : s >= 0.8 ? 'Quase igual: veja a imagem ao lado.' : 'Nomes diferentes.');
   }
   if (campos.credNome) {
     const ped = valorCopia(g, 'executante'), lido = campos.credNome.valor;
