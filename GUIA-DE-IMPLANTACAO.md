@@ -108,8 +108,8 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 - Botões secundários (copiar, atualizar, corrigir, excluir etc.) mostram só o ícone, com o nome na dica ao passar o mouse. Há um botão de copiar ao lado da carteira usada no sistema.
 - A página foi ajustada para funcionar até 320 px de largura, sem rolagem horizontal.
 
-### Extensão do Chrome
-A pasta `extensao/` contém uma extensão (painel lateral) que lê o e-mail aberto no webmail e o oferece ao conferidor, sem baixar o .eml. Veja `extensao/LEIA-ME.md`.
+### Extensão do Chrome (botão "Abrir no conferidor")
+No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada". Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
 
 ### Visões do Painel
 Dia, **Semana** (segunda a domingo) e Mês. A coluna Clínica mostra quem gerou a guia.

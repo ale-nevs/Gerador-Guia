@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<meta name="conferidor-guias" content="1">
 <meta name="color-scheme" content="light dark">
 <title>Conferidor de Guias · Promédica</title>
 <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -132,9 +133,6 @@ body.topo-mini .progs{display:flex}
 .prog::before{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--surface)}
 .prog .pe{position:relative;display:inline-flex;line-height:1}
 .prog .emoji{font-size:17px}.prog .ic{color:var(--text-3)}
-.barra-webmail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px auto 0;max-width:1600px;padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-br);border-radius:var(--r);width:calc(100% - 24px)}
-.barra-webmail[hidden]{display:none}
-.barra-webmail .bw-txt{font-weight:650;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 140px}
 .chip.mini-btn{padding:0 9px;min-width:var(--h-ctl);justify-content:center}
 /* Topo compacto: só operador, luz da pasta e botão de voltar, na cor do operador */
 body.topo-mini header.topo{background:linear-gradient(var(--c-bg,transparent),var(--c-bg,transparent)),var(--surface);border-bottom-color:var(--c-br,var(--border));box-shadow:none}
@@ -578,7 +576,6 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
   <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
 <div class="wrap print-wrap"><div class="print-head"><img src="logo-promedica.png" alt="Promédica"><b>Conferidor de Guias · <span>Núcleo Gestão de Terapias</span></b><small id="printData"></small></div></div>
-<div id="barraWebmail" class="barra-webmail" hidden></div>
 <main id="app"></main>
 <footer class="rodape">
   <span>© <span id="anoRodape"></span> Promédica · Conferidor de Guias<span class="ver" id="verRodape" title="Versão do sistema"></span></span>
@@ -2336,6 +2333,7 @@ function pintarProgresso() {
     : `<span class="prog" role="img" style="--p:0" title="Nenhum atendimento em andamento" aria-label="Nenhum atendimento em andamento"><span class="pe">${ic('user', 'sm')}</span></span>`;
 }
 setInterval(async () => { if (document.hidden || !LS.get('topoMini', false)) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
+const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
   const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : painelModo === 'semana' ? 'Semana: ' + rotuloSemana(painelSemana) : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
@@ -2363,6 +2361,7 @@ function renderTopo() {
     <label class="chip chip-op" style="${op ? estiloOp(op) : ''}" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
+    ${extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     <button class="chip mini-btn" data-act="topoMini" title="Ocultar menu e topo (modo compacto)" aria-label="Ocultar menu e topo">${ic('chevup', 'sm')}</button>`;
   $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'layers', 'Ações'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
@@ -2471,7 +2470,6 @@ function htmlPassos(g) {
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
   renderTopo();
-  if (typeof pintarOfertaWebmail === 'function') pintarOfertaWebmail();
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
@@ -3489,16 +3487,25 @@ function avisoEmailJaAtendido(email) {
   const quem = unicos(outros.map(r => `${r.operador || 'um operador'} (${r.status === 'concluido' ? 'concluído' : 'em andamento'} em ${fmtDH(r.atualizadoEm)})`));
   return `Este e-mail já foi aberto por: ${quem.join('; ')}.\n\nAbrir mesmo assim?`;
 }
-/* Webmail (extensão): o e-mail aberto fica "oferecido" numa barra; o operador decide quando abrir */
-let webmailOferta = null;
-function pintarOfertaWebmail() {
-  const el = document.getElementById('barraWebmail'); if (!el) return;
-  const e = webmailOferta, aberto = e && S && S.email && S.email.messageId === e.messageId;
-  if (!e || aberto) { el.hidden = true; el.innerHTML = ''; return; }
-  el.hidden = false;
-  el.innerHTML = `<span class="tag info">${ic('mail', 'sm')}Webmail</span><span class="bw-txt" title="${esc(e.assunto)}">${esc(e.assunto || '(sem assunto)')}</span><span class="bw-de muted">${esc(e.remetente.nome || e.remetente.email)}</span><button class="btn pri sm" data-act="abrirWebmail">${ic('filecheck', 'sm')}Abrir no conferidor</button>`;
+/* Webmail (extensão do Chrome): o botão flutuante "Abrir no conferidor" do webmail entrega o e-mail aqui */
+const webmailParaEmail = m => emailDeWebmail({
+  uid: m.uid, folder: m.folder, messageId: m.messageId, assunto: m.assunto, fromNome: m.de && m.de.nome, fromEmail: m.de && m.de.email,
+  plain: m.plain, html: m.html, data: m.data, datas: m.datas, anexos: m.anexos
+});
+async function abrirDoWebmail(m) {
+  let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail.', 'bad'); return; }
+  if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return; }
+  if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return; }
+  if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return;
+  aba = 'atend';
+  try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); }
 }
-function ofertarWebmail(m) { try { webmailOferta = emailDeWebmail(m); } catch (e) { console.error(e); return; } pintarOfertaWebmail(); }
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (ev.source !== window || ev.origin !== location.origin || !d) return;
+  if (d.__conferidorExt === 'instalada') { render(); return; }
+  if (d.__conferidorExt === 'webmail' && d.msg) abrirDoWebmail(d.msg);
+});
 async function iniciar(email) {
   await Reg.carregarTudo(); await Param.carregar();
   const aviso = avisoEmailJaAtendido(email);
@@ -3563,7 +3570,17 @@ const acoes = {
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
-  async abrirWebmail() { if (!webmailOferta) return; if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; } if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return; aba = 'atend'; try { await iniciar(webmailOferta); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); } pintarOfertaWebmail(); },
+  baixarExtensao() {
+    abrirModal({ titulo: 'Extensão do Chrome', sub: 'Abre o e-mail do webmail aqui com um clique', icone: 'download', tamanho: 'g',
+      corpo: `<ol class="passos-ext" style="margin:0 0 0 18px;display:grid;gap:8px">
+        <li>Baixe o arquivo abaixo e <b>descompacte</b> (clique direito > Extrair tudo).</li>
+        <li>Abra <b>chrome://extensions</b> (no Edge: <b>edge://extensions</b>) e ative o <b>Modo do desenvolvedor</b>.</li>
+        <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta descompactada.</li>
+        <li>Deixe esta página aberta numa aba e o webmail em outra (recarregue o webmail com F5).</li>
+        <li>Ao abrir um e-mail no webmail aparece o botão flutuante <b>Abrir no conferidor</b>. O clique abre o pedido aqui, nesta aba.</li></ol>
+        <p class="dica" style="margin-top:12px">A extensão só atua no webmail da Promédica e nesta página. Nada é enviado nem respondido automaticamente.</p>`,
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button><a class="btn pri" href="extensao/conferidor-guias-extensao.zip" download>${ic('download')}Baixar extensão (.zip)</a>` });
+  },
   usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
   topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },

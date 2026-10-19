@@ -2,17 +2,17 @@
   "manifest_version": 3,
   "name": "Conferidor de Guias · Promédica",
   "short_name": "Conferidor",
-  "description": "Painel lateral do Conferidor de Guias ligado ao webmail da Promédica: lê o e-mail aberto e oferece abri-lo no conferidor.",
-  "version": "1.0.0",
-  "minimum_chrome_version": "116",
-  "icons": { "16": "painel/favicon.ico", "48": "painel/icon-192.png", "128": "painel/icon-192.png" },
-  "action": { "default_title": "Abrir o Conferidor de Guias" },
-  "side_panel": { "default_path": "painel/painel.html" },
+  "description": "Botão flutuante \"Abrir no conferidor\" no webmail da Promédica: abre o e-mail aberto na aba do Conferidor de Guias.",
+  "version": "1.1.0",
+  "minimum_chrome_version": "111",
+  "icons": { "16": "icones/icon-32.png", "32": "icones/icon-32.png", "48": "icones/icon-192.png", "128": "icones/icon-192.png" },
+  "action": { "default_title": "Ir para o Conferidor de Guias", "default_icon": { "32": "icones/icon-32.png" } },
   "background": { "service_worker": "fundo.js" },
-  "permissions": ["sidePanel", "storage"],
+  "permissions": ["storage"],
   "host_permissions": ["https://mail.promedica.com.br/*"],
   "content_scripts": [
-    { "matches": ["https://mail.promedica.com.br/*"], "js": ["captura-main.js"], "run_at": "document_start", "world": "MAIN", "all_frames": false },
-    { "matches": ["https://mail.promedica.com.br/*"], "js": ["ponte.js"], "run_at": "document_start", "all_frames": false }
+    { "matches": ["https://mail.promedica.com.br/*"], "js": ["captura-main.js"], "run_at": "document_start", "world": "MAIN" },
+    { "matches": ["https://mail.promedica.com.br/*"], "js": ["ponte.js"], "run_at": "document_start" },
+    { "matches": ["https://*.vercel.app/*"], "js": ["conferidor.js"], "run_at": "document_idle" }
   ]
 }
