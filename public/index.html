@@ -1833,6 +1833,20 @@ const MOTIVOS_PADRAO = [
   { id: 'sem-direito-local', nome: 'Sem direito no local ou prestador', modelo: 'sem_direito_local' },
   { id: 'outro', nome: 'Outro motivo (descrever nas observações)', modelo: '' }
 ];
+/* Observações automáticas da conferência pelos prints: aparecem como sugestão marcável, nunca entram sozinhas se desmarcadas.
+   Campos: {CODIGO} {QTD_PEDIDO} {QTD_SISTEMA}. Os textos e a marcação padrão podem ser mudados nas configurações. */
+const OBS_AUTO = {
+  'item-ausente': { nome: 'Item que não consta na guia gerada', texto: 'Item {CODIGO}: não consta na guia gerada (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
+  'item-menor': { nome: 'Item autorizado com quantidade menor', texto: 'Item {CODIGO}: autorizado com quantidade {QTD_SISTEMA} (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
+  'item-qtd': { nome: 'Item com quantidade diferente (maior)', texto: 'Item {CODIGO}: guia com quantidade {QTD_SISTEMA} (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
+  'item-extra': { nome: 'Item na guia que não estava no pedido', texto: 'Item {CODIGO}: consta na guia gerada (quantidade {QTD_SISTEMA}) e não estava no pedido.', padrao: true, itens: true },
+  guia: { nome: 'Número da guia diferente do digitado', texto: 'Número da guia diferente do digitado.', padrao: true },
+  paciente: { nome: 'Nome do beneficiário diferente', texto: 'Nome do beneficiário no sistema difere do informado no pedido.', padrao: true },
+  credNome: { nome: 'Credenciado executante diferente', texto: 'Credenciado executante no sistema difere do cadastrado.', padrao: true },
+  ident: { nome: 'Carteira incorreta', texto: 'Carteira no sistema difere da carteira usada.', padrao: false },
+  cid: { nome: 'CID diferente', texto: 'CID no sistema difere do informado no pedido.', padrao: false }
+};
+const obsAutoPadrao = () => Object.fromEntries(Object.entries(OBS_AUTO).map(([k, v]) => [k, { texto: v.texto, padrao: v.padrao }]));
 const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10 };
 
 /* Motor de modelos: campos entre chaves → texto/HTML. Falta de valor fica visível. */
@@ -1857,6 +1871,7 @@ const ctxDe = (g, extra = {}) => ({ S, g, extra });
    ==================================================================== */
 function configPadrao() {
   return {
+    obsAuto: obsAutoPadrao(),
     operadores: [
       { id: 'alipio', nome: 'Alípio', icone: '🦊', corRgb: '#2563eb', corAlfa: 25 },
       { id: 'rafael', nome: 'Rafael', icone: '🐻', corRgb: '#0891b2', corAlfa: 25 },
@@ -1909,6 +1924,7 @@ function mesclarConfig(base, c) {
     if (typeof p.obsParametrizadoAuto === 'boolean') r.preferencias.obsParametrizadoAuto = p.obsParametrizadoAuto;
     if (Number.isInteger(p.acoesMinutos) && p.acoesMinutos >= 0 && p.acoesMinutos <= 1440) r.preferencias.acoesMinutos = p.acoesMinutos;
   }
+  if (c.obsAuto) for (const k in OBS_AUTO) { const o = c.obsAuto[k]; if (!o) continue; if (typeof o.texto === 'string' && o.texto.trim()) r.obsAuto[k].texto = o.texto.trim(); if (typeof o.padrao === 'boolean') r.obsAuto[k].padrao = o.padrao; }
   if (Array.isArray(c.glosas)) r.glosas = unicos(c.glosas.map(g => String(g).trim()).filter(Boolean));
   return r;
 }
@@ -1924,7 +1940,7 @@ function configParaSalvar(c) {
     operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, corRgb: o.corRgb, corAlfa: o.corAlfa, ...(o.senhaHash ? { senhaHash: o.senhaHash, senhaSalt: o.senhaSalt } : {}) })),
     clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', codigos: cl.codigos || {} })),
     modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
-    alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], preferencias: c.preferencias
+    alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], obsAuto: c.obsAuto, preferencias: c.preferencias
   };
 }
 // Antes de gravar, traz do config.json da pasta os operadores que colegas criaram ou protegeram com senha
@@ -2916,7 +2932,7 @@ function renderFinal(alvo, g) {
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
-        ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> Detalhe o motivo nas <b>observações adicionais</b> abaixo: o texto-base já foi gerado e vai para a resposta ao prestador. Você pode finalizar normalmente.</div></div>` : ''}
+        ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> As observações marcadas na etapa 3 já estão nas <b>observações adicionais</b> abaixo (e vão para a resposta ao prestador): detalhe o motivo. Você pode finalizar normalmente.</div></div>` : ''}
         <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
           <input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
           <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
@@ -3303,7 +3319,7 @@ let cfgEdit = null, cfgSecao = 'aparencia', cfgDirty = false, cfgErros = [], cfg
 const cfgModeloSel = { modelos: 'autorizada', obs: 'observacao', param: 'parametrizacao' };
 const CFG_SECOES = [
   ['aparencia', 'palette', 'Aparência'], ['perfil', 'user', 'Perfil e identificação'], ['clinicas', 'building', 'Clínicas e cadastros'],
-  ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['param', 'layers', 'Parametrizações'],
+  ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['obsauto', 'bell', 'Observações automáticas'], ['param', 'layers', 'Parametrizações'],
   ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['info', 'info', 'Informações e versão do sistema']
 ];
 let cfgOpsIni = [];
@@ -3374,6 +3390,7 @@ function htmlCfgSecao() {
     case 'clinicas': return cfgClinicas();
     case 'modelos': return cfgModelos('modelos', k => MODELOS_META[k].destino === 'email', 'Modelos de e-mail', 'Textos das respostas enviadas às clínicas. Aceitam negrito, itálico, cor, listas e campos dinâmicos.');
     case 'obs': return cfgModelos('obs', k => ['observacao', 'obs_parametrizado'].includes(k), 'Modelo de observação da guia', 'Textos do campo de observação da guia no sistema oficial. São copiados como texto simples.');
+    case 'obsauto': return cfgObsAuto();
     case 'param': return cfgParam();
     case 'alertas': return cfgAlertas();
     case 'export': return cfgExport();
@@ -3515,6 +3532,19 @@ function cfgExport() {
 }
 
 /* ---------- 9. Preferências operacionais ---------- */
+function cfgObsAuto() {
+  const o = cfgEdit.obsAuto;
+  const linha = ([k, v]) => `<div class="card" style="box-shadow:none;margin:0 0 10px;padding:12px">
+    <div class="linha-flex" style="justify-content:space-between"><b>${esc(v.nome)}</b>
+      <label class="switch"><input type="checkbox" data-cfg="obsAuto.${k}.padrao" ${o[k].padrao ? 'checked' : ''}><span>Marcada por padrão</span></label></div>
+    <label class="lbl" for="oa-${k}">Texto da observação</label><input type="text" id="oa-${k}" data-cfg="obsAuto.${k}.texto" value="${esc(o[k].texto)}"></div>`;
+  return `<div class="card">${cabSecao('Observações automáticas')}
+    <p class="dica">Quando você usa <b>Ignorar</b> numa divergência da conferência pelos prints, o sistema sugere uma observação para o prestador. Aqui você muda o texto e define se ela já vem <b>marcada</b>. Em qualquer caso, ela só entra na resposta se estiver marcada (a marcação pode ser mudada em cada atendimento).</p>
+    <p class="dica">Campos para os itens: <code>{CODIGO}</code>, <code>{QTD_PEDIDO}</code> e <code>{QTD_SISTEMA}</code>.</p>
+    <h3>Itens</h3>${Object.entries(OBS_AUTO).filter(([, v]) => v.itens).map(linha).join('')}
+    <h3>Campos da guia</h3>${Object.entries(OBS_AUTO).filter(([, v]) => !v.itens).map(linha).join('')}
+    <div class="acoes"><button class="btn line" data-act="obsAutoRestaurar">${ic('undo', 'sm')}Restaurar padrões</button></div></div>`;
+}
 function cfgPrefs() {
   const p = cfgEdit.preferencias;
   return `<div class="card">${cabSecao('Preferências operacionais')}
@@ -3798,17 +3828,18 @@ function resumoPrints(av, ign) {
 }
 /* texto que vai para as observações adicionais da resposta ao prestador (sem nome, CID ou carteira) */
 function linhaIgnorada(x) {
-  const q = (a, b) => `${a ?? '—'} (solicitado ${b ?? '—'})`;
+  let key, t = 'ign';
   if (x.chave.startsWith('i:')) {
-    if (x.nota === 'Não aparece nos prints.') return { t: 'menor', linha: `Item ${x.codigo}: não consta na guia gerada (solicitado ${x.qPed ?? '—'}).` };
-    if (x.nota === 'Quantidade diferente.') return { t: x.qSis != null && x.qPed != null && x.qSis < x.qPed ? 'menor' : 'ign', linha: `Item ${x.codigo}: guia com quantidade ${q(x.qSis, x.qPed)}.` };
-    return { t: 'ign', linha: `Item ${x.codigo}: consta na guia gerada (quantidade ${x.qSis ?? '—'}) e não estava no pedido.` };
-  }
-  const T = { guia: 'Número da guia diferente do digitado.', paciente: 'Nome do beneficiário no sistema difere do informado no pedido.', credNome: 'Credenciado executante no sistema difere do cadastrado.', ident: 'Carteira no sistema difere da carteira usada.', cid: 'CID no sistema difere do informado no pedido.' };
-  return { t: 'ign', linha: T[x.chave.slice(2)] || (x.rot + ': diferente do pedido.') };
+    if (x.nota === 'Não aparece nos prints.') { key = 'item-ausente'; t = 'menor'; }
+    else if (x.nota === 'Quantidade diferente.') { const menor = x.qSis != null && x.qPed != null && x.qSis < x.qPed; key = menor ? 'item-menor' : 'item-qtd'; t = menor ? 'menor' : 'ign'; }
+    else key = 'item-extra';
+  } else key = x.chave.slice(2);
+  const o = (cfg.obsAuto && cfg.obsAuto[key]) || OBS_AUTO[key] || { texto: x.rot + ': diferente do pedido.', padrao: true };
+  const linha = o.texto.replace(/\{CODIGO\}/g, x.codigo || '').replace(/\{QTD_PEDIDO\}/g, x.qPed ?? '—').replace(/\{QTD_SISTEMA\}/g, x.qSis ?? '—');
+  return { t, key, linha, on: o.padrao !== false };
 }
 function sincronizarObsPrints(g) {
-  const ign = (g.prints && g.prints.ign) || {}, linhas = Object.values(ign).map(x => x.linha);
+  const ign = (g.prints && g.prints.ign) || {}, linhas = Object.values(ign).filter(x => x.on !== false).map(x => x.linha);
   const novo = linhas.length ? 'Conferência da guia pelo sistema:\n' + linhas.join('\n') : '';
   const r = g.resultado; let atual = r.obsAdicionais || '';
   if (g.obsPrintsTxt && atual.includes(g.obsPrintsTxt)) atual = atual.replace(g.obsPrintsTxt, '').replace(/\n{2,}/g, '\n').trim();
@@ -3857,13 +3888,14 @@ function htmlCartaoPrints(g) {
     : res ? `<span class="tag ${res.ok ? 'ok' : 'warn'}">${ic(res.ok ? 'check' : 'alert', 'sm')}${res.ok ? 'Conferido pelos prints' + (nIgn ? ' (com ressalva)' : '') : 'Prints com divergência'} em ${fmtHora(res.em)}</span>` : (cegaExigida() ? '<span class="tag warn">Obrigatório</span>' : '<span class="tag">Opcional</span>');
   const st = { ok: ['ok', 'check', 'Confere'], warn: ['warn', 'alert', 'Conferir'], bad: ['bad', 'x', 'Diverge'], info: ['', 'info', 'Sem base'] };
   const tg = x => {
-    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span> <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>`;
+    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span> <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" data-obsp="${esc(x.chave)}" ${x.ign.on !== false ? 'checked' : ''}><span>Incluir na observação ao prestador<br><span class="muted" style="font-size:var(--fs-sm)">${esc(x.ign.linha)}</span></span></label>`;
     const [c, i, t] = st[x.st];
     return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>` + (x.st === 'bad' || x.st === 'warn' ? ` <button class="btn sm line" data-act="ignorarPrint" data-key="${esc(x.chave)}" title="Aceita esta divergência, gera a observação para o prestador e deixa continuar">${ic('shield', 'sm')}Ignorar</button>` : '');
   };
   const corpo = av ? `
     ${av.avisos.map(a => `<div class="aviso" style="margin:8px 0">${ic('info')}<div>${esc(a)}</div></div>`).join('')}
-    ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${av.ressalvas} divergência(s) ignorada(s).</b> A observação para o prestador foi gerada nas <b>observações adicionais</b> (etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
+    ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${av.ressalvas} divergência(s) ignorada(s).</b> Marque, em cada uma, se quer incluir a observação para o prestador (vai para as <b>observações adicionais</b>, etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Campo</th><th>Pedido</th><th>Lido no print</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
       ${av.checks.map(c => `<tr><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
     </tbody></table></div>
@@ -4006,13 +4038,14 @@ const acoes = {
     const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
     const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
     g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {}; g.prints.ign[x.chave] = linhaIgnorada(x);
-    aplicarPrints(g); persistir(); render(); toast('Divergência ignorada: a observação para o prestador foi incluída na etapa 4.');
+    aplicarPrints(g); persistir(); render(); toast(g.prints.ign[x.chave].on !== false ? 'Divergência ignorada: a observação para o prestador foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência ignorada. Marque “Incluir na observação ao prestador” se quiser avisar a clínica.');
   },
   desfazerPrint(b) {
     const g = guiaAtiva(); if (!g.prints || !g.prints.ign) return; delete g.prints.ign[b.dataset.key];
     aplicarPrints(g); persistir(); render();
   },
   limparPrints() { const g = guiaAtiva(); PRINTS_MEM.delete(g.id); g.prints = null; sincronizarObsPrints(g); if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; } persistir(); render(); },
+  obsAutoRestaurar() { if (!confirm('Restaurar os textos e as marcações padrão das observações automáticas?')) return; cfgEdit.obsAuto = obsAutoPadrao(); marcarSujo(); render(); },
   topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
@@ -4477,6 +4510,7 @@ document.addEventListener('change', async e => {
     }
     LS.set('operadorId', t.value); render(); return;
   }
+  if (t.dataset.obsp) { const g = guiaAtiva(); const x = g.prints && g.prints.ign && g.prints.ign[t.dataset.obsp]; if (x) { x.on = t.checked; sincronizarObsPrints(g); persistir(); render(); } return; }
   if (t.id === 'arqPrints') { const fs = [...t.files]; t.value = ''; if (fs.length) processarPrints(fs); return; }
   if (t.id === 'arquivoEml') { const f = t.files[0]; t.value = ''; if (f) abrirArquivo(f); return; }
   if (t.id === 'arqConc') { try { await conciliarEmails([...t.files]); } catch (err) { toast('Erro ao ler: ' + err.message, 'bad'); } return; }
