@@ -1144,7 +1144,7 @@ function extrairItens(bloco) {
       const fim = desc.match(/^(.*\D)\s+(\d{1,2})$/);
       if (fim && fim[1].replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 3) { qtd = Number(fim[2]); desc = fim[1]; origem = 'fim-da-linha'; }
     }
-    desc = desc.replace(/\s+\d{1,3}\s*sess(?:[õo]es|[ãa]o)\b.*$/i, '').replace(/^[\s\-–—:|.]+/, '').replace(/[\s\-–—:|(.,]+$/, '').trim();
+    desc = desc.replace(/\s+\d{4,6}\s*[-–]?\s*$/, '').replace(/\s+\d{1,3}\s*sess(?:[õo]es|[ãa]o)\b.*$/i, '').replace(/^[\s\-–—:|.]+/, '').replace(/[\s\-–—:|(.,]+$/, '').trim();
     return { codigo: m[1], desc, qtd, origemQtd: origem };
   });
   const invalidos = [...bloco.matchAll(/(?<!\d)(\d{5,7}|\d{9,12})(?!\d)/g)].map(m => m[1]);
@@ -1153,8 +1153,8 @@ function extrairItens(bloco) {
 function lerMedico(bruto) {
   const conselho = (bruto.match(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/i) || [''])[0].toUpperCase();
   const dig = (bruto.match(/\d[\d.\s]{1,10}\d|\d{3,}/) || [''])[0].replace(/\D/g, '');
-  const nome = bruto.replace(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/gi, ' ').replace(/\b[A-Z]{2}\b(?=\s*[:\-\/]?\s*\d)/g, ' ')
-    .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const nome = bruto.replace(/(?<![\p{L}])(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)(?![\p{L}])/giu, ' ').replace(/(?<![\p{L}\d])[A-Z]{2}(?![\p{L}\d])(?=\s*[:\-\/]?\s*\d)/gu, ' ')
+    .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(?:dr|dra|doutor|doutora|prof|profa)\b\.?\s+/i, '');
   return { bruto, nome, crm: dig.length >= 3 ? dig : '', conselho };
 }
 const MESES_EXT = { janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, mar: 3, abril: 4, abr: 4, maio: 5, mai: 5, junho: 6, jun: 6, julho: 7, jul: 7, agosto: 8, ago: 8, setembro: 9, set: 9, outubro: 10, out: 10, novembro: 11, nov: 11, dezembro: 12, dez: 12 };
@@ -1170,6 +1170,13 @@ function lerEmissao(bruto, referencia) {
   const b = (bruto || '').trim();
   if (!b) return { estado: 'ausente', bruto: '' };
   if (/sem\s*data/i.test(b)) return { estado: 'sem_data', bruto: b };
+  // "16 DE JULHO" (sem ano): usa o ano da data do e-mail, ou o anterior se a data cairia no futuro
+  const dm = b.match(/(?<!\d)(\d{1,2})\s*(?:º|°)?\s*(?:de\s+)?(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?!\s*(?:de\s+|\/|-)?\s*\d)/i);
+  if (dm && !/\d{1,2}\s*[\/.\-]\s*\d{1,2}/.test(b)) {
+    const mes = MESES_EXT[semAcento(dm[2]).toLowerCase()], ref = referencia ? new Date(referencia) : new Date(); let a = ref.getFullYear();
+    let dt = new Date(a, mes - 1, Number(dm[1])); if (dt.getDate() === Number(dm[1]) && dt > new Date(ref.getTime() + 7 * 864e5)) { a--; dt = new Date(a, mes - 1, Number(dm[1])); }
+    if (dt.getDate() === Number(dm[1])) return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: false, mesesAtras: (ref - dt) / (30.44 * 864e5), anoInferido: true };
+  }
   const ext = dataPorExtenso(b);
   const m = (ext || b).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
   if (!m) return { estado: 'invalida', bruto: b };
@@ -1178,23 +1185,6 @@ function lerEmissao(bruto, referencia) {
   if (dt.getDate() !== d || dt.getMonth() !== mo - 1) return { estado: 'invalida', bruto: b };
   const ref = referencia ? new Date(referencia) : new Date();
   return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: dt > ref, mesesAtras: (ref - dt) / (30.44 * 864e5) };
-}
-/* Formato de uma linha por beneficiário (ex.: MRA):
-     NOME  CARTEIRA  CÓDIGO
-     DESCRIÇÃO QTD  CRM-MÉDICO  [números soltos]  LOCAL
-   Só entra quando falta quantidade, médico e local, para não mexer nos outros formatos. */
-function lerDuasLinhas(texto, p) {
-  if (p.itens.length !== 1 || p.itens[0].qtd != null || p.medico.nome || p.local) return;
-  const L = texto.split('\n').map(l => l.replace(/[*_]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const i = L.findIndex(l => l.includes(p.itens[0].codigo)); if (i < 0 || !L[i + 1]) return;
-  const m = L[i + 1].match(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ ./()-]*?)\s+(\d{1,2})\s+(\d{3,7})\s*[-–]\s*(.+)$/); if (!m) return;
-  const [, desc, qtd, crm, resto] = m;
-  const r = resto.match(/^(\D+?)\s+[\d ]+?\s+(\D+)$/);   // "NOME  411 5 12 25  LOCAL": os números do meio separam o médico do local
-  const nome = (r ? r[1] : resto).trim(), local = r ? r[2].trim() : '';
-  p.medico = lerMedico(`${nome} CRM ${crm}`);
-  if (local) p.local = local;
-  p.itens[0].qtd = Number(qtd); p.itens[0].origemQtd = 'linha';
-  if (!p.itens[0].desc) p.itens[0].desc = desc.trim();
 }
 function lerPedido(texto, referencia) {
   texto = explodirTexto(texto);
@@ -1278,7 +1268,10 @@ function lerPedido(texto, referencia) {
   const textoLivre = secoes.filter(s => !['carteira', 'medico', 'emissao', 'cid'].includes(s.k)).flatMap(s => s.linhas).join('\n');
   p.soltos = [...new Set([...textoLivre.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].map(m => m[1]).filter(c => !usados.has(c)))];
   p.secoesEncontradas = [...new Set(secoes.map(s => s.k).filter(Boolean))];
-  lerDuasLinhas(texto, p);
+  if (cartDeLinha) {   // sem rótulos ("NOME  CARTEIRA  CÓDIGO ..."): lê o que sobrou em texto livre
+    const tem = k => de(k).some(x => primeiraLinha(x));
+    aplicarLivre(texto, p, { medico: tem('medico'), cid: tem('cid') && /^[A-Za-z]\d{2,3}(\.\d)?$/.test(p.cid), local: tem('local'), emissao: tem('emissao') });
+  }
   return p;
 }
 
@@ -1404,6 +1397,81 @@ function relacionarBlocos(blocos) {
     vistos[b.chave] = (vistos[b.chave] || 0) + 1;
     b.multi = { total: blocos.length, distintos: ordem.length, mesmo: contagem[b.chave], ocorrencia: vistos[b.chave], excesso: ordem.indexOf(b.chave) >= MAX_BENEFICIARIOS };
   });
+}
+/* ====================================================================
+   Leitura de texto livre (sem rótulos): "NOME  CARTEIRA  CÓDIGO  DESCRIÇÃO" seguido de linhas soltas com
+   CRM, médico, CID, data e local, em qualquer ordem. Só preenche o que a leitura por rótulos deixou vazio.
+   ==================================================================== */
+const LOCAIS_CONHECIDOS = [
+  'CIDADE BAIXA', 'CENTRO MEDICO CIDADE BAIXA', 'ESPACO BOM VIVER', 'IGUATEMI', 'ITAIGARA', 'PITUBA', 'BARRA', 'BROTAS', 'RIO VERMELHO', 'CAMINHO DAS ARVORES',
+  'STIEP', 'IMBUI', 'PERNAMBUES', 'CABULA', 'COSTA AZUL', 'PARALELA', 'ONDINA', 'GRACA', 'CANDEAL', 'ARMACAO', 'PROCARDIACO', 'PRO CARDIACO', 'SANTA IZABEL', 'SANTA ISABEL',
+  'CENTRO', 'LAURO DE FREITAS', 'CAMACARI', 'SIMOES FILHO', 'FEIRA DE SANTANA', 'ALAGOINHAS', 'SALVADOR'
+];
+const RE_LOCAL_FIM = new RegExp('(?:^|[\\s,;/-])(' + [...LOCAIS_CONHECIDOS].sort((a, b) => b.length - a.length).map(x => x.replace(/ /g, '\\s+')).join('|') + ')\\s*[.,;]?\\s*$', 'i');
+
+/* palavras de especialidade que sobram ao lado do código (não são médico nem local) */
+const SERVICOS_PALAVRAS = ['TERAPIA OCUPACIONAL', 'PSICOPEDAGOGIA', 'FONOAUDIOLOGIA', 'FISIOTERAPIA', 'PSICOMOTRICIDADE', 'PSICOLOGIA', 'NUTRICIONISTA', 'NUTRICAO', 'ATENDENTE TERAPEUTICO', 'ABA DENVER', 'FONO', 'PSICO'];
+const RE_SERVICO_INI = new RegExp('^(?:' + SERVICOS_PALAVRAS.map(x => x.replace(/ /g, '\\s+')).join('|') + ')\\b[\\s.\\-–]*', 'i');
+function limparPeca(s) { return (s || '').replace(/[\/|;:,_*]+/g, ' ').replace(/^[\s\-–—.()]+|[\s\-–—(]+$/g, '').replace(/\s+/g, ' ').trim(); }
+
+/* devolve {crm, medico, cid, data, local, qtd} do que for possível ler no texto livre */
+function lerLivre(texto, p) {
+  const r = {};
+  let t = '\n' + texto.normalize('NFC').replace(/[*_●•·]/g, ' ').replace(/\[\s*https?:[^\]]*\]/g, ' ') + '\n';
+  // 1) tira o que já foi lido: carteira, códigos, descrições, nome do beneficiário
+  t = t.replace(new RegExp(CART_RE.source, 'gi'), ' ');
+  [...p.itens.map(i => i.codigo), ...p.invalidos].forEach(c => { t = t.split(c).join(' '); });
+  p.itens.forEach(i => { if (i.desc && i.desc.length >= 4) t = t.replace(new RegExp(i.desc.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'), ' '); });
+  if (p.beneficiario) t = t.replace(new RegExp(p.beneficiario.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'), ' ');
+  t = t.replace(/\(\s*\d{0,2}\s*[ºo°]?\s*[A-Za-zÀ-ÿ ]{0,25}\)/g, ' ');   // "(1º ATENDIMENTO)", "(1)"
+  const suspeito = t.match(/(?<![\dA-Za-z])(\d{7}|\d{9,12})(?!\d)/);   // código com dígito a mais ou a menos: não é CRM
+  if (suspeito) { r.codigoSuspeito = suspeito[1]; t = t.replace(suspeito[1], ' '); }
+  // 2) data: ddmmaaaa, dd/mm/aaaa ou SEM DATA
+  let m = t.match(/(?<!\d)(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d\d)(?!\d)/);
+  if (m) { r.data = `${m[1]}/${m[2]}/${m[3]}`; t = t.replace(m[0], ' '); }
+  else if ((m = t.match(/(?<!\d)(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?!\d)/))) { r.data = m[0]; t = t.replace(m[0], ' '); }
+  else if ((m = t.match(/\bsem\s+data\b/i))) { r.data = 'SEM DATA'; t = t.replace(m[0], ' '); }
+  // 3) CID: letra + 2 ou 3 dígitos (com ou sem espaço/ponto); a letra tem de estar maiúscula e isolada
+  m = t.match(/(?<![A-Za-zÀ-ÿ\d])(?:[Cc][Ii][Dd](?:-?10)?\s*[:\-]?\s*)?([A-Z])\s?(\d{2}(?:\.\d{1,2}|\d)?)(?![\dA-Za-z])/);
+  if (m) { r.cid = (m[1] + m[2]).replace('.', '.'); t = t.replace(m[0], ' '); }
+  t = t.replace(/\bCID(?:-?10)?\b\s*[:\-]?/gi, ' ');
+  // 4) CRM: número de 4 a 6 dígitos (com "CRM" na frente ou solto)
+  m = t.match(/(?:\b(?:CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b[\s:.\-]*(?:[A-Z]{2}\b[\s:.\-]*)?)?(?<!\d)(\d{3,6})(?!\d)/i);
+  if (m) { r.crm = m[1]; t = t.replace(m[0], ' | '); }
+  // 5) quantidade: 1 ou 2 dígitos soltos logo depois da descrição
+  const q = t.match(/(?:^|\s)(\d{1,2})(?=\s{2,}|\s*\n|\s*\|)/);
+  // 6) peças de texto: separadas por linha, grupo de números, "|" ou 3+ espaços
+  let servico = '';
+  const pecas = t.split(/\n|\||\s{3,}|(?<=\D)\s+\d[\d ]*\s+(?=\D)/).map(limparPeca).map(x => { const m = semAcento(x).match(RE_SERVICO_INI); if (m) { servico = servico || x.slice(0, m[0].length).trim(); return limparPeca(x.slice(m[0].length)); } return x; }).filter(x => /[A-Za-zÀ-ÿ]{2}/.test(x));
+  let medico = '', local = '';
+  const juntas = pecas.join(' '), J = semAcento(juntas).toUpperCase(), lm = J.match(RE_LOCAL_FIM);
+  if (lm) {   // local conhecido no fim do texto
+    const ini = lm.index + lm[0].indexOf(lm[1]);
+    local = limparPeca(juntas.slice(ini)); medico = limparPeca(juntas.slice(0, ini));
+  } else if (pecas.length >= 2) { medico = pecas[0]; local = pecas[pecas.length - 1]; }
+  else if (pecas.length === 1) medico = pecas[0];
+  // o médico precisa parecer nome de pessoa: 2+ palavras (ou 1 palavra + inicial)
+  if (medico && (medico.split(' ').filter(w => w.length > 1).length < 2 && !/\b[A-ZÀ-Ý]\.?\b/.test(medico))) { if (!local) local = medico; medico = ''; }
+  if (medico) r.medico = medico;
+  if (local) r.local = local;
+  if (q) r.qtd = Number(q[1]);
+  if (servico) r.servico = servico;
+  return r;
+}
+
+/* aplica o que a leitura livre achou só nos campos que ficaram vazios */
+function aplicarLivre(texto, p, rot = {}) {
+  const r = lerLivre(texto, p);
+  if (!rot.medico) {
+    const nome = r.medico || p.medico.nome, crm = r.crm || p.medico.crm;
+    if (r.medico || r.crm) p.medico = lerMedico(`${nome || ''}${crm ? ' CRM ' + crm : ''}`.trim());
+  }
+  if (!rot.cid && r.cid) p.cid = r.cid.toUpperCase();
+  if (!rot.local && r.local) p.local = r.local;
+  if (!rot.emissao && r.data && p.emissao.estado === 'ausente') p.emissao = lerEmissao(r.data, null);
+  if (r.qtd != null && p.itens.length === 1 && p.itens[0].qtd == null) { p.itens[0].qtd = r.qtd; p.itens[0].origemQtd = 'linha'; }
+  if (r.codigoSuspeito) p.codigoSuspeito = r.codigoSuspeito;
+  if (r.servico && p.itens.length === 1 && !p.itens[0].desc) p.itens[0].desc = r.servico.toUpperCase();
 }
 /* ====================================================================
    Pasta compartilhada (File System Access API) + IndexedDB
@@ -1802,6 +1870,9 @@ const ALERTAS = {
   'falta-med': { grupo: 'Pedido médico', nome: 'Médico não informado', desc: 'O pedido não traz nome nem CRM do médico.', modo: 'bloqueio' },
   'em-inv': { grupo: 'Pedido médico', nome: 'Data de emissão não reconhecida', desc: 'O texto da data não é uma data válida.', modo: 'atencao' },
   'em-fut': { grupo: 'Pedido médico', nome: 'Data de emissão no futuro', desc: 'A emissão é posterior ao recebimento do e-mail.', modo: 'atencao' },
+  'em-inf': { grupo: 'Pedido médico', nome: 'Ano da emissão inferido', desc: 'A clínica escreveu dia e mês sem o ano; o ano foi deduzido pela data do e-mail. Confirme.', modo: 'atencao', nivel: 'info' },
+  'cid-fmt': { grupo: 'Pedido médico', nome: 'CID fora do padrão', desc: 'O CID não tem o formato letra + 2 ou 3 dígitos (ex.: F84 ou F84.0).', modo: 'atencao' },
+  'nao-pedido': { grupo: 'E-mail', nome: 'E-mail que não parece um pedido', desc: 'Sem beneficiário, carteira nem código de serviço. Pode ser outro assunto (dúvida, retificação, conversa).', modo: 'atencao' },
   'em-sd': { grupo: 'Pedido médico', nome: 'Emissão "SEM DATA"', desc: 'A clínica informou SEM DATA. Informativo.', modo: 'atencao', nivel: 'info' },
   'em-aus': { grupo: 'Pedido médico', nome: 'Data de emissão não informada', desc: 'Campo não obrigatório. Informativo.', modo: 'atencao', nivel: 'info' },
   'crm': { grupo: 'Pedido médico', nome: 'CRM não informado', desc: 'Há nome do médico, mas sem número de registro. Informativo.', modo: 'atencao', nivel: 'info' },
@@ -2177,6 +2248,20 @@ function descRefItem(g, it) {
 }
 
 /* ---------- Alertas (regras centralizadas; o comportamento vem de cfg.alertas) ---------- */
+/* Para um código com tamanho errado, procura um código de 8 dígitos já cadastrado a 1 caractere de distância */
+function sugestaoCodigo(c, cl) {
+  const conhecidos = new Map();
+  (cl ? [cl] : []).concat(cfg.clinicas).forEach(x => Object.entries(x.codigos || {}).forEach(([k, d]) => { if (/^\d{8}$/.test(k) && !conhecidos.has(k)) conhecidos.set(k, d); }));
+  const cand = [...conhecidos.keys()].filter(k => Math.abs(k.length - c.length) <= 1 && distanciaTexto(k, c) === 1);
+  if (cand.length !== 1) return '';
+  return ` Provável: ${cand[0]}${conhecidos.get(cand[0]) ? ' (' + conhecidos.get(cand[0]) + ')' : ''}.`;
+}
+function distanciaTexto(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
 function avaliar(g) {
   const A = [], p = g.pedido, e = S.email, cl = clinicaDe(S), P = cfg.preferencias, mu = g.multi;
   const add = (tipo, texto, extra = {}) => {
@@ -2199,13 +2284,13 @@ function avaliar(g) {
   if (!p.beneficiario) add('falta-benef', 'Beneficiário não informado.', { clinica: 'Nome do beneficiário não informado.' });
   if (!cartValida(g.carteiraUsada)) {
     if (!p.beneficiario && !p.carteiraBruta) add('cart', 'Carteira e nome do beneficiário não informados.', { clinica: 'Número da carteira Promédica não informado.' });
-    else add('cart', p.carteiraBruta ? `Carteira fora do padrão: "${p.carteiraBruta}". Localize o beneficiário pelo nome no sistema e informe a carteira usada.` : 'Carteira não informada. Localize o beneficiário pelo nome no sistema e informe a carteira usada.', { acaoCarteira: true });
+    else add('cart', p.carteiraBruta ? `Carteira fora do padrão: "${p.carteiraBruta}" (${normCart(p.carteiraBruta).length} caracteres; o correto são 17: 15 dígitos + 2 caracteres). Localize o beneficiário pelo nome no sistema e informe a carteira usada.` : 'Carteira não informada. Localize o beneficiário pelo nome no sistema e informe a carteira usada.', { acaoCarteira: true });
   } else if (p.carteira !== g.carteiraUsada) {
     add('cart-dif', `Carteira usada (${g.carteiraUsada}) diferente da informada no e-mail (${p.carteiraBruta || 'não informada'}). Confirme que nome e carteira são do mesmo beneficiário.`);
   }
   /* serviços */
   if (!p.itens.length) add('falta-serv', 'Nenhum código de serviço de 8 dígitos foi encontrado.', { clinica: 'Código do serviço (8 dígitos) não informado.' });
-  unicos(p.invalidos).forEach(c => add('cod-invalido', `Código "${c}" tem ${c.length} dígitos (o correto são 8).`, { sub: c, clinica: `O código "${c}" está incorreto ou incompleto: os códigos de serviço têm 8 dígitos.` }));
+  unicos([...p.invalidos, p.codigoSuspeito].filter(Boolean)).forEach(c => add('cod-invalido', `Código "${c}" tem ${c.length} dígitos (o correto são 8).${sugestaoCodigo(c, cl)}`, { sub: c, clinica: `O código "${c}" está incorreto ou incompleto: os códigos de serviço têm 8 dígitos.` }));
   const cont = {}; p.itens.forEach(i => cont[i.codigo] = (cont[i.codigo] || 0) + 1);
   Object.entries(cont).filter(([, n]) => n > 1).forEach(([c, n]) => add('cod-repetido', `Código ${c} aparece ${n} vezes no pedido.`, { sub: c, clinica: `O código ${c} foi informado mais de uma vez. Por gentileza, informe a quantidade total em uma única linha.` }));
   p.itens.forEach(it => {
@@ -2227,6 +2312,9 @@ function avaliar(g) {
   if (em.estado === 'ausente') add('em-aus', 'Data de emissão não informada (não obrigatória).');
   if (p.medico.nome && !p.medico.crm) add('crm', 'CRM do médico não informado.');
   if (!p.cid) add('cid', 'CID não informado (não obrigatório).');
+  else if (!/^[A-Z]\d{2}(\.?\d{1,2})?$/i.test(p.cid)) add('cid-fmt', `CID "${p.cid}" fora do padrão (ex.: F84 ou F84.0). Confira no e-mail.`);
+  if (em.anoInferido) add('em-inf', `A clínica escreveu "${em.bruto}" sem o ano; foi considerado ${fmtData(em.data)}. Confirme no pedido médico.`);
+  if (!p.beneficiario && !p.carteiraBruta && !p.itens.length && !p.invalidos.length && !p.codigoSuspeito) add('nao-pedido', 'Este e-mail não traz beneficiário, carteira nem código de serviço: pode não ser um pedido de autorização (dúvida, retificação ou conversa).');
   /* e-mail */
   if (!cl) add('remetente', `Remetente ${e.remetente.email || '(sem endereço)'} não está no cadastro de clínicas.`, { vincular: true });
   else {
