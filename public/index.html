@@ -3766,7 +3766,7 @@ async function abrirImagem(file) {
 }
 /* acha as barras amarelas do cabeçalho (255,224,128) e devolve deslocamento e escala em relação ao print de referência */
 function acharAncora(cv) {
-  const W = cv.width, H = Math.min(cv.height, 200), d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const W = cv.width, H = Math.min(cv.height, 1600), d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;   // o print pode ser a tela inteira: procura as barras em qualquer altura
   // amarelo das barras (255,224,128), com folga para compressão JPEG e zoom
   const amarelo = i => Math.abs(d[i] - 255) < 40 && Math.abs(d[i + 1] - 224) < 45 && Math.abs(d[i + 2] - 128) < 70;
   const lin = new Uint16Array(H);
