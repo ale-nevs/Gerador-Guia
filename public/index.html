@@ -1065,14 +1065,14 @@ async function lerZip(buf) {
    Leitura do pedido
    ==================================================================== */
 const ROTULOS = [
-  ['local', /^local(\s+d[aeo]s?\s+(emissao|pedido|atendimento|solicitacao))?\b/],
-  ['emissao', /^(data\s+(da\s+|de\s+|do\s+)?(emissao(\s+d[oa]\s+(pedido|encaminhamento|solicitacao|requisicao|receita)(\s+medico)?)?|pedido(\s+medico)?|solicitacao|encaminhamento|requisicao|receita)|emissao(\s+do\s+pedido)?|data)\b/],
-  ['beneficiario', /^(benefici[a]ri[oa]s?|pacientes?|usuari[oa]|segurad[oa]|nome(\s+(completo(\s+d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa]))?|d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa])))?)\b/],
+  ['local', /^(local(\s+d[aeo]s?\s+(emissao|pedido|atendimento|solicitacao)(\s+d[ao]\s+(pedido|emissao))?)?|origem\s+do\s+pedido)(?![a-z0-9])/],
+  ['emissao', /^(data\s+(da\s+|de\s+|do\s+)?(emissao(\s+d[oa]\s+(pedido|encaminhamento|solicitacao|requisicao|receita)(\s+medico)?)?|pedido(\s+medico)?|solicitacao|encaminhamento|requisicao|receita)|emissao(\s+do\s+pedido)?|data)(?![a-z0-9])/],
+  ['beneficiario', /^(benefici[a]ri[oa]s?|benef\b\.?|pacientes?|usuari[oa]|segurad[oa]|nome(\s+(completo(\s+d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa]))?|d[oa]s?\s+(benefici[a]ri[oa]|paciente|usuari[oa])))?)(?![a-z0-9])/],
   ['carteira', /^((n[or°º.]*\s*)?(d[ao]s?\s+)?(carteir(a|inha)\b|cart\b\.?|matricula\b|cartao\b)(\s+(promedica|do\s+benefici[a]ri[oa]|do\s+paciente|do\s+plano))?|codigo\s+do\s+benefici[a]ri[oa])/],
   ['servico', /^(servicos?|procedimentos?|terapias?|codigos?(\s+(e\s+descricao\s+)?d[oa]s?\s+(servicos?|procedimentos?|terapias?))?|tuss)(\s+(solicitad[oa]s?|autorizad[oa]s?|a\s+autorizar))?\b/],
-  ['quantidade', /^(quantidades?(\s+(semanal|mensal|por\s+semana))?|qtd[es]?|quant|sess(oes|ao)|n[oru°º.]*\s*(de\s+)?sess(oes|ao))\b\.?/],
-  ['medico', /^(nome\s+e\s+(crm|registro)\s+d[oa]\s+medic[oa](\s+solicitante)?|medic[oa]s?(\s+(solicitante|assistente|responsavel))?|dr[a]?\.?|doutor[a]?|solicitante|profissional(\s+solicitante)?|nome\s+do\s+medic[oa])\b/],
-  ['cid', /^(cid(-?10)?|diagnostico)\b/],
+  ['quantidade', /^(quantidades?(\s+(semanal|mensal|por\s+semana|de\s+sess(oes|ao)))?|numero\s+de\s+sess(oes|ao)|qtd[es]?|quant|sess(oes|ao)|n[oru°º.]*\s*(de\s+)?sess(oes|ao))\b\.?/],
+  ['medico', /^(nome\s+e\s+(crm|registro)\s+d[oa]\s+medic[oa](\s+solicitante)?|nome\s+d[oa]\s+medic[oa]|medic[oa]s?(\s+(solicitante|assistente|responsavel))?|dr[a]?(?:\.|\b)|doutor[a]?|solicitante|profissional(\s+solicitante)?|nome\s+do\s+medic[oa])(?![a-z0-9])/],
+  ['cid', /^(cid(?:-?10|\s*10)?|diagnostico|hipotese\s+diagnostica)(?![a-z0-9])/],
   ['obs', /^(obs|observac(ao|oes))\b\.?/]
 ];
 /* rótulos que dispensam os dois-pontos quando o valor tem o formato esperado (ex.: "CID F84", "Carteira 4122...") */
@@ -1135,7 +1135,10 @@ function extrairItens(bloco) {
   const ctx = ms.map(lin);
   const descPrimeiro = ms.length > 0 && ctx.every(x => /[A-Za-zÀ-ÿ]{3,}/.test(x.antes) && !/:\s*$/.test(x.antes.trim()) && !x.depois.replace(/[*_.\-–—\s]/g, ''));
   const itens = ms.map((m, k) => {
-    const seg = descPrimeiro ? ctx[k].depois : bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
+    // com a descrição antes do código, a quantidade fica no resto da linha ou nas linhas seguintes, até a linha do próximo código
+    const seg = descPrimeiro
+      ? ctx[k].depois + bloco.slice((bloco.indexOf('\n', m.index) < 0 ? bloco.length : bloco.indexOf('\n', m.index)), k + 1 < ms.length ? bloco.lastIndexOf('\n', ms[k + 1].index - 1) + 1 : bloco.length)
+      : bloco.slice(m.index + 8, k + 1 < ms.length ? ms[k + 1].index : bloco.length);
     let qtd = null, qm = null;
     for (const p of pats) { qm = seg.match(p); if (qm) { qtd = Number(qm[1]); break; } }
     let origem = qtd != null ? 'linha' : null;
