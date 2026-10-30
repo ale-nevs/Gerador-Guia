@@ -1911,6 +1911,10 @@ const OBS_AUTO = {
   'item-menor': { nome: 'Item autorizado com quantidade menor', texto: 'Item {CODIGO}: autorizado com quantidade {QTD_SISTEMA} (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
   'item-qtd': { nome: 'Item com quantidade diferente (maior)', texto: 'Item {CODIGO}: guia com quantidade {QTD_SISTEMA} (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
   'item-extra': { nome: 'Item na guia que não estava no pedido', texto: 'Item {CODIGO}: consta na guia gerada (quantidade {QTD_SISTEMA}) e não estava no pedido.', padrao: true, itens: true },
+  'item-status': { nome: 'Item com status diferente de Liberada', texto: 'Item {CODIGO}: status no sistema {STATUS}.', padrao: true, itens: true },
+  profissional: { nome: 'Médico solicitante diferente', texto: 'Médico solicitante no sistema difere do informado no pedido.', padrao: true },
+  registro: { nome: 'Registro (CRM) diferente', texto: 'Registro do médico no sistema difere do informado no pedido.', padrao: false },
+  dtSolic: { nome: 'Data da solicitação diferente', texto: 'Data da solicitação no sistema difere da data do pedido.', padrao: false },
   guia: { nome: 'Número da guia diferente do digitado', texto: 'Número da guia diferente do digitado.', padrao: true },
   paciente: { nome: 'Nome do beneficiário diferente', texto: 'Nome do beneficiário no sistema difere do informado no pedido.', padrao: true },
   credNome: { nome: 'Credenciado executante diferente', texto: 'Credenciado executante no sistema difere do cadastrado.', padrao: true },
@@ -3628,7 +3632,7 @@ function cfgObsAuto() {
     <label class="lbl" for="oa-${k}">Texto da observação</label><input type="text" id="oa-${k}" data-cfg="obsAuto.${k}.texto" value="${esc(o[k].texto)}"></div>`;
   return `<div class="card">${cabSecao('Observações automáticas')}
     <p class="dica">Quando você usa <b>Ignorar</b> numa divergência da conferência pelos prints, o sistema sugere uma observação para o prestador. Aqui você muda o texto e define se ela já vem <b>marcada</b>. Em qualquer caso, ela só entra na resposta se estiver marcada (a marcação pode ser mudada em cada atendimento).</p>
-    <p class="dica">Campos para os itens: <code>{CODIGO}</code>, <code>{QTD_PEDIDO}</code> e <code>{QTD_SISTEMA}</code>.</p>
+    <p class="dica">Campos para os itens: <code>{CODIGO}</code>, <code>{QTD_PEDIDO}</code>, <code>{QTD_SISTEMA}</code> e <code>{STATUS}</code>.</p>
     <h3>Itens</h3>${Object.entries(OBS_AUTO).filter(([, v]) => v.itens).map(linha).join('')}
     <h3>Campos da guia</h3>${Object.entries(OBS_AUTO).filter(([, v]) => !v.itens).map(linha).join('')}
     <div class="acoes"><button class="btn line" data-act="obsAutoRestaurar">${ic('undo', 'sm')}Restaurar padrões</button></div></div>`;
@@ -3675,6 +3679,7 @@ const PRINTS_GEO = {
   ancora: { x: 307, y: 36, w: 402 },            // barras amarelas "Benef.:" e "Nº Solic." (referência: print 100%)
   guia: [541, 99, 657, 113], credNome: [14, 151, 257, 165], credCgc: [260, 151, 364, 165],
   ident: [48, 301, 160, 317], paciente: [163, 301, 317, 317], cid: [16, 445, 62, 459],
+  profissional: [14, 197, 276, 213], registro: [305, 197, 378, 213], dtSolic: [724, 197, 794, 213],
   faixaGuia: [10, 118, 330, 134], faixaProc: [10, 60, 52, 78],
   linhas: { topo: 88, passo: 18, max: 6, item: [14, 36], cod: [484, 556], qtd: [557, 575] }
 };
@@ -3717,27 +3722,40 @@ async function abrirImagem(file) {
 }
 /* acha as barras amarelas do cabeçalho (255,224,128) e devolve deslocamento e escala em relação ao print de referência */
 function acharAncora(cv) {
-  const W = cv.width, H = Math.min(cv.height, 110), d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
-  const amarelo = i => Math.abs(d[i] - 255) < 14 && Math.abs(d[i + 1] - 224) < 26 && Math.abs(d[i + 2] - 128) < 46;   // tolera a compressão do print
-  const X1 = Math.min(W, 740), lin = new Uint16Array(H);
-  for (let y = 20; y < H; y++) for (let x = 250; x < X1; x++) if (amarelo((y * W + x) * 4)) lin[y]++;
-  let y0 = -1; for (let y = 20; y < H; y++) if (lin[y] >= 100) { y0 = y; break; }      // topo das barras amarelas
+  const W = cv.width, H = Math.min(cv.height, 200), d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  // amarelo das barras (255,224,128), com folga para compressão JPEG e zoom
+  const amarelo = i => Math.abs(d[i] - 255) < 40 && Math.abs(d[i + 1] - 224) < 45 && Math.abs(d[i + 2] - 128) < 70;
+  const lin = new Uint16Array(H);
+  for (let y = 12; y < H; y++) for (let x = 0; x < W; x++) if (amarelo((y * W + x) * 4)) lin[y]++;
+  let y0 = -1; for (let y = 12; y < H; y++) if (lin[y] >= 90) { y0 = y; break; }      // topo das barras amarelas
   if (y0 < 0) return null;
-  const col = new Uint16Array(W);
-  for (let y = y0; y < Math.min(H, y0 + 14); y++) for (let x = 250; x < X1; x++) if (amarelo((y * W + x) * 4)) col[x]++;
-  let x0 = -1, x1 = -1; for (let x = 0; x < W; x++) if (col[x] >= 3) { if (x0 < 0) x0 = x; x1 = x; }
-  if (x0 < 0) return null;
-  let esc = (x1 - x0 + 1) / PRINTS_GEO.ancora.w;
-  if (esc < 0.5 || esc > 3) return null;
-  const xRef = PRINTS_GEO.ancora.x + PRINTS_GEO.ancora.w - 1;
-  if (Math.abs(esc - 1) < 0.04) return { esc: 1, dx: x1 - xRef, dy: y0 - PRINTS_GEO.ancora.y };   // print em 100%: alinha pela borda direita (a esquerda borra na compressão)
-  return { esc, dx: x0 - PRINTS_GEO.ancora.x * esc, dy: y0 - PRINTS_GEO.ancora.y * esc };
+  let y1 = y0; while (y1 + 1 < H && lin[y1 + 1] >= 90) y1++;
+  const alt = y1 - y0 + 1, col = new Uint16Array(W);
+  for (let y = y0; y <= y1; y++) for (let x = 0; x < W; x++) if (amarelo((y * W + x) * 4)) col[x]++;
+  /* extensão horizontal: colunas "fortes" (quase só amarelo); no print comprimido, afrouxa. Franjas de texto (ClearType) são esparsas e ficam de fora. */
+  const medir = (frac, folga, minimo) => {
+    const lim = Math.max(3, Math.round(alt * frac)); let melhor = null, ini = -1, ult = -1;
+    const fecha = () => { if (ini >= 0 && ult - ini + 1 >= minimo && (!melhor || ult - ini > melhor[1] - melhor[0])) melhor = [ini, ult]; };
+    for (let x = 0; x < W; x++) if (col[x] >= lim) { if (ini < 0) ini = ult = x; else if (x - ult <= folga) ult = x; else { fecha(); ini = ult = x; } }
+    fecha(); return melhor;
+  };
+  const ref = PRINTS_GEO.ancora.w;
+  let r = medir(0.7, 26, 40);
+  if (!r || r[1] - r[0] + 1 < ref * 0.6) r = medir(0.4, 12, 40) || r;
+  if (!r || r[1] - r[0] + 1 < ref * 0.6) r = medir(0.3, 12, 30) || r;
+  if (!r) return null;
+  const x0 = r[0], x1 = r[1]; let esc = (x1 - x0 + 1) / ref;
+  if (esc < 0.5 || esc > 3.5) return null;
+  const xRef = PRINTS_GEO.ancora.x + ref - 1;
+  if (Math.abs(esc - 1) < 0.045) esc = 1;                                   // print em 100%
+  return { esc, dx: x1 - xRef * esc, dy: y0 - PRINTS_GEO.ancora.y * esc };   // alinha pela borda direita (a esquerda borra)
 }
 /* recorta uma caixa (em coordenadas do print de referência), amplia, equilibra contraste e inverte se o fundo for escuro */
-function prepararCampo(cv, an, caixa, ampl = 4) {
+function prepararCampo(cv, an, caixa, ampl = 4, opc = {}) {
   const [a, b, c, d] = caixa, s = an.esc;
   const sx = Math.round(an.dx + a * s), sy = Math.round(an.dy + b * s), sw = Math.max(2, Math.round((c - a) * s)), sh = Math.max(2, Math.round((d - b) * s));
-  const o = document.createElement('canvas'); o.width = sw * ampl; o.height = sh * ampl;
+  ampl = ampl / s;   // com zoom do print, amplia menos: o tamanho final do texto fica igual ao do print em 100%
+  const o = document.createElement('canvas'); o.width = Math.max(8, Math.round(sw * ampl)); o.height = Math.max(8, Math.round(sh * ampl));
   const x = o.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
   x.drawImage(cv, sx, sy, sw, sh, 0, 0, o.width, o.height);
   const im = x.getImageData(0, 0, o.width, o.height), p = im.data, n = o.width * o.height, g = new Uint8Array(n);
@@ -3750,9 +3768,11 @@ function prepararCampo(cv, an, caixa, ampl = 4) {
   let wB = 0, sumB = 0, melhor = 0, lim = 128;
   for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = tot - wB; if (!wF) break; sumB += t * hist[t]; const mB = sumB / wB, mF = (sB - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > melhor) { melhor = v; lim = t; } }
   const W = o.width, Hh = o.height, bin = new Uint8Array(n);
-  for (let i = 0; i < n; i++) bin[i] = g[i] > lim ? 255 : 0;
+  // opc.limite desloca o limiar (mais alto = traço mais fino; ajuda quando letras coladas viram uma só); opc.cinza mantém tons de cinza
+  const lim2 = Math.min(250, Math.max(5, lim + (opc.limite || 0)));
+  for (let i = 0; i < n; i++) bin[i] = opc.cinza ? g[i] : (g[i] > lim2 ? 255 : 0);
   // apaga as linhas de grade (colunas/linhas quase inteiras pretas), que o OCR confunde com dígitos
-  const borda = ampl * 3;   // nas bordas do recorte, coluna escura quase inteira é a moldura do campo
+  const borda = Math.round(ampl * 3);   // nas bordas do recorte, coluna escura quase inteira é a moldura do campo
   for (let cx = 0; cx < W; cx++) { let k = 0; for (let cy = 0; cy < Hh; cy++) if (!bin[cy * W + cx]) k++; const lim = (cx < borda || cx >= W - borda) ? 0.75 : 0.93; if (k >= Hh * lim) for (let cy = 0; cy < Hh; cy++) bin[cy * W + cx] = 255; }
   for (let cy = 0; cy < Hh; cy++) { let k = 0; for (let cx = 0; cx < W; cx++) if (!bin[cy * W + cx]) k++; if (k >= W * 0.93) for (let cx = 0; cx < W; cx++) bin[cy * W + cx] = 255; }
   for (let i = 0; i < n; i++) { const v = bin[i]; p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v; p[i * 4 + 3] = 255; }
@@ -3786,34 +3806,96 @@ function limparCid(t) {
 const limparNome = t => semAcento((t || '').toUpperCase()).replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
 
 /* ---------- leitura de um print ---------- */
+/* Cada campo é lido com mais de um preparo da imagem (ampliação, limiar, tons de cinza) até o valor passar na validação do seu formato
+   (ex.: guia = T/S + dígitos; carteira = 15 dígitos + 2 caracteres). Se duas leituras válidas concordam, ou uma válida tem boa confiança, para. */
+const VAR_PADRAO = [{ ampl: 4 }, { ampl: 4, cinza: true }, { ampl: 3, limite: 15 }, { ampl: 5, limite: -15 }, { ampl: 6, cinza: true }, { ampl: 5, cinza: true }, { ampl: 3, cinza: true }, { ampl: 4, limite: 30 }, { ampl: 5, limite: 10 }];
+const VAR_CURTO = [{ ampl: 4 }, { ampl: 4, psm: '13' }, { ampl: 6, psm: '13' }, { ampl: 4, cinza: true }, { ampl: 3, limite: 15, psm: '13' }];
+const VAR_TEXTO = [{ ampl: 4 }, { ampl: 4, cinza: true }];
+const LISTA_NOME = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ .-/&';
+const dataCalendario = v => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v); if (!m) return false; const d = new Date(+m[3], +m[2] - 1, +m[1]); return d.getDate() === +m[1] && d.getMonth() === +m[2] - 1 && +m[3] > 2000; };
+const DEF_GUIA = {
+  guia: { caixa: PRINTS_GEO.guia, lista: 'TS0123456789', norm: limparGuia, valida: v => /^[TS]\d{7,8}$/.test(v) },
+  credNome: { caixa: PRINTS_GEO.credNome, lista: LISTA_NOME + '0123456789', norm: limparNome, variantes: VAR_TEXTO },
+  ident: { caixa: PRINTS_GEO.ident, lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', norm: soAlfaNum, valida: v => cartValida(v) },
+  paciente: { caixa: PRINTS_GEO.paciente, lista: LISTA_NOME, norm: limparNome, variantes: VAR_TEXTO },
+  cid: { caixa: PRINTS_GEO.cid, lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', norm: limparCid, valida: v => /^[A-Z]\d{2,3}$/.test(v) },
+  profissional: { caixa: PRINTS_GEO.profissional, lista: LISTA_NOME, norm: limparNome, variantes: VAR_TEXTO },
+  registro: { caixa: PRINTS_GEO.registro, lista: '0123456789', norm: soDigitos, valida: v => /^\d{3,7}$/.test(v) },
+  dtSolic: { caixa: PRINTS_GEO.dtSolic, lista: '0123456789/', norm: v => (v || '').replace(/[^0-9/]/g, ''), valida: dataCalendario }
+};
+async function lerCampo(cv, an, def) {
+  const vars = def.variantes || (def.valida ? VAR_PADRAO : VAR_TEXTO), norm = def.norm || (x => x), leituras = [];
+  for (const v of vars) {
+    const c = prepararCampo(cv, an, def.caixa, v.ampl, v);
+    if (def.vazioOk && !leituras.length && c.tinta < 0.012) return { valor: '', vazio: true, conf: 100, leituras };
+    const r = await OCR.ler(c.canvas, { psm: v.psm || def.psm || '7', lista: def.lista });
+    const valor = norm(r.texto), valido = def.valida ? !!valor && def.valida(valor) : !!valor;
+    leituras.push({ valor, conf: r.conf, bruto: r.texto, valido, tinta: c.tinta });
+    if (!def.valida) { if (r.conf >= 60 || leituras.length >= vars.length) break; continue; }
+    const validos = leituras.filter(x => x.valido);
+    if (valido && validos.filter(x => x.valor === valor).length >= (def.consenso || 2) + (r.conf >= 75 ? -1 : 0)) break;   // leituras válidas iguais encerram; senão passa por todos os preparos e vence a maioria
+  }
+  const validos = leituras.filter(x => x.valido), pool = validos.length ? validos : leituras;
+  const freq = new Map(); pool.forEach(x => freq.set(x.valor, (freq.get(x.valor) || 0) + 1));
+  const melhor = [...pool].sort((a, b) => (freq.get(b.valor) - freq.get(a.valor)) || (b.conf - a.conf))[0] || { valor: '', conf: 0, bruto: '' };
+  return { valor: melhor.valor, bruto: melhor.bruto, conf: melhor.conf, incerto: def.valida ? !validos.length : melhor.conf < 50, leituras };
+}
+/* acerta o alinhamento fino da grade de procedimentos (±3 px) procurando as linhas escuras da tabela */
+function refinarGrade(cv, an) {
+  const L = PRINTS_GEO.linhas, W = cv.width, H = cv.height, d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const esc = an.esc, lum = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return 255; const i = (y * W + x) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
+  let melhor = null;
+  for (let ddy = -3; ddy <= 3; ddy++) for (let ddx = -3; ddx <= 3; ddx++) {
+    let sc = 0;
+    for (let k = 0; k <= L.max; k++) { const y = Math.round(an.dy + (L.topo + L.passo * k) * esc) + ddy; for (let xr = 488; xr <= 552; xr += 2) sc += 255 - lum(Math.round(an.dx + xr * esc) + ddx, y); }
+    for (const xr of [483, 556]) for (let yr = 90; yr <= 190; yr += 2) sc += 255 - lum(Math.round(an.dx + xr * esc) + ddx, Math.round(an.dy + yr * esc) + ddy);
+    sc -= (Math.abs(ddx) + Math.abs(ddy)) * 40;
+    if (!melhor || sc > melhor.sc) melhor = { sc, ddx, ddy };
+  }
+  return { ...an, dx: an.dx + melhor.ddx, dy: an.dy + melhor.ddy, nota: melhor.sc / ((L.max + 1) * 33 + 2 * 51) / 255 };   // nota = quão parecida com a grade de procedimentos é a imagem (0 a 1)
+}
+/* cor da célula "ST" da linha: L liberada (verde), C cancelada (ciano), N negada (vermelho), A aberta (amarelo) */
+function statusLinha(cv, an, y0) {
+  const [a, b, c, d] = [599, y0 + 4, 610, y0 + 15], s = an.esc, sx = Math.round(an.dx + a * s), sy = Math.round(an.dy + b * s), sw = Math.max(2, Math.round((c - a) * s)), sh = Math.max(2, Math.round((d - b) * s));
+  const px = cv.getContext('2d', { willReadFrequently: true }).getImageData(sx, sy, sw, sh).data; let r = 0, g = 0, bl = 0, n = 0;
+  for (let i = 0; i < px.length; i += 4) { const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]); if (mx - mn > 140 && mx > 180) { r += px[i]; g += px[i + 1]; bl += px[i + 2]; n++; } }
+  if (n < 8) return '';
+  r /= n; g /= n; bl /= n;
+  if (g > 180 && r < 100 && bl < 100) return 'L';
+  if (g > 180 && bl > 180 && r < 100) return 'C';
+  if (r > 180 && g < 100 && bl < 100) return 'N';
+  if (r > 180 && g > 180 && bl < 100) return 'A';
+  return '?';
+}
 async function lerPrintTela(file, aviso) {
-  const cv = await abrirImagem(file), an = acharAncora(cv);
+  const cv = await abrirImagem(file); let an = acharAncora(cv);
   if (!an) return { erro: 'Não reconheci a tela "Liberação de Senhas" neste print (não achei as barras amarelas do topo).' };
   await OCR.iniciar(aviso);
-  const G = PRINTS_GEO, ler = async (caixa, opc) => { const c = prepararCampo(cv, an, caixa); return { ...(await OCR.ler(c.canvas, opc)), tinta: c.tinta, vazio: c.vazio }; };
-  const faixa = (await ler(G.faixaGuia, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ' })).texto;
+  const G = PRINTS_GEO;
+  const faixa = (await lerCampo(cv, an, { caixa: G.faixaGuia, lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ', variantes: [{ ampl: 4 }] })).bruto || '';
   let tipo = /credenc|executant/i.test(faixa) ? 'guia' : null;
-  if (!tipo) { const t = (await ler(G.faixaProc, { lista: 'ItemtemIT' })).texto; if (/item|tem/i.test(t)) tipo = 'proc'; }
+  if (!tipo) { const t = (await lerCampo(cv, an, { caixa: G.faixaProc, lista: 'ItemtemIT', variantes: [{ ampl: 4 }] })).bruto || ''; if (/item|tem/i.test(t)) tipo = 'proc'; }
+  if (!tipo) {   // plano B: a grade de procedimentos tem muitas linhas escuras em posições fixas; a aba "Dados da Guia" não
+    const nota = refinarGrade(cv, an).nota;
+    if (nota >= 0.33) tipo = 'proc'; else if (nota <= 0.29) tipo = 'guia';
+  }
   if (!tipo) return { erro: 'Esse print não parece ser a aba "Dados da Guia" nem "Procedimentos".' };
   const crops = {};
   if (tipo === 'guia') {
     const campos = {};
-    const def = [['guia', G.guia, { lista: 'TS0123456789' }, limparGuia], ['credNome', G.credNome, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-/&' }, limparNome],
-      ['ident', G.ident, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }, soAlfaNum], ['paciente', G.paciente, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' }, limparNome], ['cid', G.cid, { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }, limparCid]];
-    for (const [k, caixa, opc, fn] of def) { const r = await ler(caixa, opc); campos[k] = { valor: fn(r.texto), bruto: r.texto, conf: r.conf }; crops[k] = miniatura(cv, an, caixa); }
+    for (const [k, def] of Object.entries(DEF_GUIA)) { const r = await lerCampo(cv, an, def); campos[k] = { valor: r.valor, bruto: r.bruto, conf: r.conf, incerto: r.incerto }; crops[k] = miniatura(cv, an, def.caixa); }
     return { tipo, campos, crops };
   }
-  // números curtos: linha normal primeiro; se não vier nada (um "1" isolado), tenta o modo de linha crua
-  const lerCurto = async caixa => { let r = await ler(caixa, { lista: '0123456789' }); if (!soDigitos(r.texto) && !r.vazio) { const r2 = await ler(caixa, { psm: '13', lista: '0123456789' }); if (soDigitos(r2.texto)) r = r2; } return r; };
+  an = refinarGrade(cv, an);
   const L = G.linhas, itens = [];
   for (let i = 0; i < L.max; i++) {
-    const y0 = L.topo + L.passo * i, y1 = y0 + L.passo, cx = [L.cod[0], y0 + 3, L.cod[1], y1 - 2];
-    const pre = prepararCampo(cv, an, cx);
-    if (pre.tinta < 0.015) continue;   // linha vazia
-    const cod = await ler(cx, { lista: '0123456789' }), qtd = await lerCurto([L.qtd[0], y0 + 3, L.qtd[1], y1 - 2]), num = await lerCurto([L.item[0], y0 + 3, L.item[1], y1 - 2]);
-    let codigo = soDigitos(cod.texto); if (codigo.length > 8) codigo = codigo.slice(-8);
-    if (codigo.length < 5 && !soDigitos(num.texto)) continue;
-    itens.push({ fila: i, n: Number(soDigitos(num.texto)) || null, codigo, qtd: soDigitos(qtd.texto) === '' ? null : Number(soDigitos(qtd.texto)), conf: Math.min(cod.conf, qtd.conf),
+    const y0 = L.topo + L.passo * i, y1 = y0 + L.passo;
+    const cod = await lerCampo(cv, an, { caixa: [L.cod[0], y0 + 3, L.cod[1], y1 - 2], lista: '0123456789', norm: v => { const t = soDigitos(v); return t.length > 8 ? t.slice(-8) : t; }, valida: v => /^\d{8}$/.test(v), vazioOk: true, variantes: VAR_PADRAO });
+    if (cod.vazio) continue;
+    const qtd = await lerCampo(cv, an, { caixa: [L.qtd[0], y0 + 3, L.qtd[1], y1 - 2], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,2}$/.test(v) && +v >= 1, variantes: VAR_CURTO });
+    const num = await lerCampo(cv, an, { caixa: [L.item[0], y0 + 3, L.item[1], y1 - 2], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,2}$/.test(v) && +v >= 1, variantes: VAR_CURTO });
+    if (cod.valor.length < 5 && !num.valor) continue;
+    itens.push({ fila: i, n: Number(num.valor) || null, codigo: cod.valor, qtd: qtd.valor === '' ? null : Number(qtd.valor), st: statusLinha(cv, an, y0), conf: Math.min(cod.conf, qtd.conf), incerto: cod.incerto || qtd.incerto,
       img: miniatura(cv, an, [L.cod[0] - 2, y0 + 2, L.qtd[1] + 2, y1 - 1], 2) });
   }
   // numeração: as linhas são consecutivas; vale o deslocamento mais frequente entre o nº lido e a posição na grade
@@ -3852,7 +3934,8 @@ function nomeConfere(ped, lido) {
   return { ok: true, exato: false };
 }
 const prefixo = (a, b) => { a = limparNome(a).replace(/ /g, ''); b = limparNome(b).replace(/ /g, ''); return a.length >= 8 && b.length >= 8 && (a.startsWith(b) || b.startsWith(a)); };
-const ROT_PRINT = { guia: 'Nº da guia', paciente: 'Nome do paciente', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
+const ST_ROT = { L: 'Liberada', C: 'Cancelada', N: 'Negada', A: 'Aberta', '?': 'status não reconhecido' };
+const ROT_PRINT = { profissional: 'Médico solicitante', registro: 'Registro do médico (CRM)', dtSolic: 'Data da solicitação', guia: 'Nº da guia', paciente: 'Nome do paciente', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
 
 function avaliarPrints(g) {
   const mem = PRINTS_MEM.get(g.id); if (!mem) return null;
@@ -3884,15 +3967,28 @@ function avaliarPrints(g) {
     if (!ped) add('cid', '—', lido, 'info', 'Pedido sem CID.');
     else { const ok = lido === ped || lido.startsWith(ped) || ped.startsWith(lido); add('cid', ped, lido, ok ? 'ok' : 'bad', ok ? '' : 'CID diferente do pedido.'); }
   }
+  if (campos.profissional) {
+    const ped = p.medico.nome || '', lido = campos.profissional.valor, nc = nomeConfere(ped, lido), s = similaridade(ped, lido);
+    add('profissional', ped || '—', lido, !ped ? 'info' : (nc.ok || s >= 0.93) ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? 'Pedido sem nome do médico.' : nc.exato ? '' : nc.ok ? 'Confere pelos 3 primeiros nomes, sem acentos.' : s >= 0.8 ? 'Quase igual: veja a imagem.' : 'Médico diferente do pedido.');
+  }
+  if (campos.registro) {
+    const sz = x => (x || '').replace(/\D/g, '').replace(/^0+/, ''), ped = sz(p.medico.crm), lido = sz(campos.registro.valor);
+    add('registro', p.medico.crm || '—', campos.registro.valor, !ped ? 'info' : ped === lido ? 'ok' : (distancia(ped, lido) === 1 ? 'warn' : 'bad'), !ped ? 'Pedido sem CRM.' : ped === lido ? '' : distancia(ped, lido) === 1 ? 'Um dígito diferente: pode ser leitura da imagem.' : 'Registro diferente do pedido.');
+  }
+  if (campos.dtSolic) {
+    const em = p.emissao, lido = campos.dtSolic.valor, ped = em.estado === 'valida' ? fmtData(em.data) : '';
+    add('dtSolic', ped || (em.estado === 'sem_data' ? 'SEM DATA' : '—'), lido, !ped ? 'info' : ped === lido ? 'ok' : 'bad', !ped ? 'Pedido sem data para comparar.' : ped === lido ? '' : 'Data diferente da data do pedido.');
+  }
   // itens: pedido × sistema
   const sis = [...itensSis.values()].sort((a, b) => (a.n || 99) - (b.n || 99));
   const usados = new Set(), linhas = [];
   p.itens.forEach(it => {
     const i = sis.findIndex((s, k) => !usados.has(k) && s.codigo === it.codigo); if (i >= 0) usados.add(i);
-    const s = i >= 0 ? sis[i] : null, qOk = s && s.qtd === it.qtd;
-    linhas.push({ codigo: it.codigo, qPed: it.qtd, qSis: s ? s.qtd : null, img: s ? s.img : null, st: !s ? 'bad' : qOk ? 'ok' : 'bad', nota: !s ? 'Não aparece nos prints.' : qOk ? '' : 'Quantidade diferente.' });
+    const s = i >= 0 ? sis[i] : null, qOk = s && s.qtd === it.qtd, stOk = !s || !s.st || s.st === 'L';
+    linhas.push({ codigo: it.codigo, qPed: it.qtd, qSis: s ? s.qtd : null, stSis: s ? s.st : '', img: s ? s.img : null, st: !s ? 'bad' : !qOk ? 'bad' : stOk ? 'ok' : 'warn',
+      nota: !s ? 'Não aparece nos prints.' : !qOk ? 'Quantidade diferente.' : stOk ? '' : 'Status no sistema: ' + (ST_ROT[s.st] || s.st) + '.' });
   });
-  sis.forEach((s, k) => { if (!usados.has(k)) linhas.push({ codigo: s.codigo, qPed: null, qSis: s.qtd, img: s.img, st: 'bad', nota: 'Está no sistema e não está no pedido.' }); });
+  sis.forEach((s, k) => { if (!usados.has(k)) linhas.push({ codigo: s.codigo, qPed: null, qSis: s.qtd, stSis: s.st, img: s.img, st: 'bad', nota: 'Está no sistema e não está no pedido.' }); });
   const temProc = mem.leituras.some(l => l.tipo === 'proc'), temGuia = mem.leituras.some(l => l.tipo === 'guia');
   const faltam = linhas.filter(l => l.nota === 'Não aparece nos prints.').length, sobram = linhas.filter(l => l.nota.startsWith('Está')).length, qtdDif = linhas.filter(l => l.nota === 'Quantidade diferente.').length;
   const avisos = [];
@@ -3920,10 +4016,11 @@ function linhaIgnorada(x) {
   if (x.chave.startsWith('i:')) {
     if (x.nota === 'Não aparece nos prints.') { key = 'item-ausente'; t = 'menor'; }
     else if (x.nota === 'Quantidade diferente.') { const menor = x.qSis != null && x.qPed != null && x.qSis < x.qPed; key = menor ? 'item-menor' : 'item-qtd'; t = menor ? 'menor' : 'ign'; }
+    else if (/^Status no sistema/.test(x.nota)) { key = 'item-status'; t = 'ign'; }
     else key = 'item-extra';
   } else key = x.chave.slice(2);
   const o = (cfg.obsAuto && cfg.obsAuto[key]) || OBS_AUTO[key] || { texto: x.rot + ': diferente do pedido.', padrao: true };
-  const linha = o.texto.replace(/\{CODIGO\}/g, x.codigo || '').replace(/\{QTD_PEDIDO\}/g, x.qPed ?? '—').replace(/\{QTD_SISTEMA\}/g, x.qSis ?? '—');
+  const linha = o.texto.replace(/\{CODIGO\}/g, x.codigo || '').replace(/\{QTD_PEDIDO\}/g, x.qPed ?? '—').replace(/\{QTD_SISTEMA\}/g, x.qSis ?? '—').replace(/\{STATUS\}/g, (ST_ROT[x.stSis] || x.stSis || '').toLowerCase());
   return { t, key, linha, on: o.padrao !== false };
 }
 function sincronizarObsPrints(g) {
@@ -3989,7 +4086,7 @@ function htmlCartaoPrints(g) {
     </tbody></table></div>
     <h3>Itens: pedido × sistema (${av.nPedido} no pedido, ${av.nSistema} nos prints)</h3>
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Código</th><th>Qtd. pedido</th><th>Qtd. no sistema</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
-      ${av.linhas.map(l => `<tr><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
+      ${av.linhas.map(l => `<tr><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}${l.stSis ? `<div class="dica">${esc(ST_ROT[l.stSis] || l.stSis)}</div>` : ''}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
     </tbody></table></div>
     <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button></div>` : '';
   return `<div class="card" id="cartaoPrints">

@@ -113,12 +113,15 @@ No topo do site há um ícone de download: ele baixa a extensão (`public/extens
 
 ### Conferência pelos prints (etapa 3)
 No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de Senhas" do sistema oficial, por OCR no próprio navegador (arquivos em `public/ocr/`, sem IA externa e sem enviar imagens).
-- **Colar:** copie o print da aba *Dados da Guia* e o da aba *Procedimentos* e use Ctrl+V, ou o botão **Colar print** (também aceita escolher ou arrastar arquivos). Se houver mais de 6 itens, cole um print rolado até o fim. A leitura usa a posição fixa dos campos (âncora nas barras amarelas do topo) e funciona com prints em 100%.
-- **O que confere:** nº da guia, nome do paciente, credenciado executante, carteira (identificação), CID e, item a item, código e quantidade × pedido. Cada valor lido aparece com o recorte da imagem para você ver.
+- **Colar:** copie o print da aba *Dados da Guia* e o da aba *Procedimentos* e use Ctrl+V, ou o botão **Colar print** (também aceita escolher ou arrastar arquivos). Se houver mais de 6 itens, cole um print rolado até o fim. A leitura usa a posição fixa dos campos (âncora nas barras amarelas do topo, com ajuste fino pela grade) e funciona com prints em 100%, com margem ou deslocados, e com zoom de 125% a 150%; compressão forte (JPEG) pode derrubar a precisão.
+- **O que confere:** nº da guia, nome do paciente, credenciado executante, carteira (identificação), CID, **médico solicitante, registro (CRM) e data da solicitação** e, item a item, código, quantidade e **status** (só "Liberada" é aceita sem aviso; Negada, Cancelada ou Aberta viram alerta) × pedido. Cada campo é lido com vários preparos da imagem até passar na validação do seu formato (ex.: carteira = 15 dígitos + 2 caracteres), e vale a maioria. Cada valor lido aparece com o recorte da imagem para você ver.
 - **Número da guia:** vai sozinho para a etapa 4 (aceita T ou S + 7 ou 8 dígitos).
 - **Ignorar:** ao lado de "Diverge" (e "Conferir") o botão **Ignorar** aceita a divergência: o item com quantidade menor vira "Autorizado a menor", os demais "Ignorado". A conferência passa com ressalva e a etapa 4 mostra um alerta para detalhar o motivo, sem bloquear. **Desfazer** reverte. Cada divergência ignorada gera uma **observação sugerida, com caixa de seleção** ("Incluir na observação ao prestador"): marcada, entra nas observações adicionais da resposta (sem nome, CID ou carteira, só o texto configurado). Vêm marcadas por padrão as de itens, número da guia, nome e credenciado; vêm **desmarcadas** as de CID e de carteira incorreta. Os textos e a marcação padrão mudam em Configurações > **Observações automáticas**.
 - Sem prints: o botão "conferir a grade manualmente (conferência cega)" continua disponível.
 - O recurso precisa do site publicado (não funciona abrindo o arquivo direto) e baixa cerca de 14 MB de arquivos de leitura na primeira vez.
+
+### Leitura do e-mail
+Além do formato com rótulos (Beneficiário:, Carteira:, Serviço: ...), o app lê pedidos em **texto livre** (uma linha "NOME  CARTEIRA  CÓDIGO  DESCRIÇÃO" e linhas soltas com CRM, médico, CID, data e local em qualquer ordem), inclusive vários pacientes sem rótulos. Também reconhece "Dr./Dra." antes do médico, datas por extenso e sem ano (o ano é deduzido pela data do e-mail, com alerta), código com dígito a mais ou a menos (sugere o código cadastrado mais parecido), CID fora do padrão e e-mails que não parecem pedido.
 
 ### Visões do Painel
 Dia, **Semana** (segunda a domingo) e Mês. A coluna Clínica mostra quem gerou a guia.
