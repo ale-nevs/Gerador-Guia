@@ -952,7 +952,7 @@ function htmlParaTexto(html) {
         if (c.tagName === 'BR') { s += '\n'; continue; }
         const b = bloco.test(c.tagName);
         if (b) s += '\n';
-        if (c.tagName === 'TD' || c.tagName === 'TH') s += ' ';
+        if (c.tagName === 'TD' || c.tagName === 'TH') s += (c.previousElementSibling ? '\t' : '');   // células separadas por tabulação: o leitor reconstrói a tabela
         andar(c);
         if (b) s += '\n';
       }
@@ -1122,8 +1122,8 @@ function extrairItens(bloco) {
   const ms = [...bloco.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].filter(m => !ehData(m[1]));
   const SEM_FREQ = '(?!\\s*(?:por|\\/|ao|na)\\s*(?:semana|m[eê]s|dia))';
   const pats = [
+    /(?<!\d)(\d{1,2})\s*[x×]\s*(?:por|\/|na|ao)\s*semana/i,   // "10 sessões - 03 x por semana": vale a frequência semanal, mesmo com "Quantidade: 10" antes
     /\(?\s*(?:quantidades?|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
-    /(?<!\d)(\d{1,2})\s*[x×]\s*(?:por|\/|na|ao)\s*semana/i,   // "10 sessões - 03 x por semana": vale a frequência semanal
     /(?<!\d)(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o)|vezes|atendimentos?|consultas?)\b/i,
     new RegExp('(?:^|\\s)[x×]\\s*(\\d{1,2})(?!\\d)' + SEM_FREQ, 'i'),
     new RegExp('(?<!\\d)(\\d{1,2})\\s*[x×](?=\\s|$)' + SEM_FREQ, 'i'),
@@ -1246,7 +1246,7 @@ function lerPedido(texto, referencia) {
   p.local = primeiraLinha(de('local')[0]);
   p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
   const aplicarQtd = (lista, qsec) => {
-    const q = (primeiraLinha(qsec).match(/\d+/) || [null])[0];
+    const lq = primeiraLinha(qsec), q = ((lq.match(/(?<!\d)(\d{1,2})\s*[x×]\s*(?:por|\/|na|ao)\s*semana/i) || lq.match(/\d+/) || [null, null])[1] ?? (lq.match(/\d+/) || [null])[0]);   // "10 sessões - 3 x por semana": vale o 3
     const sem = lista.filter(it => it.qtd == null);
     if (q != null && sem.length) { sem.forEach(it => { it.qtd = Number(q); it.origemQtd = 'campo'; }); if (sem.length > 1) p.qtdUnicaAplicada = true; qsec.usada = true; }
   };
@@ -1307,7 +1307,48 @@ function dividirPor(linhas, ks, tipos, cabecalhoCompartilhado) {
   const cab = linhas.slice(0, inicios[0]);
   return { cab, blocos: inicios.map((ini, j) => linhas.slice(ini, j + 1 < inicios.length ? inicios[j + 1] : linhas.length)) };
 }
+/* ---------- Tabelas (e-mail em HTML): as células chegam separadas por tabulação ---------- */
+const ROT_CANON = { beneficiario: 'Beneficiário', carteira: 'Carteira', servico: 'Serviço', quantidade: 'Quantidade', medico: 'Médico', cid: 'CID', emissao: 'Emissão', local: 'Local', obs: 'Obs' };
+function rotuloDeCelula(cel) {
+  const n = normUnidades(cel.replace(/[*_]/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/^[^\p{L}\p{N}]*/u, '').trim());
+  if (/^especialidades?\b|^terapias?\b/.test(n)) return 'servico';
+  if (/^sess(oes|ao)(\s+por\s+semana)?\b|^quant|^qtd|^qtde/.test(n)) return 'quantidade';
+  for (const [k, re] of ROTULOS) if (re.test(n)) return k;
+  return null;
+}
+function converterTabelas(texto) {
+  const L = texto.split('\n'); if (!L.some(l => l.includes('\t'))) return texto;
+  const out = [], compartilhados = []; let i = 0, haPacientes = false;
+  while (i < L.length) {
+    if (!L[i].includes('\t')) { out.push(L[i]); i++; continue; }
+    const rows = []; let j = i;
+    while (j < L.length && (L[j].includes('\t') || (!L[j].trim() && j + 1 < L.length && L[j + 1].includes('\t')))) { if (L[j].trim()) rows.push(L[j].split('\t').map(c => c.trim())); j++; }
+    i = j;
+    // um grupo de linhas com tabulação pode juntar várias tabelas: uma linha só de nomes de coluna abre uma nova tabela
+    const ehCab = r => r.filter(Boolean).length >= 2 && r.filter(Boolean).every(c => rotuloDeCelula(c));
+    const tabelas = []; rows.forEach((r, k) => { if (!tabelas.length || (k > 0 && ehCab(r))) tabelas.push([]); tabelas[tabelas.length - 1].push(r); });
+    for (const tab of tabelas) {
+      const vertical = tab.length && tab.every(r => r.length === 2) && rotuloDeCelula(tab[0][0]) && !ehCab(tab[0]);
+      if (vertical) { tab.forEach(r => out.push(`${r[0]}: ${r[1]}`)); continue; }
+      const cab = tab[0].map(rotuloDeCelula);
+      if (cab.filter(Boolean).length < 2 && !cab.some(k => k === 'carteira' || k === 'beneficiario')) { tab.forEach(r => out.push(r.filter(Boolean).join('   '))); continue; }
+      const temPac = cab.includes('beneficiario') || cab.includes('carteira');
+      const blocos = tab.slice(1).filter(r => r.some(Boolean)).map(r => r.map((c, k) => c ? (cab[k] ? `${ROT_CANON[cab[k]]}: ${c}` : c) : '').filter(Boolean));
+      if (temPac) { haPacientes = true; blocos.forEach(b => { out.push(...b); out.push('-----'); }); }
+      else blocos.forEach(b => compartilhados.push(...b));
+    }
+  }
+  if (compartilhados.length) {   // tabela só de serviços: vale para todos os pacientes da tabela anterior; o que vem depois da última tabela é rodapé comum
+    if (!haPacientes) return [...out, ...compartilhados].join('\n');
+    const blocos = []; let atual = [];
+    out.forEach(l => { if (l === '-----') { blocos.push(atual); atual = []; } else atual.push(l); });
+    const rodape = atual.filter(x => x.trim());
+    return blocos.map(b => [...b, ...compartilhados].join('\n')).join('\n-----\n') + (rodape.length ? '\n-----\n' + rodape.join('\n') : '');
+  }
+  return out.join('\n');
+}
 function lerPedidos(texto, referencia) {
+  texto = converterTabelas(texto);
   const L = texto.split('\n').flatMap(explodirLinha);
   /* 1) separadores explícitos (linhas de traços, "Paciente 2") */
   const comDados = [], compartilhado = [];
