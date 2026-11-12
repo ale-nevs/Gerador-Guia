@@ -478,7 +478,7 @@ pre.simples{white-space:pre-wrap;font-family:var(--font-sans);margin:0}
 .aviso-simples{display:flex;gap:8px;align-items:flex-start;background:var(--info-bg);color:var(--info-fg);border:1px solid var(--info-br);border-radius:var(--r-sm);padding:9px 12px;font-size:var(--fs-sm)}
 
 /* ===== Configurações ===== */
-.cfg{display:grid;grid-template-columns:250px minmax(0,1fr);gap:10px;align-items:start}
+.cfg{display:grid;grid-template-columns:250px minmax(0,1fr);gap:10px;align-items:start;padding-bottom:76px}   /* espaço para a barra de salvar, fixa no rodapé da tela */
 @media (max-width:900px){.cfg{grid-template-columns:1fr}}
 .cfg-nav{position:sticky;top:76px;display:flex;flex-direction:column;gap:2px;padding:8px}
 @media (max-width:900px){.cfg-nav{position:static;flex-direction:row;overflow-x:auto}.cfg-nav button{white-space:nowrap}}
@@ -486,7 +486,7 @@ pre.simples{white-space:pre-wrap;font-family:var(--font-sans);margin:0}
 .cfg-nav button:hover{background:var(--surface-2);color:var(--text)}
 .cfg-nav button.ativo{background:var(--soft);color:var(--soft-fg)}
 .cfg-nav button:focus-visible{outline:2px solid var(--focus)}
-.cfg-barra{position:sticky;bottom:0;z-index:20;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 -4px 14px rgba(0,0,0,.08)}
+.cfg-barra{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);width:min(1552px,calc(100% - 24px));z-index:20;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 -4px 14px rgba(0,0,0,.08)}
 .cfg-barra .esp{flex:1}
 .erros-cfg{background:var(--bad-bg);color:var(--bad-fg);border:1px solid var(--bad-br);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:12px;font-size:var(--fs-sm)}
 .erros-cfg ul{margin:6px 0 0;padding-left:20px}
@@ -571,6 +571,8 @@ pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
 input[type=text][data-teste^="p:"],input[type=text][data-teste^="e:"]{min-width:240px}
 img.mini.tst-img{max-width:min(520px,60vw);max-height:none;height:auto}
 .cfg-barra[hidden]{display:none}
+@media (min-width:640px){.cfg-barra{width:min(1552px,calc(100% - 48px))}}
+body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra de salvar */
 .t tr.tst-errado td.pri{color:var(--bad-fg)}
 .regras-cl{display:grid;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface-2)}
 </style>
@@ -3604,6 +3606,9 @@ async function renderConfig(app) {
   if (!cfgEdit) iniciarCfgEdit();
   if (cfgSecao === 'param') await Param.carregar();
   const nErr = cfgErros.length;
+  // redesenhar não pode mover a tela: guarda rolagem da página, da lista de clínicas e dos filtros, e devolve depois
+  const ant = $('.cfg') ? { y: scrollY, secao: renderConfig.secao, clin: renderConfig.clin, lista: ($('#listaCl') || {}).scrollTop || 0, cod: ($('#tabCod') && $('#tabCod').closest('.tabela-scroll') || {}).scrollTop || 0, nav: ($('.cfg-nav') || {}).scrollLeft || 0, bCl: ($('#buscaCl') || {}).value || '', bCod: ($('#buscaCod') || {}).value || '' } : null;
+  renderConfig.secao = cfgSecao; renderConfig.clin = cfgClinicaSel;
   app.innerHTML = `<div class="cfg"><nav class="card cfg-nav" aria-label="Seções de configuração">${CFG_SECOES.map(([k, i, t]) => `<button data-act="cfgSecao" data-s="${k}" class="${cfgSecao === k ? 'ativo' : ''}" ${cfgSecao === k ? 'aria-current="true"' : ''}>${ic(i)}${t}</button>`).join('')}</nav>
     <div id="cfgCorpo">${nErr ? `<div class="erros-cfg" role="alert"><b>${ic('alert', 'sm')} Não foi possível salvar. Corrija os itens abaixo:</b><ul>${cfgErros.map(e => `<li>${esc(e.m)} <a href="#" data-act="cfgSecao" data-s="${e.s}">(ir para ${esc(CFG_SECOES.find(x => x[0] === e.s)[2])})</a></li>`).join('')}</ul></div>` : ''}${htmlCfgSecao()}</div></div>
     <div class="cfg-barra" id="cfgBarra" ${cfgSecao === 'testes' ? 'hidden' : ''}><span id="cfgEstado"></span><span class="esp"></span>
@@ -3611,6 +3616,19 @@ async function renderConfig(app) {
       <button class="btn pri" id="cfgSalvar" data-act="salvarCfg">${ic('save')}Salvar configurações</button></div>`;
   atualizarBarraCfg();
   if (cfgSecao === 'modelos' || cfgSecao === 'obs' || cfgSecao === 'param') montarEditorModelo();
+  if (ant) {
+    const nav = $('.cfg-nav'); if (nav) nav.scrollLeft = ant.nav;
+    if (ant.secao === cfgSecao) {
+      const filtrar = (sel, v) => { const el = $(sel); if (el && v) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+      filtrar('#buscaCl', ant.bCl);
+      const l = $('#listaCl'); if (l) l.scrollTop = ant.lista;
+      if (ant.clin === cfgClinicaSel) { filtrar('#buscaCod', ant.bCod); const tc = $('#tabCod') && $('#tabCod').closest('.tabela-scroll'); if (tc) tc.scrollTop = ant.cod; }
+      window.scrollTo(0, ant.y);
+    } else {   // outra seção: fica onde está, só sobe até o começo das configurações se a tela estiver abaixo dele
+      const topo = $('.cfg').getBoundingClientRect().top + scrollY - 80;
+      window.scrollTo(0, Math.min(ant.y, Math.max(0, topo)));
+    }
+  }
 }
 function htmlCfgSecao() {
   switch (cfgSecao) {
@@ -4708,7 +4726,7 @@ const acoes = {
   },
   conciliarGuias() { conciliarGuias(); },
   /* ---- configurações: navegação e salvamento ---- */
-  cfgSecao(b) { cfgSecao = b.dataset.s; render(); window.scrollTo(0, 0); },
+  cfgSecao(b) { cfgSecao = b.dataset.s; render(); },
   async salvarCfg() {
     prepararSalvar(cfgEdit); cfgErros = validarCfg(cfgEdit);
     if (cfgErros.length) { await render(); window.scrollTo(0, 0); toast(`${cfgErros.length} problema(s) encontrado(s). Nada foi salvo.`, 'bad'); return; }
