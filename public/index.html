@@ -3663,7 +3663,7 @@ function cfgClinicas() {
   const cl = cls[cfgClinicaSel];
   return `<div class="card">${cabSecao(`Clínicas e cadastros (${cls.length})`, 'Informações usadas para reconhecer o remetente, preencher o credenciado executante e mostrar a descrição oficial de cada código. Campos sem informação ficam vazios: nada é preenchido por suposição.')}
   <div class="mestre"><div>
-    <div class="linha-flex"><div class="busca" style="flex:1;min-width:150px"><span class="sr"><label for="buscaCl">Buscar clínica</label></span>${ic('search', 'sm')}<input type="search" id="buscaCl" placeholder="Nome, cidade, e-mail ou código" data-filtro="cl"></div><button class="btn sm pri" data-act="clNova">${ic('plus', 'sm')}Nova clínica</button></div>
+    <div class="linha-flex"><div class="busca" style="flex:1;min-width:150px"><span class="sr"><label for="buscaCl">Buscar clínica</label></span>${ic('search', 'sm')}<input type="search" id="buscaCl" placeholder="Nome, cidade, e-mail ou código" data-filtro="cl"></div><button class="btn sm pri" data-act="clNova">${ic('plus', 'sm')}Nova clínica</button><button class="btn sm line" data-act="clImportar" title="Cola a lista de clínicas da planilha (nome, cidade e e-mails)">${ic('upload', 'sm')}Importar lista</button></div>
     <div class="lista-cl" id="listaCl">${cls.map((c, i) => `<button class="cl-item idc ${corClinica(c)} ${i === cfgClinicaSel ? 'ativa' : ''}" data-act="clSel" data-i="${i}" data-busca="${esc(norm([c.nome, c.cidade, c.emails.join(' '), Object.keys(c.codigos || {}).join(' '), c.apelidos].join(' ')))}"><span class="sq">${esc(iniciais(c.nome))}</span><span><span class="n" data-eco="clinicas.${i}.nome">${esc(c.nome || 'Sem nome')}</span><br><span class="s">${esc(c.cidade || 'Cidade não informada')} · ${c.emails.length} e-mail(s) · ${c._lista.filter(x => x.c).length} código(s)</span></span></button>`).join('') || '<p class="muted">Nenhuma clínica cadastrada.</p>'}</div>
   </div>
   <div>${cl ? cfgClinicaDetalhe(cl, cfgClinicaSel) : '<div class="vazio"><h2>Nenhuma clínica selecionada</h2><p>Cadastre a primeira clínica para começar.</p><button class="btn pri" data-act="clNova">' + ic('plus') + 'Nova clínica</button></div>'}</div></div></div>`;
@@ -5243,6 +5243,82 @@ document.addEventListener('drop', async e => {
   if (z.id === 'zonaTstPrint') { const fs = [...e.dataTransfer.files].filter(f => /^image\//.test(f.type)); if (fs.length) testarPrints(fs); return; }
   const lista = []; for (const f of [...e.dataTransfer.files].filter(f => /\.eml$/i.test(f.name) || f.type === 'message/rfc822')) { try { lista.push({ nome: f.name, email: lerEml(await f.arrayBuffer()) }); } catch (er) { toast('Não consegui ler ' + f.name, 'bad'); } }
   if (lista.length) testarEmails(lista);
+});
+
+/* ---------- Importar lista de clínicas (colada de planilha): nome, cidade e e-mails; junta com o cadastro sem duplicar ---------- */
+const CIDADES_BA = ['Salvador', 'Lauro De Freitas', 'Camaçari', 'Simões Filho', 'Candeias', 'Dias D\'Ávila', 'Feira De Santana', 'Alagoinhas', 'Barreiras', 'Jequié', 'Vitória Da Conquista', 'Paulo Afonso', 'Santo Antônio De Jesus', 'Entre Rios', 'Ilhéus', 'Itabuna', 'Juazeiro', 'Teixeira De Freitas', 'Porto Seguro', 'Eunápolis', 'Jacobina', 'Irecê', 'Guanambi', 'Brumado', 'Valença', 'Cruz Das Almas', 'Senhor Do Bonfim', 'Itapetinga', 'Serrinha', 'Conceição Do Coité', 'Santo Amaro', 'Catu', 'Pojuca', 'Mata De São João', 'Esplanada', 'Ribeira Do Pombal', 'Euclides Da Cunha', 'Bom Jesus Da Lapa', 'Luís Eduardo Magalhães', 'Santa Maria Da Vitória', 'Ipirá', 'Amargosa', 'Itaberaba', 'Seabra'];
+const tokClinica = s => semAcento(String(s || '')).toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 1 && !['CLINICA', 'CLINICAS', 'ESPACO', 'LTDA', 'ME', 'EIRELI', 'DE', 'DA', 'DO', 'DOS', 'DAS', 'E', 'CENTRO'].includes(w));
+function mesmaClinica(a, b) {
+  const x = tokClinica(a), y = tokClinica(b); if (!x.length || !y.length) return false;
+  const [m, M] = x.length <= y.length ? [x, y] : [y, x];
+  return m.every(w => M.includes(w)) && m.join('').length >= 3;
+}
+function lerListaClinicas(texto) {
+  const linhas = [];
+  String(texto || '').split('\n').forEach(l => {
+    const emails = unicos((l.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(e => e.toLowerCase().replace(/\.$/, '')));
+    let antes = l.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '\t').replace(/;/g, '\t');
+    antes = antes.replace(/^\s*\d{1,3}\s*[.)\-–\t ]\s*/, '');   // número da linha
+    let cols = antes.split(/\t|\s{2,}/).map(x => x.trim()).filter(Boolean);
+    if (!cols.length || /^prestadores?$/i.test(cols[0]) || (!emails.length && cols.length < 2)) return;   // cabeçalho ou linha vazia
+    let nome = cols[0], cidade = cols[1] || '';
+    if (cols.length === 1) {   // sem tabulação: a cidade é o fim da linha, se for uma cidade conhecida
+      const n = semAcento(nome).toUpperCase(), c = [...CIDADES_BA].sort((a, b) => b.length - a.length).find(c => n.endsWith(' ' + semAcento(c).toUpperCase()));
+      if (c) { cidade = nome.slice(nome.length - c.length).trim(); nome = nome.slice(0, nome.length - c.length).trim(); }
+    }
+    nome = nome.replace(/[*]+/g, '').replace(/\s+/g, ' ').replace(/[\s\-–—]+$/, '').trim();
+    cidade = cidade.replace(/\s+/g, ' ').trim();
+    const ok = CIDADES_BA.find(c => semAcento(c).toLowerCase() === semAcento(cidade).toLowerCase());   // grafia padrão (Jequie → Jequié)
+    if (ok) cidade = ok;
+    if (nome) linhas.push({ nome, cidade, emails });
+  });
+  return linhas;
+}
+/* plano: o que cada linha faz no cadastro (sem alterar nada ainda) */
+function planoImportClinicas(texto, base) {
+  const donoEmail = {}; base.forEach((c, i) => c.emails.forEach(e => { donoEmail[e] = i; }));
+  return lerListaClinicas(texto).map(r => {
+    let alvo = base.findIndex(c => r.emails.some(e => c.emails.includes(e)));
+    if (alvo < 0) alvo = base.findIndex(c => mesmaClinica(c.nome, r.nome));
+    const conflito = r.emails.filter(e => donoEmail[e] != null && donoEmail[e] !== alvo);
+    const novos = r.emails.filter(e => !conflito.includes(e) && !(alvo >= 0 && base[alvo].emails.includes(e)));
+    const cidadeNova = alvo >= 0 ? (!base[alvo].cidade && r.cidade ? r.cidade : '') : r.cidade;
+    const acao = alvo < 0 ? 'nova' : (novos.length || cidadeNova ? 'atualizar' : 'igual');
+    return { ...r, alvo, acao, novos, conflito, cidadeNova, nomeAtual: alvo >= 0 ? base[alvo].nome : '' };
+  });
+}
+function htmlPrevImport(plano) {
+  if (!plano.length) return '<p class="muted">Nenhuma clínica reconhecida no texto.</p>';
+  const n = k => plano.filter(p => p.acao === k).length;
+  return `<p style="margin:10px 0 6px"><span class="tag ok">${n('nova')} nova(s)</span> <span class="tag info">${n('atualizar')} a atualizar</span> <span class="tag">${n('igual')} já cadastrada(s), sem mudança</span></p>
+  <div class="tabela-scroll" style="max-height:42vh"><table class="t"><thead><tr><th>Ação</th><th>Clínica</th><th>Cidade</th><th>E-mails</th></tr></thead><tbody>
+  ${plano.map(p => `<tr><td>${p.acao === 'nova' ? '<span class="tag ok">Nova</span>' : p.acao === 'atualizar' ? '<span class="tag info">Atualizar</span>' : '<span class="tag">Sem mudança</span>'}</td>
+    <td class="pri">${esc(p.nome)}${p.nomeAtual && p.nomeAtual !== p.nome ? `<br><span class="muted" style="font-weight:400">no cadastro: ${esc(p.nomeAtual)}</span>` : ''}</td>
+    <td>${esc(p.cidade || '—')}${p.alvo >= 0 && !p.cidadeNova && p.cidade ? '<br><span class="muted">mantém a do cadastro</span>' : ''}</td>
+    <td class="num">${p.novos.map(e => `<div>+ ${esc(e)}</div>`).join('')}${p.conflito.map(e => `<div style="color:var(--bad-fg)">${esc(e)} (já é de outra clínica: ignorado)</div>`).join('')}${!p.novos.length && !p.conflito.length ? '<span class="muted">nenhum novo</span>' : ''}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+Object.assign(acoes, {
+  clImportar() {
+    M = { tipo: 'climp' };
+    abrirModal({ titulo: 'Importar lista de clínicas', sub: 'Cole a tabela da planilha: nome, cidade e e-mails', icone: 'upload', tamanho: 'g',
+      corpo: `<textarea id="clImpTxt" rows="8" placeholder="1&#9;CLÍNICA EXEMPLO&#9;Salvador&#9;contato@exemplo.com.br;&#9;financeiro@exemplo.com.br" aria-label="Lista de clínicas"></textarea>
+        <p class="dica" style="margin-top:8px">Uma clínica por linha, como vem da planilha (o número da linha e o cabeçalho são ignorados). Clínica já cadastrada (pelo e-mail ou pelo nome) ganha só os e-mails que faltam e a cidade, se estiver vazia; nada é apagado. Nada é gravado até clicar em “Salvar configurações”.</p>
+        <div id="clImpPrev"></div>`,
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn" data-act="clImportarPrev">${ic('eye')}Pré-visualizar</button><button class="btn pri" data-act="clImportarOk">${ic('check')}Importar para o cadastro</button>` });
+  },
+  clImportarPrev() { $('#clImpPrev').innerHTML = htmlPrevImport(planoImportClinicas($('#clImpTxt').value, cfgEdit.clinicas)); },
+  clImportarOk() {
+    const plano = planoImportClinicas($('#clImpTxt').value, cfgEdit.clinicas);
+    if (!plano.length) { toast('Nenhuma clínica reconhecida no texto.', 'bad'); return; }
+    let nov = 0, atu = 0;
+    plano.forEach(p => {
+      if (p.acao === 'nova') { cfgEdit.clinicas.push({ id: slug(p.nome) + '-' + Date.now().toString(36).slice(-4) + nov, nome: p.nome, cidade: p.cidade, executante: '', emails: p.novos, apelidos: '', codigos: {}, leitura: normLeitura(), _lista: [] }); nov++; }
+      else if (p.acao === 'atualizar') { const c = cfgEdit.clinicas[p.alvo]; c.emails = unicos([...c.emails, ...p.novos]); if (p.cidadeNova) c.cidade = p.cidadeNova; atu++; }
+    });
+    fecharModal(true); if (nov || atu) marcarSujo(); render();
+    toast(`${nov} clínica(s) nova(s), ${atu} atualizada(s). Confira e clique em Salvar configurações.`);
+  }
 });
 
 async function init() {

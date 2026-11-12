@@ -120,6 +120,9 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 - Sem prints: o botão "conferir a grade manualmente (conferência cega)" continua disponível.
 - O recurso precisa do site publicado (não funciona abrindo o arquivo direto) e baixa cerca de 14 MB de arquivos de leitura na primeira vez.
 
+### Importar lista de clínicas
+Em Configurações › Clínicas, **Importar lista** recebe a tabela copiada da planilha (número, nome, cidade e e-mails, uma clínica por linha; o cabeçalho é ignorado). **Pré-visualizar** mostra o que será feito: clínica nova, clínica a atualizar ou sem mudança. Uma clínica já cadastrada (reconhecida pelo e-mail ou pelo nome, ex.: "CLÍNICA CRIAR" = "Criar Clínica de Integração") só ganha os e-mails que faltam e a cidade, se estiver vazia; nada é apagado. E-mail que já pertence a outra clínica é ignorado e aparece em vermelho. Depois de importar, confira e clique em **Salvar configurações**.
+
 ### Regras de leitura por clínica
 Em Configurações › Clínicas, cada clínica tem **Regras de leitura do e-mail**, para erros que ela repete: **quantidade quando o e-mail não informar** (ex.: a MRA não escreve a quantidade: use 1), **código com um dígito a mais ou a menos** (corrige para o código cadastrado da clínica que só difere nesse dígito, ex.: 5000470 → 50000470), **quantidade colada no CRM** ("PSICOLOGIA 19700-" = 1 + CRM 9700; com 6 dígitos, "119741", isso já é automático) e uma lista de **códigos que a clínica escreve errado** (escrito = certo). Valem só para os e-mails daquela clínica (reconhecida pelo e-mail do remetente) e cada ajuste aparece como alerta "Ajuste feito pela regra de leitura da clínica" para conferir. Em Testar leitura, **Ler de novo** aplica as regras ainda não salvas.
 
