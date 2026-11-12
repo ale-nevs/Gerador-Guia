@@ -567,6 +567,11 @@ main,.card,.card-h,.email-meta dd,.cp-campos,.form-grid>*,.grid2>*{min-width:0}
 .email-meta dd,.email-meta dd .num{overflow-wrap:anywhere}
 pre.original,pre.simples{white-space:pre-wrap;overflow-wrap:anywhere}
 @media (max-width:560px){.btn{white-space:normal;max-width:100%;text-align:left;padding-top:5px;padding-bottom:5px}.btn.so{text-align:center}.linha-flex{flex-wrap:wrap}.email-meta{grid-template-columns:1fr}.email-meta dt{margin-top:4px}}
+.t tr.tst-errado td{background:var(--bad-bg)}
+input[type=text][data-teste^="p:"],input[type=text][data-teste^="e:"]{min-width:240px}
+img.mini.tst-img{max-width:min(520px,60vw);max-height:none;height:auto}
+.cfg-barra[hidden]{display:none}
+.t tr.tst-errado td.pri{color:var(--bad-fg)}
 </style>
 </head>
 <body>
@@ -3456,7 +3461,7 @@ const cfgModeloSel = { modelos: 'autorizada', obs: 'observacao', param: 'paramet
 const CFG_SECOES = [
   ['aparencia', 'palette', 'Aparência'], ['perfil', 'user', 'Perfil e identificação'], ['clinicas', 'building', 'Clínicas e cadastros'],
   ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['obsauto', 'bell', 'Observações automáticas'], ['param', 'layers', 'Parametrizações'],
-  ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['info', 'info', 'Informações e versão do sistema']
+  ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['testes', 'search', 'Testar leitura (prints e e-mails)'], ['info', 'info', 'Informações e versão do sistema']
 ];
 let cfgOpsIni = [];
 function iniciarCfgEdit() {
@@ -3513,7 +3518,7 @@ async function renderConfig(app) {
   const nErr = cfgErros.length;
   app.innerHTML = `<div class="cfg"><nav class="card cfg-nav" aria-label="Seções de configuração">${CFG_SECOES.map(([k, i, t]) => `<button data-act="cfgSecao" data-s="${k}" class="${cfgSecao === k ? 'ativo' : ''}" ${cfgSecao === k ? 'aria-current="true"' : ''}>${ic(i)}${t}</button>`).join('')}</nav>
     <div id="cfgCorpo">${nErr ? `<div class="erros-cfg" role="alert"><b>${ic('alert', 'sm')} Não foi possível salvar. Corrija os itens abaixo:</b><ul>${cfgErros.map(e => `<li>${esc(e.m)} <a href="#" data-act="cfgSecao" data-s="${e.s}">(ir para ${esc(CFG_SECOES.find(x => x[0] === e.s)[2])})</a></li>`).join('')}</ul></div>` : ''}${htmlCfgSecao()}</div></div>
-    <div class="cfg-barra" id="cfgBarra"><span id="cfgEstado"></span><span class="esp"></span>
+    <div class="cfg-barra" id="cfgBarra" ${cfgSecao === 'testes' ? 'hidden' : ''}><span id="cfgEstado"></span><span class="esp"></span>
       <button class="btn" id="cfgDescartar" data-act="descartarCfg">${ic('undo')}Descartar alterações</button>
       <button class="btn pri" id="cfgSalvar" data-act="salvarCfg">${ic('save')}Salvar configurações</button></div>`;
   atualizarBarraCfg();
@@ -3532,6 +3537,7 @@ function htmlCfgSecao() {
     case 'export': return cfgExport();
     case 'prefs': return cfgPrefs();
     case 'info': return cfgInfo();
+    case 'testes': return cfgTestes();
   }
   return '';
 }
@@ -3968,27 +3974,31 @@ function telaVazia(cv, an) {
 }
 async function lerPrintTela(file, aviso) {
   const cv = await abrirImagem(file), barra = acharBarra(cv);
-  if (!barra) return { erro: 'Não reconheci a tela "Liberação de Senhas" neste print (não achei a barra amarela do topo, com "Benef." e "Nº Solic.").' };
+  // diagnóstico (só para o teste de leitura nas Configurações): tamanho da imagem, barra amarela e layout escolhido
+  const diag = { imagem: [cv.width, cv.height], barra };
+  if (!barra) return { erro: 'Não reconheci a tela "Liberação de Senhas" neste print (não achei a barra amarela do topo, com "Benef." e "Nº Solic.").', diag };
   await OCR.iniciar(aviso);
   /* descobre o layout e a aba: primeiro pelos rótulos; se nenhum confere, pela grade de procedimentos */
   const cands = ancorasPossiveis(barra); let an = null, tipo = null;
+  diag.candidatos = cands.map(c => ({ layout: c.L.nome, esc: +c.esc.toFixed(3), dx: +c.dx.toFixed(1), dy: +c.dy.toFixed(1) }));
   for (const c of cands) {
     const g = await confereRotulos(cv, c, c.L.rotGuia), p = await confereRotulos(cv, c, c.L.rotProc);
     if (g || p) { an = c; tipo = p > g ? 'proc' : g > p ? 'guia' : null; if (!tipo) { const nota = refinarGrade(cv, c).nota; tipo = nota >= 0.2 ? 'proc' : 'guia'; } break; }
   }
   if (!an) {   // plano B: a grade de procedimentos tem linhas em posições fixas; vale o layout em que ela aparece mais nítida
     for (const c of cands) { const nota = refinarGrade(cv, c).nota; if (!an || nota > an.nota) an = { ...c, nota }; }
-    if (!an) return { erro: 'Não reconheci o layout desta tela.' };
+    if (!an) return { erro: 'Não reconheci o layout desta tela.', diag };
     const ref = an.L.nome === 'compacto' ? [0.29, 0.33] : [0.06, 0.1];
     if (an.nota >= ref[1]) tipo = 'proc'; else if (an.nota <= ref[0]) tipo = 'guia';
   }
-  if (!tipo) return { erro: 'Esse print não parece ser a aba "Dados da Guia" nem "Procedimentos".' };
+  diag.layout = an.L.nome; diag.esc = +an.esc.toFixed(3); diag.dx = +an.dx.toFixed(1); diag.dy = +an.dy.toFixed(1);
+  if (!tipo) return { erro: 'Esse print não parece ser a aba "Dados da Guia" nem "Procedimentos".', diag };
   const crops = {}, G = an.L;
   if (tipo === 'guia') {
-    if (telaVazia(cv, an)) return { erro: 'A tela deste print está vazia (nenhuma guia aberta). Abra a guia no sistema e tire o print de novo.' };
+    if (telaVazia(cv, an)) return { erro: 'A tela deste print está vazia (nenhuma guia aberta). Abra a guia no sistema e tire o print de novo.', diag };
     const campos = {};
-    for (const [k, base] of Object.entries(DEF_GUIA)) { const def = { ...base, caixa: G[k] }; const r = await lerCampo(cv, an, def); campos[k] = { valor: r.valor, bruto: r.bruto, conf: r.conf, incerto: r.incerto }; crops[k] = miniatura(cv, an, def.caixa); }
-    return { tipo, layout: G.nome, campos, crops };
+    for (const [k, base] of Object.entries(DEF_GUIA)) { const def = { ...base, caixa: G[k] }; const r = await lerCampo(cv, an, def); campos[k] = { valor: r.valor, bruto: r.bruto, conf: r.conf, incerto: r.incerto, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) }; crops[k] = miniatura(cv, an, def.caixa); }
+    return { tipo, layout: G.nome, campos, crops, diag };
   }
   an = refinarGrade(cv, an);
   const L = G.linhas, itens = [];
@@ -4000,13 +4010,14 @@ async function lerPrintTela(file, aviso) {
     const num = await lerCampo(cv, an, { caixa: [L.item[0], y0 + 2, L.item[1], y1 - 1], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,2}$/.test(v) && +v >= 1, variantes: VAR_CURTO });
     if (cod.valor.length < 5 && !num.valor) continue;
     itens.push({ fila: i, n: Number(num.valor) || null, codigo: cod.valor, qtd: qtd.valor === '' ? null : Number(qtd.valor), st: statusLinha(cv, an, y0), conf: Math.min(cod.conf, qtd.conf), incerto: cod.incerto || qtd.incerto,
-      img: miniatura(cv, an, [L.cod[0] - 2, y0 + 1, L.qtd[1] + 2, y1], 2) });
+      img: miniatura(cv, an, [L.cod[0] - 2, y0 + 1, L.qtd[1] + 2, y1], 2), varCod: cod.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`), varQtd: qtd.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) });
   }
   // numeração: as linhas são consecutivas; vale o deslocamento mais frequente entre o nº lido e a posição na grade
   const cont = new Map(); itens.forEach(it => { if (it.n) cont.set(it.n - it.fila, (cont.get(it.n - it.fila) || 0) + 1); });
   const desl = [...cont.entries()].sort((a, b) => b[1] - a[1])[0];
   if (desl) itens.forEach(it => { it.n = desl[0] + it.fila; });
-  return { tipo, layout: G.nome, maxLinhas: L.max, itens, crops };
+  diag.ajusteGrade = { dx: +an.dx.toFixed(1), dy: +an.dy.toFixed(1), nota: +(an.nota || 0).toFixed(3) };
+  return { tipo, layout: G.nome, maxLinhas: L.max, itens, crops, diag };
 }
 
 /* ---------- comparação com o pedido ---------- */
@@ -4885,6 +4896,236 @@ function iniciarSoIcone() {
   const mo = new MutationObserver(() => alvos.forEach(soIcone));
   alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); soIcone(a); });
 }
+
+/* ====================================================================
+   Configurações › Testar leitura: lê prints e e-mails sem abrir atendimento, o operador corrige o que saiu errado
+   e baixa um registro (.json) para enviar ao suporte ajustar os leitores. Nada é salvo na pasta nem no navegador.
+   ==================================================================== */
+const TESTE = { prints: [], emails: [], lendo: '', recortes: true, imagem: false, texto: true, anonimo: false };
+const ROT_EMAIL_T = { beneficiario: 'Beneficiário', carteira: 'Carteira', medico: 'Médico', crm: 'CRM', cid: 'CID', emissao: 'Data do pedido', local: 'Local do pedido', itens: 'Serviços (código x qtd, um por linha)' };
+const normT = v => String(v ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
+const normItensT = v => String(v || '').split('\n').map(l => l.replace(/\s+/g, '').toUpperCase().replace(/[×*]/g, 'X')).filter(Boolean).join('|');
+const certoT = c => c.k === 'itens' ? normItensT(c.lido) === normItensT(c.correto) : normT(c.lido) === normT(c.correto);
+
+async function testarPrints(files) {
+  for (const f of files) {
+    TESTE.lendo = 'Lendo ' + (f.name || 'print colado') + '…'; render();
+    const t0 = performance.now(); let r;
+    try { r = await lerPrintTela(f, m => { TESTE.lendo = m; }); } catch (e) { r = { erro: 'Falha na leitura: ' + (e.message || e) }; }
+    const img = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => ok(''); fr.readAsDataURL(f); });
+    const t = { id: uid(), nome: f.name && f.name !== 'image.png' ? f.name : 'print ' + (TESTE.prints.length + 1), ms: Math.round(performance.now() - t0), r, img, obs: '', faltando: '', campos: [], itens: [] };
+    if (r.campos) t.campos = Object.entries(r.campos).map(([k, c]) => ({ k, rot: ROT_PRINT[k] || k, lido: c.valor, correto: c.valor, bruto: c.bruto, conf: Math.round(c.conf), incerto: !!c.incerto, var: c.var || [], crop: r.crops[k] }));
+    if (r.itens) t.itens = r.itens.map(it => ({ n: it.n, codLido: it.codigo, cod: it.codigo, qtdLida: it.qtd ?? '', qtd: it.qtd ?? '', st: it.st, incerto: !!it.incerto, varCod: it.varCod || [], varQtd: it.varQtd || [], crop: it.img }));
+    TESTE.prints.unshift(t);
+  }
+  TESTE.lendo = ''; render();
+}
+async function testarEmails(lista) {
+  for (const { nome, email } of lista) {
+    let lp = lerPedidos(email.textoPrincipal, email.data);
+    if (email.cortado && lp.blocos.every(b => !b.pedido.itens.length && !b.pedido.carteiraBruta)) lp = lerPedidos(email.textoCompleto, email.data);
+    const blocos = lp.blocos.map((b, i) => {
+      const p = b.pedido, em = p.emissao;
+      const lidos = { beneficiario: p.beneficiario, carteira: p.carteira || p.carteiraBruta, medico: p.medico.nome, crm: p.medico.crm, cid: p.cid,
+        emissao: em.estado === 'valida' ? fmtData(em.data) : em.estado === 'sem_data' ? 'SEM DATA' : (em.bruto || ''), local: p.local,
+        itens: p.itens.map(it => `${it.codigo} x ${it.qtd ?? '?'}`).join('\n') };
+      return { n: i + 1, campos: Object.entries(lidos).map(([k, v]) => ({ k, rot: ROT_EMAIL_T[k], lido: v || '', correto: v || '' })), soltos: p.soltos || [], invalidos: p.invalidos || [] };
+    });
+    TESTE.emails.unshift({ id: uid(), nome, email, blocos, obs: '' });
+  }
+  render();
+}
+
+function htmlTesteCampo(tipo, tid, c, extra = '') {
+  const ok = certoT(c), area = c.k === 'itens';
+  return `<tr class="${ok ? '' : 'tst-errado'}" data-linha="${tipo}:${tid}:${c.k}">
+    <td class="pri">${esc(c.rot)}</td>${extra}
+    <td class="num">${area ? esc(c.lido).replace(/\n/g, '<br>') || '<span class="muted">—</span>' : esc(c.lido) || '<span class="muted">(vazio)</span>'}</td>
+    <td>${area ? `<textarea rows="${Math.max(2, c.correto.split('\n').length)}" class="num" data-teste="${tipo}:${tid}:${c.k}">${esc(c.correto)}</textarea>` : `<input type="text" class="num" data-teste="${tipo}:${tid}:${c.k}" value="${esc(c.correto)}">`}</td>
+    <td class="c tst-st">${ok ? `<span class="tag ok">${ic('check', 'sm')}Certo</span>` : `<span class="tag bad">${ic('x', 'sm')}Errado</span>`}</td></tr>`;
+}
+function htmlTestePrint(t) {
+  const r = t.r;
+  const cab = `<div class="card-h"><h2>${ic('eye')} ${esc(t.nome)}</h2><span class="tag">${r.erro ? 'não lido' : r.tipo === 'guia' ? 'Dados da Guia' : 'Procedimentos'}</span>${r.layout ? `<span class="tag">layout ${esc(r.layout)}</span>` : ''}<span class="muted" style="font-size:var(--fs-xs)">${t.ms} ms</span><span class="esp"></span><button class="btn sm line" data-act="tstRemover" data-tipo="p" data-id="${t.id}">${ic('trash', 'sm')}Remover teste</button></div>`;
+  if (r.erro) return `<div class="card">${cab}<div class="al bloqueio"><span>${ic('ban', 'sm')}</span><div class="tx">${esc(r.erro)}</div></div>
+    <label class="lbl" style="margin-top:10px">O que deveria acontecer?</label><textarea rows="2" data-teste="p:${t.id}:obs" placeholder="Ex.: é a aba Dados da Guia, tela em tela cheia, zoom 125%">${esc(t.obs)}</textarea></div>`;
+  let corpo = '';
+  if (r.tipo === 'guia') corpo = `<div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Imagem</th><th>Lido</th><th>Correto (corrija se estiver errado)</th><th></th></tr></thead><tbody>
+    ${t.campos.map(c => htmlTesteCampo('p', t.id, c, `<td>${c.crop ? `<img class="mini tst-img" src="${c.crop}" alt="">` : ''}</td>`)).join('')}</tbody></table></div>`;
+  else corpo = `<div class="tabela-scroll"><table class="t"><thead><tr><th>Item</th><th>Imagem</th><th>Código lido</th><th>Código correto</th><th>Qtd. lida</th><th>Qtd. correta</th><th>ST</th><th></th></tr></thead><tbody>
+    ${t.itens.map((it, i) => { const ok = it.codLido === String(it.cod).trim() && String(it.qtdLida) === String(it.qtd).trim(); return `<tr class="${ok ? '' : 'tst-errado'}" data-linha="i:${t.id}:${i}"><td class="c">${it.n ?? '—'}</td><td><img class="mini tst-img" src="${it.crop}" alt=""></td>
+      <td class="num">${esc(it.codLido)}</td><td><input type="text" class="num" data-teste="i:${t.id}:${i}:cod" value="${esc(it.cod)}" style="width:110px"></td>
+      <td class="num c">${esc(it.qtdLida)}</td><td><input type="text" class="num" data-teste="i:${t.id}:${i}:qtd" value="${esc(it.qtd)}" style="width:60px"></td>
+      <td class="c">${esc(ST_ROT[it.st] || it.st || '—')}</td><td class="c tst-st">${ok ? `<span class="tag ok">${ic('check', 'sm')}Certo</span>` : `<span class="tag bad">${ic('x', 'sm')}Errado</span>`}</td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">Nenhum item lido.</td></tr>'}</tbody></table></div>
+    <label class="lbl" style="margin-top:10px">Itens que estão no print e não foram lidos (código x qtd, um por linha)</label><textarea rows="2" class="num" data-teste="p:${t.id}:faltando" placeholder="50000470 x 4">${esc(t.faltando)}</textarea>`;
+  return `<div class="card">${cab}${corpo}<label class="lbl" style="margin-top:10px">Observação (opcional)</label><textarea rows="2" data-teste="p:${t.id}:obs" placeholder="Ex.: print com zoom 125%, colado pelo WhatsApp">${esc(t.obs)}</textarea></div>`;
+}
+function htmlTesteEmail(t) {
+  const e = t.email;
+  return `<div class="card"><div class="card-h"><h2>${ic('mail')} ${esc(t.nome)}</h2><span class="tag">${t.blocos.length} pedido(s) lido(s)</span><span class="esp"></span><button class="btn sm line" data-act="tstRemover" data-tipo="e" data-id="${t.id}">${ic('trash', 'sm')}Remover teste</button></div>
+    <details style="margin-bottom:10px"><summary class="muted">Ver o texto que o leitor recebeu</summary><pre class="original">${esc(e.textoPrincipal)}</pre></details>
+    ${t.blocos.map(b => `<h3 style="margin:10px 0 6px">Pedido ${b.n}${t.blocos.length > 1 ? ` de ${t.blocos.length}` : ''}</h3>
+      <div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Lido</th><th>Correto (corrija se estiver errado)</th><th></th></tr></thead><tbody>
+      ${b.campos.map(c => htmlTesteCampo('e', t.id + ':' + b.n, c)).join('')}</tbody></table></div>
+      ${b.soltos.length || b.invalidos.length ? `<p class="dica" style="margin-top:6px">Números que não viraram item: ${esc([...b.soltos, ...b.invalidos].join(', '))}</p>` : ''}`).join('')}
+    <label class="lbl" style="margin-top:10px">Observação (ex.: faltou um paciente inteiro, juntou dois pedidos)</label><textarea rows="2" data-teste="e:${t.id}:obs">${esc(t.obs)}</textarea></div>`;
+}
+function cfgTestes() {
+  const nP = TESTE.prints.length, nE = TESTE.emails.length;
+  const erros = contarErrosTeste();
+  return `<div class="card">${cabSecao('Testar leitura')}
+    <p class="dica">Teste aqui os leitores de print e de e-mail sem abrir um atendimento. Na coluna <b>Correto</b>, corrija o que saiu errado. Depois baixe o registro e envie ao suporte: com vários registros juntos dá para ajustar os leitores. Nada daqui é salvo na pasta nem fica no navegador ao recarregar a página.</p>
+    <div class="aviso" style="margin-top:8px">${ic('shield')}<div>O registro pode conter dados de pacientes (nome, carteira, recortes da imagem, texto do e-mail). Envie só por canal interno e apague depois.</div></div>
+    <div class="form-grid" style="margin-top:12px">
+      <label class="chk"><input type="checkbox" data-tst-op="recortes" ${TESTE.recortes ? 'checked' : ''}>Incluir recortes da imagem dos campos errados</label>
+      <label class="chk"><input type="checkbox" data-tst-op="imagem" ${TESTE.imagem ? 'checked' : ''}>Incluir o print inteiro (ajuda muito quando a tela não é reconhecida)</label>
+      <label class="chk"><input type="checkbox" data-tst-op="texto" ${TESTE.texto ? 'checked' : ''}>Incluir o texto do e-mail (necessário para ajustar o leitor de e-mail)</label>
+      <label class="chk"><input type="checkbox" data-tst-op="anonimo" ${TESTE.anonimo ? 'checked' : ''}>Trocar nomes e carteiras do e-mail por letras e números fictícios</label>
+    </div>
+    <div class="acoes"><span class="tag ${erros ? 'bad' : ''}">${nP} print(s) · ${nE} e-mail(s) · ${erros} campo(s) marcado(s) como errado(s)</span><span class="esp"></span>
+      <button class="btn" data-act="tstCopiar" ${nP + nE ? '' : 'disabled'}>${ic('copy')}Copiar resumo</button>
+      <button class="btn pri" data-act="tstBaixar" ${nP + nE ? '' : 'disabled'}>${ic('download')}Baixar registro (.json)</button>
+      <button class="btn line" data-act="tstLimpar" ${nP + nE ? '' : 'disabled'}>${ic('x')}Limpar testes</button></div></div>
+
+  <div class="card"><div class="card-h"><h2>Prints do sistema</h2><span class="esp"></span>${TESTE.lendo ? `<span class="tag info">${ic('refresh', 'sm')}${esc(TESTE.lendo)}</span>` : ''}</div>
+    <div class="zona-prints" id="zonaTstPrint" data-act="tstEscolherPrint">${ic('upload', 'lg')}<div><b>Cole o print (Ctrl+V)</b>, arraste aqui ou clique para escolher. Aceita vários de uma vez.</div></div>
+    <div class="acoes"><button class="btn pri" data-act="tstColarPrint">${ic('clip')}Colar print</button><button class="btn" data-act="tstEscolherPrint">${ic('upload')}Escolher arquivos</button></div>
+    <input type="file" id="tstPrintArq" accept="image/*" multiple hidden></div>
+  ${TESTE.prints.map(htmlTestePrint).join('')}
+
+  <div class="card"><div class="card-h"><h2>E-mails</h2></div>
+    <div class="zona-prints" id="zonaTstEml" data-act="tstEscolherEml">${ic('upload', 'lg')}<div><b>Arraste o .eml aqui</b> ou clique para escolher. Aceita vários de uma vez.</div></div>
+    <details style="margin-top:10px"><summary class="muted">Ou cole o texto do e-mail</summary>
+      <div class="form-grid" style="margin-top:8px"><div style="grid-column:1/-1"><label class="lbl" for="tstTexto">Corpo do e-mail</label><textarea id="tstTexto" rows="7"></textarea></div></div>
+      <div class="acoes"><button class="btn pri" data-act="tstLerTexto">${ic('search')}Ler texto</button></div></details>
+    <input type="file" id="tstEmlArq" accept=".eml,message/rfc822" multiple hidden></div>
+  ${TESTE.emails.map(htmlTesteEmail).join('')}`;
+}
+
+/* ---------- registro (.json) e resumo ---------- */
+function contarErrosTeste() {
+  let n = 0;
+  TESTE.prints.forEach(t => { n += t.campos.filter(c => !certoT(c)).length + t.itens.filter(it => it.codLido !== String(it.cod).trim() || String(it.qtdLida) !== String(it.qtd).trim()).length + (t.faltando.trim() ? t.faltando.trim().split('\n').length : 0) + (t.r.erro ? 1 : 0); });
+  TESTE.emails.forEach(t => t.blocos.forEach(b => { n += b.campos.filter(c => !certoT(c)).length; }));
+  return n;
+}
+function anonimizador() {
+  const nomes = new Set(), carts = new Set();
+  TESTE.emails.forEach(t => t.blocos.forEach(b => b.campos.forEach(c => {
+    if (c.k === 'beneficiario' || c.k === 'medico') [c.lido, c.correto].forEach(v => String(v).split(/\s+/).forEach(w => { if (w.replace(/[^\p{L}]/gu, '').length >= 3) nomes.add(w.replace(/[^\p{L}]/gu, '')); }));
+    if (c.k === 'carteira') [c.lido, c.correto].forEach(v => { if (v) carts.add(String(v)); });
+  })));
+  const listaN = [...nomes].sort((a, b) => b.length - a.length);
+  return s => {
+    let x = String(s ?? '');
+    [...carts].sort((a, b) => b.length - a.length).forEach(c => { x = x.split(c).join(c.replace(/\d/g, '9')); const so = c.replace(/\D/g, ''); if (so.length >= 10) x = x.split(so).join(so.replace(/\d/g, '9')); });
+    x = x.replace(new RegExp(CART_RE.source, 'g'), m => m.replace(/\d/g, '9'));   // qualquer carteira escrita no texto, com ou sem separadores
+    listaN.forEach(w => { x = x.replace(new RegExp(`(?<![\\p{L}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'giu'), m => 'X'.repeat(m.length)); });
+    return x;
+  };
+}
+function montarRegistroTeste() {
+  const an = TESTE.anonimo ? anonimizador() : (x => x);
+  const prints = TESTE.prints.map(t => {
+    const o = { arquivo: t.nome, aba: t.r.tipo || null, layout: t.r.layout || null, ms: t.ms, erro: t.r.erro || null, diag: t.r.diag || null, observacao: t.obs || '' };
+    if (t.campos.length) o.campos = t.campos.map(c => { const ok = certoT(c), x = { campo: c.k, lido: c.lido, correto: c.correto, ok, bruto: c.bruto, conf: c.conf, incerto: c.incerto };
+      if (!ok) { x.variantes = c.var; if (TESTE.recortes) x.recorte = c.crop; } return x; });
+    if (t.r.tipo === 'proc') {
+      o.itens = t.itens.map(it => { const ok = it.codLido === String(it.cod).trim() && String(it.qtdLida) === String(it.qtd).trim(), x = { item: it.n, codigoLido: it.codLido, codigoCorreto: String(it.cod).trim(), qtdLida: it.qtdLida, qtdCorreta: String(it.qtd).trim(), status: it.st, ok, incerto: it.incerto };
+        if (!ok) { x.variantesCodigo = it.varCod; x.variantesQtd = it.varQtd; if (TESTE.recortes) x.recorte = it.crop; } return x; });
+      o.itensNaoLidos = t.faltando.split('\n').map(l => l.trim()).filter(Boolean);
+    }
+    if (TESTE.imagem) o.imagem = t.img;
+    return o;
+  });
+  const emails = TESTE.emails.map(t => ({
+    arquivo: t.nome, origem: t.email.origem, remetente: t.email.remetente && t.email.remetente.email ? t.email.remetente.email.replace(/^[^@]*/, '*') : '', assunto: an(t.email.assunto || ''),
+    texto: TESTE.texto ? an(t.email.textoPrincipal) : undefined, textoCompleto: TESTE.texto && t.email.cortado ? an(t.email.textoCompleto) : undefined,
+    pedidos: t.blocos.map(b => ({ n: b.n, campos: b.campos.map(c => ({ campo: c.k, lido: an(c.lido), correto: an(c.correto), ok: certoT(c) })), naoViraramItem: [...b.soltos, ...b.invalidos] })),
+    observacao: an(t.obs || '')
+  }));
+  return { tipo: 'conferidor-teste-leitura', versao: VERSAO, gerado: agora(), navegador: navigator.userAgent, camposErrados: contarErrosTeste(), prints, emails };
+}
+function resumoTeste() {
+  const L = [`Teste de leitura — Conferidor v${VERSAO} — ${fmtDH(agora())}`];
+  TESTE.prints.forEach(t => {
+    const r = t.r; L.push(`\nPRINT ${t.nome} (${r.erro ? 'não lido' : (r.tipo === 'guia' ? 'Dados da Guia' : 'Procedimentos') + ', layout ' + r.layout})`);
+    if (r.erro) L.push(`  erro: ${r.erro}`);
+    t.campos.filter(c => !certoT(c)).forEach(c => L.push(`  ${c.rot}: lido "${c.lido}" | correto "${c.correto}"`));
+    t.itens.forEach(it => { if (it.codLido !== String(it.cod).trim() || String(it.qtdLida) !== String(it.qtd).trim()) L.push(`  item ${it.n ?? '?'}: lido ${it.codLido} x ${it.qtdLida} | correto ${String(it.cod).trim()} x ${String(it.qtd).trim()}`); });
+    if (t.faltando.trim()) L.push(`  itens não lidos: ${t.faltando.trim().split('\n').join('; ')}`);
+    if (t.obs) L.push(`  obs: ${t.obs}`);
+    if (!r.erro && L[L.length - 1].startsWith('\nPRINT')) L.push('  tudo certo');
+  });
+  const an = TESTE.anonimo ? anonimizador() : (x => x);
+  TESTE.emails.forEach(t => {
+    L.push(`\nE-MAIL ${t.nome} (${t.blocos.length} pedido(s))`); let algum = false;
+    t.blocos.forEach(b => b.campos.filter(c => !certoT(c)).forEach(c => { algum = true; L.push(`  pedido ${b.n} · ${c.rot}: lido "${an(c.lido).replace(/\n/g, '; ')}" | correto "${an(c.correto).replace(/\n/g, '; ')}"`); }));
+    if (t.obs) { algum = true; L.push(`  obs: ${an(t.obs)}`); }
+    if (!algum) L.push('  tudo certo');
+  });
+  return L.join('\n');
+}
+
+/* ---------- ações e eventos ---------- */
+Object.assign(acoes, {
+  tstEscolherPrint() { $('#tstPrintArq').click(); },
+  tstEscolherEml() { $('#tstEmlArq').click(); },
+  async tstColarPrint() {
+    try {
+      const itens = await navigator.clipboard.read(), fs = [];
+      for (const it of itens) for (const t of it.types) if (/^image\//.test(t)) fs.push(new File([await it.getType(t)], 'print-colado.png', { type: t }));
+      if (!fs.length) { toast('Não há imagem na área de transferência. Copie o print e clique em Colar (ou use Ctrl+V).', 'bad'); return; }
+      testarPrints(fs);
+    } catch (e) { toast('O navegador não liberou a área de transferência. Use Ctrl+V com a página selecionada.', 'bad'); }
+  },
+  tstLerTexto() { const t = $('#tstTexto').value; if (!t.trim()) { toast('Cole o texto do e-mail.', 'bad'); return; } testarEmails([{ nome: 'texto colado ' + (TESTE.emails.length + 1), email: emailDeTexto(t, '') }]); },
+  tstRemover(b) { const k = b.dataset.tipo === 'p' ? 'prints' : 'emails'; TESTE[k] = TESTE[k].filter(t => t.id !== b.dataset.id); render(); },
+  tstLimpar() { if (!confirm('Apagar todos os testes desta tela?')) return; TESTE.prints = []; TESTE.emails = []; render(); },
+  async tstCopiar() { try { await navigator.clipboard.writeText(resumoTeste()); toast('Resumo copiado.'); } catch (e) { baixar('teste-leitura.txt', resumoTeste()); } },
+  tstBaixar() { baixar(nomeArquivo('teste_leitura', isoDia(new Date()), 'json').replace('.json', `_${new Date().toTimeString().slice(0, 5).replace(':', 'h')}.json`), JSON.stringify(montarRegistroTeste(), null, 1), 'application/json'); toast('Registro baixado. Envie o arquivo ao suporte.'); }
+});
+function emTesteCfg() { return aba === 'config' && cfgSecao === 'testes'; }
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'tstPrintArq' && t.files.length) { const fs = [...t.files]; t.value = ''; testarPrints(fs); }
+  else if (t.id === 'tstEmlArq' && t.files.length) {
+    const fs = [...t.files]; t.value = ''; const lista = [];
+    for (const f of fs) { try { lista.push({ nome: f.name, email: lerEml(await f.arrayBuffer()) }); } catch (er) { toast('Não consegui ler ' + f.name, 'bad'); } }
+    testarEmails(lista);
+  } else if (t.dataset && t.dataset.tstOp) { TESTE[t.dataset.tstOp] = t.checked; }
+});
+document.addEventListener('input', e => {
+  const t = e.target, k = t.dataset && t.dataset.teste; if (!k) return;
+  const p = k.split(':');
+  if (p[0] === 'p') { const x = TESTE.prints.find(y => y.id === p[1]); if (!x) return; if (p[2] === 'obs' || p[2] === 'faltando') x[p[2]] = t.value; else { const c = x.campos.find(y => y.k === p[2]); if (c) c.correto = t.value; } }
+  else if (p[0] === 'i') { const x = TESTE.prints.find(y => y.id === p[1]); if (!x) return; x.itens[+p[2]][p[3]] = t.value; }
+  else if (p[0] === 'e') { const x = TESTE.emails.find(y => y.id === p[1]); if (!x) return; if (p[2] === 'obs') x.obs = t.value; else { const b = x.blocos.find(y => y.n === +p[2]); const c = b && b.campos.find(y => y.k === p[3]); if (c) c.correto = t.value; } }
+  // atualiza só a marcação Certo/Errado da linha, sem redesenhar (para não perder o cursor)
+  const tr = t.closest('tr[data-linha]'); if (!tr) return;
+  let ok = true;
+  if (p[0] === 'i') { const it = TESTE.prints.find(y => y.id === p[1]).itens[+p[2]]; ok = it.codLido === String(it.cod).trim() && String(it.qtdLida) === String(it.qtd).trim(); }
+  else { const lin = tr.dataset.linha.split(':'), cid = lin[lin.length - 1]; let c;
+    if (p[0] === 'p') c = TESTE.prints.find(y => y.id === p[1]).campos.find(y => y.k === cid);
+    else c = TESTE.emails.find(y => y.id === p[1]).blocos.find(y => y.n === +p[2]).campos.find(y => y.k === cid);
+    ok = c ? certoT(c) : true; }
+  tr.classList.toggle('tst-errado', !ok);
+  const st = tr.querySelector('.tst-st'); if (st) st.innerHTML = ok ? `<span class="tag ok">${ic('check', 'sm')}Certo</span>` : `<span class="tag bad">${ic('x', 'sm')}Errado</span>`;
+});
+document.addEventListener('paste', e => {
+  if (!emTesteCfg()) return;
+  const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (!fs.length) return;
+  e.preventDefault(); testarPrints(fs);
+});
+document.addEventListener('dragover', e => { const z = e.target.closest && e.target.closest('#zonaTstPrint, #zonaTstEml'); if (z) { e.preventDefault(); z.classList.add('sobre'); } });
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#zonaTstPrint, #zonaTstEml'); if (z) z.classList.remove('sobre'); });
+document.addEventListener('drop', async e => {
+  const z = e.target.closest && e.target.closest('#zonaTstPrint, #zonaTstEml'); if (!z) return;
+  e.preventDefault(); z.classList.remove('sobre');
+  if (z.id === 'zonaTstPrint') { const fs = [...e.dataTransfer.files].filter(f => /^image\//.test(f.type)); if (fs.length) testarPrints(fs); return; }
+  const lista = []; for (const f of [...e.dataTransfer.files].filter(f => /\.eml$/i.test(f.name) || f.type === 'message/rfc822')) { try { lista.push({ nome: f.name, email: lerEml(await f.arrayBuffer()) }); } catch (er) { toast('Não consegui ler ' + f.name, 'bad'); } }
+  if (lista.length) testarEmails(lista);
+});
 
 async function init() {
   iniciarSoIcone();
