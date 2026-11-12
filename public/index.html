@@ -3733,14 +3733,14 @@ const PRINTS_LAYOUTS = [
     guia: [541, 99, 657, 113], credNome: [14, 151, 257, 165], credCgc: [260, 151, 364, 165],
     ident: [48, 301, 160, 317], paciente: [163, 301, 317, 317], cid: [16, 445, 62, 459],
     profissional: [14, 197, 276, 213], registro: [305, 197, 378, 213], dtSolic: [724, 197, 794, 213],
-    rotGuia: [[10, 118, 330, 134, /credenc|executant/i]], rotProc: [[10, 60, 52, 78, /item|tem/i]],
+    rotGuia: [[10, 118, 330, 134, /credenc|executant/i]], rotProc: [[10, 60, 52, 78, /item|tem/i]], rotCid: [[120, 420, 390, 442, /cid|descri|ricao do c/i]],
     linhas: { topo: 88, passo: 18, alt: 18, sep: 0, max: 6, item: [14, 36], cod: [484, 556], qtd: [557, 575], st: [599, 610], gradeX: [483, 556], gradeY: [90, 190] } },
   { nome: 'largo',
     ancora: { x: 322, y: 85, w: 598 },
     guia: [1000, 149, 1150, 166], credNome: [6, 203, 424, 220], credCgc: [428, 203, 553, 220],
     ident: [98, 353, 240, 369], paciente: [242, 353, 729, 369], cid: [10, 501, 62, 518],
     profissional: [6, 246, 484, 262], registro: [511, 246, 591, 262], dtSolic: [1249, 246, 1347, 262],
-    rotGuia: [[1050, 131, 1112, 150, /guia/i], [120, 131, 235, 150, /plano|credenc/i]], rotProc: [[880, 123, 968, 142, /c[oó]d|servi/i], [670, 124, 800, 142, /servi|descri/i]],
+    rotGuia: [[1050, 131, 1112, 150, /guia/i], [120, 131, 235, 150, /plano|credenc/i]], rotCid: [[300, 480, 560, 499, /cid|descri|ricao do c/i]], rotProc: [[880, 123, 968, 142, /c[oó]d|servi/i], [670, 124, 800, 142, /servi|descri/i]],
     linhas: { topo: 146, passo: 20, alt: 18, sep: -2, max: 7, item: [8, 30], cod: [895, 961], qtd: [991, 1015], st: [1120, 1136], gradeX: [893, 962], gradeY: [150, 280] } }
 ];
 const PRINTS_GEO = PRINTS_LAYOUTS[0];   // compatibilidade
@@ -3812,7 +3812,7 @@ function acharBarra(cv) {
     if (y <= y0 || y >= y1) continue;
     let melhor = null, ini = -1, ult = -1;
     const fecha = () => { if (ini >= 0 && (!melhor || ult - ini > melhor[1] - melhor[0])) melhor = [ini, ult]; };
-    for (let x = 0; x < W; x++) if (amarelo((y * W + x) * 4)) { if (ini < 0) ini = ult = x; else if (x - ult <= 26) ult = x; else { fecha(); ini = ult = x; } }   // a folga junta as duas barras do layout compacto
+    for (let x = 0; x < W; x++) if (amarelo((y * W + x) * 4)) { if (ini < 0) ini = ult = x; else if (x - ult <= 10) ult = x; else { fecha(); ini = ult = x; } }   // a folga junta as duas barras do layout compacto (8 px entre elas), sem alcançar o botão "Histórico"
     fecha(); if (melhor && melhor[1] - melhor[0] + 1 >= 240) corridas.push(melhor);
   }
   if (corridas.length >= 2) {
@@ -3862,11 +3862,13 @@ function prepararCampo(cv, an, caixa, ampl = 4, opc = {}) {
   const W = o.width, Hh = o.height, bin = new Uint8Array(n);
   // opc.limite desloca o limiar (mais alto = traço mais fino; ajuda quando letras coladas viram uma só); opc.cinza mantém tons de cinza
   const lim2 = Math.min(250, Math.max(5, lim + (opc.limite || 0)));
-  for (let i = 0; i < n; i++) bin[i] = opc.cinza ? g[i] : (g[i] > lim2 ? 255 : 0);
-  // apaga as linhas de grade (colunas/linhas quase inteiras pretas), que o OCR confunde com dígitos
+  const pb = new Uint8Array(n); for (let i = 0; i < n; i++) pb[i] = g[i] > lim2 ? 255 : 0;
+  for (let i = 0; i < n; i++) bin[i] = opc.cinza ? g[i] : pb[i];
+  // apaga as linhas de grade (colunas/linhas quase inteiras pretas), que o OCR confunde com dígitos ou com "I"/"J";
+  // a detecção usa o preto e branco também no modo em tons de cinza (senão a borda cinza da célula ficava)
   const borda = Math.round(ampl * 3);   // nas bordas do recorte, coluna escura quase inteira é a moldura do campo
-  for (let cx = 0; cx < W; cx++) { let k = 0; for (let cy = 0; cy < Hh; cy++) if (!bin[cy * W + cx]) k++; const lim = (cx < borda || cx >= W - borda) ? 0.75 : 0.93; if (k >= Hh * lim) for (let cy = 0; cy < Hh; cy++) bin[cy * W + cx] = 255; }
-  for (let cy = 0; cy < Hh; cy++) { let k = 0; for (let cx = 0; cx < W; cx++) if (!bin[cy * W + cx]) k++; if (k >= W * 0.93) for (let cx = 0; cx < W; cx++) bin[cy * W + cx] = 255; }
+  for (let cx = 0; cx < W; cx++) { let k = 0; for (let cy = 0; cy < Hh; cy++) if (!pb[cy * W + cx]) k++; const naBorda = cx < borda || cx >= W - borda, lim = naBorda ? 0.75 : 0.93; if (k >= Hh * lim && (!opc.cinza || (naBorda && opc.bordaCinza))) for (let cy = 0; cy < Hh; cy++) bin[cy * W + cx] = 255; }
+  for (let cy = 0; cy < Hh; cy++) { let k = 0; for (let cx = 0; cx < W; cx++) if (!pb[cy * W + cx]) k++; if (k >= W * 0.93 && (!opc.cinza || (opc.bordaCinza && (cy < borda || cy >= Hh - borda)))) for (let cx = 0; cx < W; cx++) bin[cy * W + cx] = 255; }
   for (let i = 0; i < n; i++) { const v = bin[i]; p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v; p[i * 4 + 3] = 255; }
   x.putImageData(im, 0, 0);
   // moldura branca ao redor: ajuda o reconhecimento de linhas curtas
@@ -3891,9 +3893,12 @@ function limparGuia(t) {
   return s;
 }
 function limparCid(t) {
-  const s = soAlfaNum(t); let m = s.match(/[A-Z]\d{2,4}/); if (m) return m[0];
-  if (/^\d{3,4}$/.test(s)) { const f = { 2: 'Z', 0: 'O', 8: 'B', 5: 'S', 1: 'I', 6: 'G' }[s[0]]; if (f) return f + s.slice(1); }   // letra inicial lida como dígito
-  return s;
+  let s = soAlfaNum(t); if (!s) return '';
+  if (/^[IL1|][A-Z]/.test(s)) s = s.slice(1);   // linha da grade à esquerda lida como I
+  // o CID começa pela letra; depois só dígitos (letras parecidas com dígitos são trocadas: "M7T71" não vira "T71")
+  const ini = { 2: 'Z', 0: 'O', 8: 'B', 5: 'S', 1: 'I', 6: 'G' }, dig = { O: '0', D: '0', Q: '0', I: '1', L: '1', T: '7', Z: '2', S: '5', B: '8', G: '6', A: '4' };
+  const c0 = /[A-Z]/.test(s[0]) ? s[0] : (ini[s[0]] || s[0]);
+  return c0 + s.slice(1).replace(/[A-Z]/g, ch => dig[ch] || ch);
 }
 const limparNome = t => semAcento((t || '').toUpperCase()).replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -3902,13 +3907,13 @@ const limparNome = t => semAcento((t || '').toUpperCase()).replace(/[^A-Z ]/g, '
    (ex.: guia = T/S + dígitos; carteira = 15 dígitos + 2 caracteres). Se duas leituras válidas concordam, ou uma válida tem boa confiança, para. */
 const VAR_PADRAO = [{ ampl: 4 }, { ampl: 4, cinza: true }, { ampl: 3, limite: 15 }, { ampl: 5, limite: -15 }, { ampl: 6, cinza: true }, { ampl: 5, cinza: true }, { ampl: 3, cinza: true }, { ampl: 4, limite: 30 }, { ampl: 5, limite: 10 }];
 const VAR_CURTO = [{ ampl: 4 }, { ampl: 4, psm: '13' }, { ampl: 6, psm: '13' }, { ampl: 4, cinza: true }, { ampl: 3, limite: 15, psm: '13' }];
-const VAR_TEXTO = [{ ampl: 4, cinza: true }, { ampl: 4 }, { ampl: 3, cinza: true }, { ampl: 5 }];   // nomes: vence a leitura repetida (texto cinza perde letras finas no preto e branco)
+const VAR_TEXTO = [{ ampl: 4, cinza: true, bordaCinza: true }, { ampl: 4 }, { ampl: 3, cinza: true, bordaCinza: true }, { ampl: 5 }];   // nomes: vence a leitura repetida (texto cinza perde letras finas no preto e branco)
 const LISTA_NOME = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ .-/&';
 const dataCalendario = v => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v); if (!m) return false; const d = new Date(+m[3], +m[2] - 1, +m[1]); return d.getDate() === +m[1] && d.getMonth() === +m[2] - 1 && +m[3] > 2000; };
 const DEF_GUIA = {
   guia: { lista: 'TS0123456789', norm: limparGuia, valida: v => /^[TS]\d{7,8}$/.test(v) },
   credNome: { lista: LISTA_NOME + '0123456789', norm: limparNome, variantes: VAR_TEXTO },
-  ident: { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', norm: soAlfaNum, valida: v => /^\d{15}[A-Z][A-Z0-9]$/.test(v) },   // no sistema o final é a sigla do plano (EQ, IE…)
+  ident: { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', norm: soAlfaNum, valida: v => cartValida(v) },   // no sistema o final é a sigla do plano (EQ, IE…)
   paciente: { lista: LISTA_NOME, norm: limparNome, variantes: VAR_TEXTO },
   cid: { lista: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', norm: limparCid, valida: v => /^[A-Z]\d{2,3}$/.test(v) },
   profissional: { lista: LISTA_NOME, norm: limparNome, variantes: VAR_TEXTO },
@@ -3997,7 +4002,9 @@ async function lerPrintTela(file, aviso) {
   if (tipo === 'guia') {
     if (telaVazia(cv, an)) return { erro: 'A tela deste print está vazia (nenhuma guia aberta). Abra a guia no sistema e tire o print de novo.', diag };
     const campos = {};
-    for (const [k, base] of Object.entries(DEF_GUIA)) { const def = { ...base, caixa: G[k] }; const r = await lerCampo(cv, an, def); campos[k] = { valor: r.valor, bruto: r.bruto, conf: r.conf, incerto: r.incerto, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) }; crops[k] = miniatura(cv, an, def.caixa); }
+    const abaCid = !G.rotCid || await confereRotulos(cv, an, G.rotCid);   // na parte de baixo pode estar aberta outra aba (ex.: Terapia): aí não há CID para ler
+    diag.abaCid = !!abaCid;
+    for (const [k, base] of Object.entries(DEF_GUIA)) { if (k === 'cid' && !abaCid) continue; const def = { ...base, caixa: G[k] }; const r = await lerCampo(cv, an, def); campos[k] = { valor: r.valor, bruto: r.bruto, conf: r.conf, incerto: r.incerto, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) }; crops[k] = miniatura(cv, an, def.caixa); }
     return { tipo, layout: G.nome, campos, crops, diag };
   }
   an = refinarGrade(cv, an);
@@ -4082,6 +4089,7 @@ function avaliarPrints(g) {
     if (!ped) add('cid', '—', lido, 'info', 'Pedido sem CID.');
     else { const ok = lido === ped || lido.startsWith(ped) || ped.startsWith(lido); add('cid', ped, lido, ok ? 'ok' : 'bad', ok ? '' : 'CID diferente do pedido.'); }
   }
+  if (!campos.cid && mem.leituras.some(l => l.tipo === 'guia')) add('cid', (p.cid || '—').replace(/\./g, '').toUpperCase(), '(aba CID fechada)', 'info', 'No print, a parte de baixo mostra outra aba (ex.: Terapia): confira o CID na tela ou envie o print com a aba CID aberta.');
   if (campos.profissional) {
     const ped = p.medico.nome || '', lido = campos.profissional.valor, nc = nomeConfere(ped, lido), s = similaridade(ped, lido);
     add('profissional', ped || '—', lido, !ped ? 'info' : (nc.ok || s >= 0.93) ? 'ok' : s >= 0.8 ? 'warn' : 'bad', !ped ? 'Pedido sem nome do médico.' : nc.exato ? '' : nc.ok ? 'Confere pelos 3 primeiros nomes, sem acentos.' : s >= 0.8 ? 'Quase igual: veja a imagem.' : 'Médico diferente do pedido.');
@@ -4092,7 +4100,8 @@ function avaliarPrints(g) {
   }
   if (campos.dtSolic) {
     const em = p.emissao, lido = campos.dtSolic.valor, ped = em.estado === 'valida' ? fmtData(em.data) : '';
-    add('dtSolic', ped || (em.estado === 'sem_data' ? 'SEM DATA' : '—'), lido, !ped ? 'info' : ped === lido ? 'ok' : 'bad', !ped ? 'Pedido sem data para comparar.' : ped === lido ? '' : 'Data diferente da data do pedido.');
+    if (!lido && ped) add('dtSolic', ped, '(em branco)', 'warn', 'A data da solicitação está em branco no print: confira se foi preenchida no sistema.');
+    else add('dtSolic', ped || (em.estado === 'sem_data' ? 'SEM DATA' : '—'), lido, !ped ? 'info' : ped === lido ? 'ok' : 'bad', !ped ? 'Pedido sem data para comparar.' : ped === lido ? '' : 'Data diferente da data do pedido.');
   }
   // itens: pedido × sistema
   const sis = [...itensSis.values()].sort((a, b) => (a.n || 99) - (b.n || 99));
