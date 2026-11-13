@@ -1085,7 +1085,7 @@ const ROTULOS = [
 ];
 /* rótulos que dispensam os dois-pontos quando o valor tem o formato esperado (ex.: "CID F84", "Carteira 4122...") */
 const VALOR_SEM_SEPARADOR = {
-  carteira: /^\s+\d[\d\s.\-]{9,}/, cid: /^\s+[A-Za-z]\d{2}/, emissao: /^\s+\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/
+  carteira: /^\s+\d[\d\s.\-]{9,}/, cid: /^\s+(?:cid(?:[\s\-]*10)?\s*[:\-]?\s*)?[A-Za-z]\s?\d{2}/i, quantidade: /^\s*\d{1,3}\s*(?:x|vezes|sess|$)/i, emissao: /^\s+\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/
 };
 const CART_RE = /(?<![\dA-Za-z])(?:\d[ ./\-]?){14}\d[ ./\-]?[A-Za-z0-9]{2}(?![\dA-Za-z])/;
 function normUnidades(l) { let s = ''; for (let i = 0; i < l.length; i++) { const n = semAcento(l[i]).toLowerCase(); s += n.length ? n[0] : l[i]; } return s; }
@@ -1120,6 +1120,7 @@ function secionar(texto) {
   for (const l of texto.split('\n')) {
     const r = detectarRotulo(l);
     if (r) secoes.push({ k: r.k, linhas: [r.valor] });
+    else if (/^\s*[●•▪■◦]/.test(l) && secoes[secoes.length - 1].k) secoes.push({ k: null, linhas: [l.replace(/[*_●•▪■◦]/g, ' ').trim()] });   // "● CID ..." não é continuação do "● Médico:" vazio
     else secoes[secoes.length - 1].linhas.push(l.replace(/[*_]/g, ' ').trim());
   }
   return secoes;
@@ -1130,7 +1131,7 @@ function extrairItens(bloco) {
   const ms = [...bloco.matchAll(/(?<![\dA-Za-z])(\d{8})(?!\d)/g)].filter(m => !ehData(m[1]));
   const SEM_FREQ = '(?!\\s*(?:por|\\/|ao|na)\\s*(?:semana|m[eê]s|dia))';
   const pats = [
-    /(?<!\d)(\d{1,2})\s*[x×]\s*(?:por|\/|na|ao)\s*semana/i,   // "10 sessões - 03 x por semana": vale a frequência semanal, mesmo com "Quantidade: 10" antes
+    /(?<!\d)(\d{1,2})\s*[x×]\s*(?:(?:por|\/|na|ao)\s*)?semana/i,   // "10 sessões - 03 x por semana": vale a frequência semanal, mesmo com "Quantidade: 10" antes
     /\(?\s*(?:quantidades?|qtde?|quant)\.?\s*[:=\-–—]?\s*(\d{1,3})\s*\)?/i,
     /(?<!\d)(\d{1,2})\s*(?:sess(?:[õo]es|[ãa]o)|vezes|atendimentos?|consultas?)\b/i,
     new RegExp('(?:^|\\s)[x×]\\s*(\\d{1,2})(?!\\d)' + SEM_FREQ, 'i'),
@@ -1151,6 +1152,10 @@ function extrairItens(bloco) {
     for (const p of pats) { qm = seg.match(p); if (qm) { qtd = Number(qm[1]); break; } }
     let origem = qtd != null ? 'linha' : null;
     let desc = descPrimeiro ? ctx[k].antes.replace(/^[\s*_\-–—•●·]+/, '') : ((qm ? seg.slice(0, qm.index) : seg).split('\n').map(x => x.trim()).filter(Boolean)[0] || '');
+    if (qtd == null && descPrimeiro) {
+      const a = ctx[k].antes.match(/(?<!\d)(\d{1,2})\s*[x×]\s*(?:(?:por|\/|na|ao)\s*)?semana\w*|(?<!\d)(\d{1,2})\s*[x×](?![A-Za-z\d])|\(\s*(\d{1,2})\s*\)/i);
+      if (a) { qtd = Number(a[1] || a[2] || a[3]); origem = 'linha'; desc = desc.replace(a[0], ' ').replace(/\s*[-–—]\s*[-–—]\s*/g, ' - ').replace(/[\s\-–—]+$/, ''); }
+    }
     if (qtd == null) {   // último recurso: número solto no fim da própria linha do serviço ("80000004 Terapia 2")
       const fim = desc.match(/^(.*\D)\s+(\d{1,2})$/);
       if (fim && fim[1].replace(/[^A-Za-zÀ-ÿ]/g, '').length >= 3) { qtd = Number(fim[2]); desc = fim[1]; origem = 'fim-da-linha'; }
@@ -1162,6 +1167,7 @@ function extrairItens(bloco) {
   return { itens, invalidos };
 }
 function lerMedico(bruto) {
+  bruto = String(bruto || '').replace(/\bRQE\b\s*[:\-nº°.]*\s*\d*/gi, ' ');   // "CRM 18103 / RQE 10935 - LORENA": RQE é a especialidade, não é nome nem CRM
   const conselho = (bruto.match(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/i) || [''])[0].toUpperCase();
   const dig = (bruto.match(/\d[\d.\s]{1,10}\d|\d{3,}/) || [''])[0].replace(/\D/g, '');
   const nome = bruto.replace(/(?<![\p{L}])(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)(?![\p{L}])/giu, ' ').replace(/(?<![\p{L}\d])[A-Z]{2}(?![\p{L}\d])(?=\s*[:\-\/]?\s*\d)/gu, ' ')
@@ -1241,8 +1247,12 @@ function lerPedido(texto, referencia) {
   p.medico = lerMedico(medicoTxt);
   if (p.medico.nome && !p.medico.crm) { const m = texto.match(/\bCRM\s*[:\-]?\s*(\d{3,7})/i); if (m) { p.medico.crm = m[1]; p.medico.conselho = p.medico.conselho || 'CRM'; p.medico.bruto = `${p.medico.bruto} CRM ${m[1]}`.trim(); } }   // CRM em linha própria, abaixo do nome
   let cidTxt = primeiraLinha(de('cid')[0]);
-  if (!cidTxt) { const m = texto.match(/\bCID(?:-?10)?\s*[:\-]?\s*([A-Za-z])\s?(\d{2,3}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1] + m[2]; }
-  cidTxt = cidTxt.replace(/\s+/g, '');
+  if (!cidTxt) { const m = texto.match(/\bCID(?:[\s\-]*10)?\s*[:\-]?\s*([A-Za-z])\s?(\d{2,3}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1] + m[2]; }
+  if (cidTxt) {   // "CID 10 F84.0", "CID F 84.0 E F41.1": tira o rótulo repetido e junta os CIDs com " + "
+    const cs = [...cidTxt.replace(/\bCID(?:[\s\-]*10)?\b\s*[:\-]?/gi, ' ').matchAll(/(?<![A-Za-z\d])([A-Za-z])\s?(\d{2}(?:\.\d{1,2}|\d)?)(?![\dA-Za-z])/g)].map(m => (m[1] + m[2]).toUpperCase());
+    if (cs.length) cidTxt = unicos(cs).join(' + ');
+  }
+  cidTxt = cidTxt.replace(/(?<!\+)\s+(?!\+)/g, '');
   if (cidTxt && !/^[A-Za-z]\d{2}/.test(cidTxt) && /^\d{3,7}$/.test(cidTxt)) { // "CID : 31163" colado na linha do médico é, na verdade, o CRM
     if (!p.medico.crm) { p.medico.crm = cidTxt; p.medico.bruto = `${p.medico.bruto} CRM ${cidTxt}`.trim(); } cidTxt = '';
   }
@@ -1265,13 +1275,14 @@ function lerPedido(texto, referencia) {
     for (let j = i + 1; j < secoes.length && secoes[j].k !== 'servico'; j++) if (secoes[j].k === 'quantidade' && !secoes[j].usada) { aplicarQtd(r.itens, secoes[j]); break; }
     p.itens.push(...r.itens);
   }
-  if (!de('servico').length) {
-    let livres = secoes.filter(s => s.k === null || s.k === 'obs').flatMap(s => s.linhas).filter(l => /^\s*[^\p{L}\p{N}]*(?:\d{1,2}[.)]\s*)?\d{8}(?!\d)/u.test(l));
+  if (!p.itens.length && !p.invalidos.length) {   // sem campo "Serviço" (ou com ele vazio, ex.: "TERAPIA SOLICITADA" no meio de uma frase)
+    let livres = secoes.flatMap(s => s.k === null || s.k === 'obs' || s.k === 'servico' ? s.linhas : s.linhas.slice(1)).filter(l => /^\s*[^\p{L}\p{N}]*(?:\d{1,2}[.)]\s*)?\d{8}(?!\d)/u.test(l)
+      || /\p{L}{3,}.*(?<![\dA-Za-z])\d{8,9}\s*[.;]?\s*$/u.test(l));   // lista "FONOAUDIOLOGO - 02 X SEMANAL - 80000008" (código no fim da linha)
     if (!livres.length && p.carteiraBruta) {   // código solto na mesma linha da carteira ("NOME carteira 50000616 FONO")
       livres = texto.split('\n').map(l => l.replace(CART_RE, ' ')).filter(l => /(?<![\dA-Za-z])\d{8}(?!\d)/.test(l)).map(l => l.slice(l.search(/(?<![\dA-Za-z])\d{8}(?!\d)/)));
     }
     const r = extrairItens(livres.join('\n'));
-    if (r.itens.length) { p.semRotulo = true; p.itens = r.itens; }
+    if (r.itens.length) { p.semRotulo = true; p.itens = r.itens; p.invalidos.push(...r.invalidos.filter(c => c.length === 7 || c.length === 9)); }   // código com dígito a mais/menos na lista: vira alerta, não some
   }
   const qLivre = de('quantidade').filter(s => !s.usada);
   if (qLivre.length === 1 && p.itens.filter(i => i.qtd == null).length) aplicarQtd(p.itens, qLivre[0]);
@@ -1355,8 +1366,14 @@ function converterTabelas(texto) {
   }
   return out.join('\n');
 }
+/* códigos escritos com ponto ("5000.0616", "5.00.00.47-0", "50.000.470") viram os 8 dígitos */
+function juntarCodigos(t) {
+  return String(t || '').replace(/(?<![\d.\-\/])(\d)\.(\d{2})\.(\d{2})\.(\d{2})-(\d)(?![\d.\-\/])/g, '$1$2$3$4$5')
+    .replace(/(?<![\d.\-\/])([1-9]0)\.(\d{3})\.(\d{3})(?![\d.\-\/])/g, '$1$2$3')
+    .replace(/(?<![\d.\-\/,])(\d{4})\.(\d{4})(?![\d.\-\/,])/g, '$1$2');
+}
 function lerPedidos(texto, referencia) {
-  texto = converterTabelas(texto);
+  texto = converterTabelas(juntarCodigos(texto));
   const L = texto.split('\n').flatMap(explodirLinha);
   /* 1) separadores explícitos (linhas de traços, "Paciente 2") */
   const comDados = [], compartilhado = [];
@@ -2454,7 +2471,7 @@ function avaliar(g) {
   if (em.estado === 'ausente') add('em-aus', 'Data de emissão não informada (não obrigatória).');
   if (p.medico.nome && !p.medico.crm) add('crm', 'CRM do médico não informado.');
   if (!p.cid) add('cid', 'CID não informado (não obrigatório).');
-  else if (!/^[A-Z]\d{2}(\.?\d{1,2})?$/i.test(p.cid)) add('cid-fmt', `CID "${p.cid}" fora do padrão (ex.: F84 ou F84.0). Confira no e-mail.`);
+  else if (!p.cid.split(' + ').every(c => /^[A-Z]\d{2}(\.?\d{1,2})?$/i.test(c))) add('cid-fmt', `CID "${p.cid}" fora do padrão (ex.: F84 ou F84.0). Confira no e-mail.`);
   if (em.anoInferido) add('em-inf', `A clínica escreveu "${em.bruto}" sem o ano; foi considerado ${fmtData(em.data)}. Confirme no pedido médico.`);
   if (!p.beneficiario && !p.carteiraBruta && !p.itens.length && !p.invalidos.length && !p.codigoSuspeito) add('nao-pedido', 'Este e-mail não traz beneficiário, carteira nem código de serviço: pode não ser um pedido de autorização (dúvida, retificação ou conversa).');
   /* e-mail */
