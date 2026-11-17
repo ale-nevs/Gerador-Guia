@@ -531,6 +531,15 @@ mark.dif{background:var(--bad-bg);color:var(--bad-fg);outline:1px solid var(--ba
 .orig .ic{width:12px;height:12px}
 .orig-digitado{color:var(--warn-solid)}.orig-aprendido,.orig-regra{color:var(--accent)}
 .aviso-parado{margin-bottom:10px;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
+.presenca{display:flex;flex-wrap:wrap;gap:8px 18px}
+.pres-op{display:flex;gap:8px;align-items:center}.pres-op b{display:block;font-size:var(--fs-sm)}.pres-op small{display:block;color:var(--text-2);font-size:var(--fs-xs)}
+.trancado-pin{text-align:center;display:grid;gap:8px;justify-items:center;padding:28px}
+.trancado-pin .ic.xl{color:var(--text-3)}
+fieldset.regras-fs{border:0;margin:0;padding:0;min-width:0}fieldset.regras-fs:disabled{opacity:.6}
+.notas-fixas{display:grid;gap:6px;margin-top:10px}
+.nota-fixa{display:flex;gap:8px;align-items:center;padding:8px 12px;border:1px solid var(--info-br);background:var(--info-bg);color:var(--info-fg);border-radius:var(--r-sm);font-size:var(--fs-sm)}
+.nota-fixa .esp{flex:1;min-width:0}
 /* ===== Esqueleto, combobox e dicas ===== */
 @keyframes brilho{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .esq-b{border-radius:6px;background:linear-gradient(90deg,var(--surface-3) 0,var(--surface-2) 50%,var(--surface-3) 100%);background-size:800px 100%;animation:brilho 1.2s linear infinite}
@@ -2269,6 +2278,7 @@ function mesclarConfig(base, c) {
   if (!c) return r;
   const ops = normOperadores(c.operadores); if (ops.length) r.operadores = ops;
   if (Array.isArray(c.clinicas)) r.clinicas = c.clinicas;
+  r.supervisor = c.supervisor && c.supervisor.pinHash && c.supervisor.pinSalt ? { pinHash: String(c.supervisor.pinHash), pinSalt: String(c.supervisor.pinSalt) } : null;
   r.clinicas.forEach(cl => { cl.leitura = normLeitura(cl.leitura); cl.id = cl.id || slug(cl.nome); cl.emails = unicos((cl.emails || []).map(e => String(e).toLowerCase().trim()).filter(Boolean)); cl.codigos = cl.codigos || {}; cl.executante = cl.executante || ''; cl.apelidos = cl.apelidos || ''; cl.cidade = cl.cidade || ''; });
   if (c.modelos) for (const k in c.modelos) {
     if (!MODELOS_PADRAO[k]) continue;           // modelos obsoletos (ex.: "Pedido em anexo") não são mais usados
@@ -2307,9 +2317,10 @@ function configParaSalvar(c) {
   return {
     versao: VERSAO, atualizadoEm: agora(), atualizadoPor: operador(),
     operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, corRgb: o.corRgb, corAlfa: o.corAlfa, ...(o.senhaHash ? { senhaHash: o.senhaHash, senhaSalt: o.senhaSalt } : {}) })),
-    clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', codigos: cl.codigos || {}, leitura: normLeitura(cl.leitura) })),
+    clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', nota: (cl.nota || '').trim(), codigos: cl.codigos || {}, leitura: normLeitura(cl.leitura) })),
     modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
-    alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], obsAuto: c.obsAuto, preferencias: c.preferencias
+    alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], obsAuto: c.obsAuto, preferencias: c.preferencias,
+    supervisor: c.supervisor && c.supervisor.pinHash ? { pinHash: c.supervisor.pinHash, pinSalt: c.supervisor.pinSalt } : null
   };
 }
 // Antes de gravar, traz do config.json da pasta os operadores que colegas criaram ou protegeram com senha
@@ -2807,6 +2818,7 @@ function aplicarParametrizacao(g) {
 /* ---------- Registro gravado (sem nome, CID ou médico) ---------- */
 function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; const gl = glosaDe(g), temGlosa = (r.situacao === 'autorizada' || r.situacao === 'parcial') && gl.resp === 'sim', okI = new Set(itensGlosaveis(g).map(i => i.codigo));
   return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut, glosaResp: (r.situacao === 'autorizada' || r.situacao === 'parcial') ? gl.resp : null, glosas: temGlosa ? Object.entries(gl.itens).filter(([c]) => okI.has(c)).map(([c, x]) => ({ c, g: x.glosa || '', m: x.motivo || '' })) : [] }; }
+const leituraCorrigida = g => !!(g.itensEditados || ['beneficiario', 'medico', 'cid', 'emissao', 'local'].some(k => ['digitado', 'aprendido'].includes((g.origem || {})[k])) || g.pedido.itens.some(i => ['digitado', 'aprendido'].includes(i.origemCod)));
 function montarRegistro(g, status, extra = {}) {
   const p = g.pedido, cl = clinicaDe(S), A = avaliar(g), op = operadorObj();
   const neg = negadosDe(g).map(x => x.it.codigo);
@@ -2814,7 +2826,7 @@ function montarRegistro(g, status, extra = {}) {
     id: g.id, atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.guias.length, versao: VERSAO,
     messageId: S.email.messageId, recebidoEm: S.email.data, assunto: S.email.assunto, remetente: S.email.remetente.email,
     clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: op ? op.nome : '', operadorId: op ? op.id : null, abertoPor: g.abertoPor || (op ? op.nome : ''), dia: S.dia,
-    abertoEm: g.abertoEm, vista: g.vista, pacienteIni: iniciais(g.pedido.beneficiario || ''), paciente: g.pedido.beneficiario || '', atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
+    abertoEm: g.abertoEm, vista: g.vista, leituraCorrigida: leituraCorrigida(g), pacienteIni: iniciais(g.pedido.beneficiario || ''), paciente: g.pedido.beneficiario || '', atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
     carteira: g.carteiraUsada || p.carteira || null,
     itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' && !g.semGuia ? !neg.includes(i.codigo) : null })),
     guia: g.semGuia ? null : (g.numero || null), resultado: status === 'concluido' ? resultadoParaRegistro(g) : null,
@@ -3108,7 +3120,7 @@ function render() {
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
   const alvoId = 'etapa';
-  app.innerHTML = htmlAvisoParado() + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g)) + `<div id="${alvoId}"></div>`;
+  app.innerHTML = htmlAvisoParado() + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g) + htmlNotasFixas(g)) + `<div id="${alvoId}"></div>`;
   const alvo = $('#' + alvoId);
   if (S.vista === 1) renderVisao(alvo); else if (g.status === 'concluido' && S.vista === 4) renderConcluida(alvo, g);
   else if (S.vista === 2) renderPedido(alvo, g); else if (S.vista === 3) renderGuia(alvo, g); else renderFinal(alvo, g);
@@ -3293,7 +3305,7 @@ function renderPedido(alvo, g) {
     <div class="col-fixa">${htmlEmailCard()}</div>
     <div class="stack">
       <div class="card">
-        <div class="card-h"><h2>Dados do pedido${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
+        <div class="card-h"><h2>Dados do pedido${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}${Notas.de(g.carteiraUsada || p.carteira) ? '' : `<button class="btn sm ghost" data-act="notaBenef" title="Recado que aparece sempre que esta carteira for atendida">${ic('message', 'sm')}Nota do beneficiário</button>`}</div>
         <div class="form-grid">
           <div data-mcampo="benef"><label class="lbl mk" for="f-benef">Beneficiário ${origemDe(g, 'beneficiario')}</label><input type="text" id="f-benef" data-campo="beneficiario" value="${esc(p.beneficiario)}"></div>
           <div data-mcampo="cart"><label class="lbl mk">Carteira informada no e-mail</label><div style="min-height:34px;display:flex;align-items:center" class="num">${esc(p.carteiraBruta || '—')}</div></div>
@@ -3781,6 +3793,25 @@ function csvRegistros(regs) {
 }
 /* Esqueleto de carregamento (no lugar de "Carregando…") */
 const htmlEsqueleto = (linhas = 6, cartoes = 0) => `<div class="esq" aria-busy="true" aria-label="Carregando">${cartoes ? `<div class="esq-kpis">${'<div class="esq-b esq-kpi"></div>'.repeat(cartoes)}</div>` : ''}<div class="card">${'<div class="esq-b esq-linha"></div>'.repeat(linhas)}</div></div>`;
+/* Tempo médio por operador e por clínica, leitura do e-mail sem correção por clínica e clínicas que mais geram correção */
+function htmlTempoQualidade(concl) {
+  const fmtMin = l => { const c = l.filter(r => r.duracaoSeg); return c.length ? (c.reduce((s, r) => s + r.duracaoSeg, 0) / c.length / 60).toFixed(1).replace('.', ',') + ' min' : '—'; };
+  const grupo = (chave, nome) => { const m = new Map(); concl.forEach(r => { const k = chave(r); if (!m.has(k)) m.set(k, { nome: nome(r), regs: [] }); m.get(k).regs.push(r); }); return [...m.values()].sort((a, b) => b.regs.length - a.regs.length); };
+  const semCorr = l => { const c = l.filter(r => r.leituraCorrigida != null); if (!c.length) return '<span class="muted">—</span>'; const pc = Math.round(100 * c.filter(r => !r.leituraCorrigida).length / c.length); return `<span class="tag ${pc >= 90 ? 'ok' : pc >= 70 ? 'warn' : 'bad'}">${pc}%</span> <span class="muted">de ${c.length}</span>`; };
+  const porOp = grupo(r => r.operadorId || r.operador || '?', r => r.operador || 'Operador');
+  const porCl = grupo(r => r.clinicaId || r.clinica || 'sem', r => r.clinica || 'Clínica não identificada');
+  const apr = new Map(); Apr.lista.forEach(x => { const k = x.clinica || x.clinicaId || '—'; const o = apr.get(k) || { n: 0, campos: {} }; o.n += x.n || 1; o.campos[x.campo] = (o.campos[x.campo] || 0) + (x.n || 1); apr.set(k, o); });
+  const topApr = [...apr.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+  const CAMPO_N = { codigo: 'código', quantidade: 'quantidade', medico: 'médico', crm: 'CRM', cid: 'CID', local: 'local', emissao: 'data', paciente: 'nome (print)', ident: 'carteira (print)', registro: 'CRM (print)', guia: 'nº da guia (print)', item: 'item (print)' };
+  const tab = (cab, linhas) => `<div class="tabela-scroll"><table class="t"><thead><tr>${cab.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${linhas || `<tr><td colspan="${cab.length}" class="muted">Sem dados no período.</td></tr>`}</tbody></table></div>`;
+  return `<div class="card"><div class="card-h"><h2>Tempo e qualidade</h2></div>
+    <div class="grid3">
+      <div><h3 style="margin-top:0">Por operador</h3>${tab(['Operador', 'Guias', 'Tempo médio'], porOp.map(x => `<tr><td>${esc(x.nome)}</td><td class="c num">${x.regs.length}</td><td class="c num">${fmtMin(x.regs)}</td></tr>`).join(''))}</div>
+      <div><h3 style="margin-top:0">Por clínica</h3>${tab(['Clínica', 'Guias', 'Tempo médio', 'E-mail lido sem correção'], porCl.map(x => `<tr><td>${esc(x.nome)}</td><td class="c num">${x.regs.length}</td><td class="c num">${fmtMin(x.regs)}</td><td class="c">${semCorr(x.regs)}</td></tr>`).join(''))}</div>
+      <div><h3 style="margin-top:0">Clínicas que mais geram correção</h3>${tab(['Clínica', 'Correções', 'Mais corrigido'], topApr.map(([k, o]) => { const c = Object.entries(o.campos).sort((a, b) => b[1] - a[1])[0]; return `<tr><td>${esc(k)}</td><td class="c num">${o.n}</td><td>${esc(CAMPO_N[c[0]] || c[0])}</td></tr>`; }).join(''))}<p class="dica" style="margin-top:6px">Todas as correções guardadas em Configurações › Aprendizado.</p></div>
+    </div>
+    <p class="dica" style="margin:8px 0 0">“E-mail lido sem correção”: guias em que ninguém precisou corrigir à mão nome, médico, CID, data, local ou serviços (conta só os atendimentos registrados a partir desta versão). Abaixo de 70%, vale criar uma regra de leitura para a clínica.</p></div>`;
+}
 async function renderPainel(app) {
   app.innerHTML = htmlEsqueleto(8, 3);
   const mes = painelModo === 'mes', sem = painelModo === 'semana', longo = mes || sem;
@@ -3816,6 +3847,7 @@ async function renderPainel(app) {
   </div>
   <div class="card"><div class="card-h"><h2>Guias por clínica</h2></div>
     ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste período.</p>'}</div>
+  ${htmlTempoQualidade(concl)}
   <div class="card">
     <div class="card-h"><h2>Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
     <div class="filtros" style="margin-bottom:12px">
@@ -3923,7 +3955,8 @@ async function renderQuadro(app) {
     [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
-  app.innerHTML = htmlAuditar() + `<div class="card"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
+  await Presenca.bater(); await Presenca.ler();
+  app.innerHTML = htmlPresenca() + htmlAuditar() + `<div class="card"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
     <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está.${lim ? ` Some da lista após ${lim} min sem movimento.` : ''}</p></div>
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
@@ -4021,10 +4054,40 @@ async function renderConfig(app) {
     }
   }
 }
+/* ---------- PIN do supervisor: regras de leitura, alertas e modelos ---------- */
+const Pin = {
+  ate: 0,
+  definido() { return !!(cfg.supervisor && cfg.supervisor.pinHash); },
+  liberado() { return !this.definido() || Date.now() < this.ate; },
+  async confere(pin) { const s = cfg.supervisor; return !!(s && s.pinHash) && (await Senha.hash(pin, s.pinSalt)) === s.pinHash; },
+  liberar() { this.ate = Date.now() + 15 * 60000; }
+};
+const SECOES_PIN = ['modelos', 'obs', 'obsauto', 'alertas'];
+const htmlTrancado = oque => `<div class="card trancado-pin">${ic('lock', 'xl')}<h2>Seção protegida pelo PIN do supervisor</h2><p class="dica">${oque}</p>
+  <div class="linha-flex" style="justify-content:center"><input type="password" id="pinIn" inputmode="numeric" maxlength="12" placeholder="PIN" data-enter="pinLiberar" style="width:160px" autocomplete="off" aria-label="PIN do supervisor"><button class="btn pri" data-act="pinLiberar">${ic('lock', 'sm')}Liberar</button></div>
+  <p class="dica" style="margin-top:8px">Fica liberado por 15 minutos neste computador.</p></div>`;
+function pedirPin(depois) {
+  abrirModal({ titulo: 'PIN do supervisor', sub: 'Necessário para mudar regras, alertas e modelos', icone: 'lock', tamanho: 'p',
+    corpo: `<label class="lbl" for="pinModal">PIN</label><input type="password" id="pinModal" inputmode="numeric" maxlength="12" autocomplete="off" data-enter="pinModalOk">`,
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="pinModalOk">${ic('lock', 'sm')}Liberar</button>` });
+  Pin.depois = depois;
+}
+function cfgPin() {
+  const s = cfgEdit.supervisor, def = !!(s && s.pinHash);
+  return `<div class="card">${cabSecao('PIN do supervisor', 'Protege as regras de leitura das clínicas, os alertas, os modelos de texto, a importação de configurações e o “Virar regra” do Aprendizado. Os operadores continuam atendendo normalmente.')}
+    ${!def ? `<div class="form-grid" style="max-width:520px"><div><label class="lbl" for="pinNovo">Novo PIN (4 a 12 dígitos)</label><input type="password" id="pinNovo" inputmode="numeric" maxlength="12" autocomplete="new-password"></div><div><label class="lbl" for="pinConf">Repita o PIN</label><input type="password" id="pinConf" inputmode="numeric" maxlength="12" autocomplete="new-password"></div></div>
+      <div class="acoes"><button class="btn pri" data-act="pinDefinir">${ic('lock', 'sm')}Definir PIN</button></div>`
+    : !Pin.liberado() ? `<p style="margin:0 0 8px">${ic('lock', 'sm')} PIN definido. Libere para trocar ou remover.</p><button class="btn" data-act="pinPedir">${ic('lock', 'sm')}Liberar com o PIN</button>`
+    : `<p style="margin:0 0 8px">${ic('check', 'sm')} PIN definido e liberado neste computador (até ${fmtHora(new Date(Pin.ate))}).</p>
+      <div class="form-grid" style="max-width:520px"><div><label class="lbl" for="pinNovo">Novo PIN</label><input type="password" id="pinNovo" inputmode="numeric" maxlength="12" autocomplete="new-password"></div><div><label class="lbl" for="pinConf">Repita o novo PIN</label><input type="password" id="pinConf" inputmode="numeric" maxlength="12" autocomplete="new-password"></div></div>
+      <div class="acoes"><button class="btn" data-act="pinDefinir">${ic('lock', 'sm')}Trocar PIN</button><button class="btn dng" data-act="pinRemover">${ic('trash', 'sm')}Remover PIN</button><button class="btn ghost" data-act="pinTrancar">Trancar agora</button></div>`}
+  </div>`;
+}
 function htmlCfgSecao() {
+  if (SECOES_PIN.includes(cfgSecao) && !Pin.liberado()) return htmlTrancado('Alertas, modelos de texto e observações automáticas só podem ser alterados pelo supervisor.');
   switch (cfgSecao) {
     case 'aparencia': return cfgAparencia();
-    case 'perfil': return cfgPerfil();
+    case 'perfil': return cfgPerfil() + cfgPin();
     case 'clinicas': return cfgClinicas();
     case 'modelos': return cfgModelos('modelos', k => MODELOS_META[k].destino === 'email', 'Modelos de e-mail', 'Textos das respostas enviadas às clínicas. Aceitam negrito, itálico, cor, listas e campos dinâmicos.');
     case 'obs': return cfgModelos('obs', k => ['observacao', 'obs_parametrizado'].includes(k), 'Modelo de observação da guia', 'Textos do campo de observação da guia no sistema oficial. São copiados como texto simples.');
@@ -4032,7 +4095,7 @@ function htmlCfgSecao() {
     case 'param': return cfgParam();
     case 'alertas': return cfgAlertas();
     case 'export': return cfgExport();
-    case 'prefs': return cfgPrefs();
+    case 'prefs': return cfgPrefs() + htmlArmazenamento();
     case 'info': return cfgInfo();
     case 'testes': return cfgTestes();
     case 'aprendizado': return cfgAprendizado();
@@ -4090,18 +4153,20 @@ function cfgClinicaDetalhe(cl, i) {
       <div><label class="lbl" for="cl-cidade">Cidade</label><input type="text" id="cl-cidade" data-cfg="${P}.cidade" value="${esc(cl.cidade)}"></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-exec">Credenciado executante no sistema</label><input type="text" id="cl-exec" data-cfg="${P}.executante" value="${esc(cl.executante)}" placeholder="Não informado"></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-apel">Apelidos usados no assunto</label><input type="text" id="cl-apel" data-cfg="${P}.apelidos" value="${esc(cl.apelidos)}" placeholder="Ex.: Criar, MRA"></div>
+      <div style="grid-column:1/-1"><label class="lbl" for="cl-nota">Nota fixa da clínica (aparece em todo atendimento dela)</label><textarea id="cl-nota" rows="2" data-cfg="${P}.nota" placeholder="Ex.: sempre manda o CID sem ponto; confirmar quantidade por telefone">${esc(cl.nota || '')}</textarea></div>
     </div>
     <h3>E-mails do remetente</h3>
     <div class="chips-e">${cl.emails.map((e, j) => `<span class="chip-e">${esc(e)}<button data-act="clRemEmail" data-i="${i}" data-j="${j}" aria-label="Remover ${esc(e)}" title="Remover">${ic('x', 'sm')}</button></span>`).join('') || '<span class="muted" style="font-size:var(--fs-sm)">Nenhum e-mail cadastrado. Ao receber um pedido de remetente desconhecido, é possível vincular o e-mail à clínica na hora.</span>'}</div>
     <div class="linha-flex"><input type="email" id="novoEmail" placeholder="contato@clinica.com.br" style="flex:1;min-width:200px;width:auto" aria-label="Novo e-mail" data-enter="clAddEmail" data-i="${i}"><button class="btn line" data-act="clAddEmail" data-i="${i}">${ic('plus', 'sm')}Adicionar e-mail</button></div>
     <h3 style="margin-top:20px">Regras de leitura do e-mail</h3>
     <p class="dica">Use quando a clínica repete o mesmo erro no e-mail. As regras valem só para os e-mails desta clínica, e cada ajuste aparece como alerta para o operador conferir. Para ver o efeito, salve e use Configurações › Testar leitura.</p>
-    <div class="regras-cl">
+    ${Pin.liberado() ? '' : `<div class="aviso-simples" style="margin-bottom:8px">${ic('lock', 'sm')}<div>Regras protegidas pelo PIN do supervisor. <button class="btn link" data-act="pinPedir">Liberar</button></div></div>`}
+    <fieldset class="regras-fs" ${Pin.liberado() ? '' : 'disabled'}><div class="regras-cl">
       <div><label class="lbl" for="cl-qtdp">Quantidade quando o e-mail não informar</label><input type="number" min="1" max="99" id="cl-qtdp" data-cfg="${P}.leitura.qtdPadrao" value="${esc(cl.leitura.qtdPadrao)}" placeholder="Vazio: não preencher (bloqueia)" style="max-width:260px"></div>
       <label class="chk"><input type="checkbox" data-cfg="${P}.leitura.completarCodigo" ${cl.leitura.completarCodigo ? 'checked' : ''}><span><b>Código com um dígito a mais ou a menos</b>: corrigir para o código cadastrado desta clínica que só difere nesse dígito (ex.: 5000470 → 50000470). Precisa dos códigos cadastrados abaixo.</span></label>
       <label class="chk"><input type="checkbox" data-cfg="${P}.leitura.qtdColada" ${cl.leitura.qtdColada ? 'checked' : ''}><span><b>Quantidade colada no CRM</b>: número de 5 dígitos começando com 1 logo depois do serviço e seguido de hífen é quantidade 1 + CRM (ex.: "PSICOLOGIA 19700-" = 1 + CRM 9700). Com 6 dígitos ("119741") isso já é automático.</span></label>
       <div><label class="lbl" for="cl-trocas">Códigos que a clínica escreve errado (um por linha: escrito = certo)</label><textarea id="cl-trocas" rows="3" class="num" data-cfg="${P}.leitura.trocas" placeholder="5000470 = 50000470">${esc(cl.leitura.trocas)}</textarea></div>
-    </div>
+    </div></fieldset>
     <div class="card-h" style="margin-top:20px"><h3 style="margin:0">Códigos e descrições (${cl._lista.filter(x => x.c).length})</h3><span class="esp"></span>
       <button class="btn sm line" data-act="codImportar" data-i="${i}">${ic('upload', 'sm')}Colar lista</button><button class="btn sm line" data-act="codSugerir" data-i="${i}" title="Lista códigos de atendimentos concluídos que ainda não estão no cadastro, para você escolher quais adicionar">${ic('search', 'sm')}Sugerir a partir de atendimentos</button><button class="btn sm pri" data-act="codAdd" data-i="${i}">${ic('plus', 'sm')}Adicionar código</button></div>
     ${cl._lista.length ? `<div class="busca" style="margin-bottom:8px"><span class="sr"><label for="buscaCod">Buscar código</label></span>${ic('search', 'sm')}<input type="search" id="buscaCod" placeholder="Filtrar por código ou descrição" data-filtro="cod"></div>
@@ -4196,6 +4261,39 @@ function cfgObsAuto() {
     <h3>Itens</h3>${Object.entries(OBS_AUTO).filter(([, v]) => v.itens).map(linha).join('')}
     <h3>Campos da guia</h3>${Object.entries(OBS_AUTO).filter(([, v]) => !v.itens).map(linha).join('')}
     <div class="acoes"><button class="btn line" data-act="obsAutoRestaurar">${ic('undo', 'sm')}Restaurar padrões</button></div></div>`;
+}
+/* ---------- Tamanho da pasta "auditoria" e limpeza dos prints antigos (o texto fica) ---------- */
+let AUD_TAM = null;
+const fmtBytes = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+async function medirAuditoria() {
+  const meses = [];
+  for (const [m, hm] of await Pasta.listar(['auditoria'])) {
+    if (hm.kind !== 'directory') continue; let n = 0, bytes = 0;
+    for (const [nome, h] of await Pasta.listar(['auditoria', m])) { if (!nome.endsWith('.json')) continue; try { bytes += (await h.getFile()).size; n++; } catch (er) { } }
+    meses.push({ m, n, bytes });
+  }
+  meses.sort((a, b) => (a.m < b.m ? 1 : -1));
+  return { total: meses.reduce((s, x) => s + x.bytes, 0), n: meses.reduce((s, x) => s + x.n, 0), meses, em: agora() };
+}
+function semImagens(a) {
+  const p = a && a.prints; if (!p) return false; let mudou = false;
+  (p.imagens || []).forEach(x => { if (x.img) { x.img = ''; mudou = true; } });
+  (p.checks || []).forEach(c => { if (c.recorte) { c.recorte = ''; mudou = true; } });
+  (p.itens || []).forEach(l => { if (l.recorte) { l.recorte = ''; mudou = true; } });
+  if (mudou) a.printsApagadosEm = agora();
+  return mudou;
+}
+function htmlArmazenamento() {
+  const T = AUD_TAM, pz = LS.get('audPrazo', 6);
+  return `<div class="card">${cabSecao('Histórico detalhado (pasta “auditoria”)', 'Fica separado dos registros: apagar prints daqui não mexe no Painel nem nos registros. O texto do histórico (lido, ignorado, linha do tempo) continua.')}
+    ${!Pasta.ok ? '<p class="muted">Conecte a pasta compartilhada para medir e limpar.</p>' : `
+    <div class="acoes" style="margin-top:0"><button class="btn line" data-act="audMedir">${ic('search', 'sm')}Calcular tamanho</button>
+      ${T ? `<span class="tag info">${fmtBytes(T.total)} em ${pl(T.n, 'guia', 'guias')}</span><span class="dica" style="margin:0">medido às ${fmtHora(T.em)}</span>` : ''}</div>
+    ${T && T.meses.length ? `<div class="tabela-scroll" style="max-height:240px;margin-top:8px"><table class="t"><thead><tr><th>Mês</th><th>Guias</th><th>Tamanho</th></tr></thead><tbody>${T.meses.map(x => `<tr><td class="c">${x.m.slice(5)}/${x.m.slice(0, 4)}</td><td class="c num">${x.n}</td><td class="c num">${fmtBytes(x.bytes)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    <div class="linha-flex" style="margin-top:12px"><label for="audPrazo">Apagar as imagens dos prints com mais de</label>
+      <select id="audPrazo" style="width:auto">${[3, 6, 12, 24].map(m => `<option value="${m}" ${pz === m ? 'selected' : ''}>${m} meses</option>`).join('')}</select>
+      <button class="btn dng" data-act="audLimpar">${ic('trash', 'sm')}Apagar prints antigos</button></div>`}
+  </div>`;
 }
 function cfgPrefs() {
   const p = cfgEdit.preferencias;
@@ -4892,7 +4990,7 @@ function htmlCartaoPrints(g) {
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Código</th><th>Qtd. pedido</th><th>Qtd. no sistema</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
       ${av.linhas.map(l => `<tr class="r-${l.ign ? 'ign' : l.st}"><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}${l.stSis ? `<div class="dica">${esc(ST_ROT[l.stSis] || l.stSis)}</div>` : ''}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
     </tbody></table></div>
-    <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button></div>` : '';
+    <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button><span class="esp"></span><button class="btn ghost" data-act="relatarGuia">${ic('help', 'sm')}Relatar problema na leitura</button></div>` : '';
   return `<div class="card" id="cartaoPrints">
     <div class="card-h"><h2>Conferência pelos prints do sistema</h2>${tag}<span class="esp"></span><span id="printsEstado"></span></div>
     ${htmlComoFazer('prints', 'Capture ou cole os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b>.', `<ol><li>No sistema, abra a guia na tela "Liberação de Senhas", aba <b>Dados da Guia</b>.</li><li>Clique em <b>Capturar a janela do sistema</b> (ou tire o print e use <b>Ctrl+V</b> aqui).</li><li>Abra a aba <b>Procedimentos</b> e capture de novo. Se a grade não couber na tela, role até o fim e capture mais uma vez.</li></ol><p>A leitura é feita neste navegador; ${cfg.preferencias.guardarPrints !== false ? 'os prints ficam no histórico da guia (pasta compartilhada).' : 'as imagens não são guardadas.'} O número da guia vai sozinho para a etapa 4.</p>`)}
@@ -5002,7 +5100,7 @@ const acoes = {
     if (!Pasta.suportado) { toast('Use o Google Chrome ou o Edge para acessar a pasta compartilhada.', 'bad'); return; }
     try {
       if (Pasta.handle && !Pasta.ok) await Pasta.reautorizar(); else await Pasta.conectar();
-      await carregarConfig(); await Param.carregar(); await Reg.carregar(); await Apr.carregar(); cfgEdit = null; cfgDirty = false; render();
+      await carregarConfig(); await Param.carregar(); await Reg.carregar(); await Apr.carregar(); await Notas.carregar(); cfgEdit = null; cfgDirty = false; render();
       Reg.conferirLocais().catch(() => { });
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
@@ -5308,6 +5406,57 @@ const acoes = {
     g.conf = g.conf || {}; g.conf[k] = on; const al = situacaoGuia(g).A.find(a => a.key === k);
     evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
   },
+  async pinLiberar() { const v = ($('#pinIn') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); render(); toast('Liberado por 15 minutos.'); } else { toast('PIN incorreto.', 'bad'); const i = $('#pinIn'); if (i) i.select(); } },
+  async pinModalOk() { const v = ($('#pinModal') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); fecharModal(true); const d = Pin.depois; Pin.depois = null; render(); toast('Liberado por 15 minutos.'); if (d) d(); } else { toast('PIN incorreto.', 'bad'); $('#pinModal').select(); } },
+  pinPedir() { pedirPin(null); },
+  pinTrancar() { Pin.ate = 0; render(); },
+  async pinDefinir() {
+    const a = ($('#pinNovo') || {}).value || '', b = ($('#pinConf') || {}).value || '';
+    if (!/^\d{4,12}$/.test(a)) { toast('O PIN deve ter de 4 a 12 dígitos.', 'bad'); return; }
+    if (a !== b) { toast('A confirmação não confere com o PIN.', 'bad'); return; }
+    const sal = Senha.novoSal(); cfgEdit.supervisor = { pinHash: await Senha.hash(a, sal), pinSalt: sal }; Pin.liberar(); marcarSujo(); render();
+    toast('PIN pronto. Clique em Salvar configurações para gravar.');
+  },
+  pinRemover() { if (!Pin.liberado()) return; cfgEdit.supervisor = null; marcarSujo(); render(); toast('PIN removido. Clique em Salvar configurações para gravar.'); },
+  async audMedir(b) { if (b) b.classList.add('carregando'); AUD_TAM = await medirAuditoria(); render(); },
+  async audLimpar() {
+    if (!Pin.liberado()) { pedirPin(() => acoes.audLimpar()); return; }
+    const meses = Number(($('#audPrazo') || {}).value || 6); LS.set('audPrazo', meses);
+    const lim = new Date(); lim.setMonth(lim.getMonth() - meses); const limM = isoDia(lim).slice(0, 7);
+    if (!(await confirmar({ titulo: 'Apagar prints antigos', texto: `Apagar as imagens dos prints das guias anteriores a <b>${limM.slice(5)}/${limM.slice(0, 4)}</b>? O texto do histórico (lido, ignorado, linha do tempo) continua. As imagens não podem ser recuperadas.`, ok: 'Apagar imagens', icone: 'trash' }))) return;
+    let n = 0, livres = 0;
+    for (const [m, hm] of await Pasta.listar(['auditoria'])) {
+      if (hm.kind !== 'directory' || m >= limM) continue;
+      for (const [nome, h] of await Pasta.listar(['auditoria', m])) {
+        if (!nome.endsWith('.json')) continue;
+        try { const f = await h.getFile(), a = JSON.parse(await f.text()); if (semImagens(a)) { await Pasta.gravar(['auditoria', m], nome, a); n++; livres += f.size - JSON.stringify(a, null, 1).length; } } catch (er) { }
+      }
+    }
+    AUD_TAM = null; render(); toast(n ? `Imagens apagadas de ${pl(n, 'guia', 'guias')} (cerca de ${fmtBytes(Math.max(0, livres))} liberados).` : 'Nenhuma imagem antiga para apagar.');
+  },
+  relatarGuia() { const g = guiaAtiva(); if (g) abrirRelato({ g }); },
+  async relatarHist(b) { const r = Reg.todos[b.dataset.id] || Reg.cache.find(x => x.id === b.dataset.id); if (!r) return; const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
+  async relatoOk() {
+    const al = M && M.alvo; if (!al) return;
+    const nota = ($('#relNota') || {}).value || '', imagens = !!($('#relImg') || {}).checked;
+    const rel = montarRelato({ ...al, nota: nota.trim(), imagens });
+    const nome = `relato-${(al.r && al.r.guia) || (al.g && al.g.numero) || 'guia'}-${isoDia(new Date())}-${Date.now().toString(36).slice(-4)}.json`;
+    baixar(nome, JSON.stringify(rel, null, 1), 'application/json');
+    if (Pasta.ok) { try { await Pasta.gravar(['relatos', isoDia(new Date()).slice(0, 7)], nome, rel); } catch (er) { } }
+    fecharModal(true); toast('Arquivo baixado' + (Pasta.ok ? ' (cópia na pasta “relatos”).' : '.') + ' Envie para o suporte do Conferidor.');
+  },
+  notaBenef() {
+    const g = guiaAtiva(); if (!g) return; const cart = g.carteiraUsada || g.pedido.carteira;
+    if (!normCart(cart || '')) { toast('Informe a carteira usada antes de criar a nota.', 'bad'); return; }
+    const n = Notas.de(cart);
+    abrirModal({ titulo: 'Nota fixa do beneficiário', sub: `Carteira ${normCart(cart)}`, icone: 'message', tamanho: 'p',
+      corpo: `<label class="lbl" for="notaTxt">Aparece sempre que esta carteira for atendida, para todos os operadores. Deixe vazio para remover.</label><textarea id="notaTxt" rows="3" autofocus placeholder="Ex.: dependente do titular 413100003537300EQ; clínica costuma mandar o nome abreviado">${esc(n ? n.texto : '')}</textarea>`,
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="notaBenefOk">${ic('check', 'sm')}Salvar nota</button>` });
+  },
+  async notaBenefOk() {
+    const g = guiaAtiva(), cart = g.carteiraUsada || g.pedido.carteira, t = ($('#notaTxt') || {}).value || '';
+    if (await Notas.salvar(cart, t)) { evento(g, 'regra', t.trim() ? 'Nota fixa do beneficiário: ' + t.trim() : 'Nota fixa do beneficiário removida'); fecharModal(true); persistir(); render(); toast(t.trim() ? 'Nota salva.' : 'Nota removida.'); }
+  },
   okParado() { if (S) { S.vistaDesde = agora(); S.avisoParado = null; persistir(); render(); } },
   verAlertas() { const el = $('.painel-al'); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); },
   sortear() {
@@ -5323,6 +5472,8 @@ const acoes = {
     if (cfgErros.length) { await render(); window.scrollTo(0, 0); toast(`${pl(cfgErros.length, 'problema encontrado', 'problemas encontrados')}. Nada foi salvo.`, 'bad'); return; }
     try {
       await mesclarOperadoresDaPasta(cfgEdit);
+      if (!Pin.liberado() || (Pin.definido() && JSON.stringify(cfgEdit.supervisor || null) !== JSON.stringify(cfg.supervisor || null) && !Pin.liberado())) cfgEdit.supervisor = cfg.supervisor || null;   // sem PIN, o PIN salvo não muda
+      if (Pasta.ok && !Pin.liberado()) { const p = await Pasta.ler([], 'config.json'); if (p && p.supervisor && p.supervisor.pinHash) cfgEdit.supervisor = p.supervisor; }
       await salvarConfig(cfgEdit); iniciarCfgEdit(); await render();
       toast('Configurações salvas' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.'));
     } catch (e) { toast('Erro ao salvar: ' + e.message, 'bad'); }
@@ -5532,6 +5683,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'painelDia' || t.id === 'painelMes' || t.id === 'painelSemana') { acoes.atualizarPainel(); return; }
   if (t.id === 'impCfg') {
     const f = t.files[0]; if (!f) return;
+    if (!Pin.liberado()) { t.value = ''; toast('Importar configurações exige o PIN do supervisor.', 'bad'); pedirPin(null); return; }
     try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); const keep = cfgEdit; cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
     return;
   }
@@ -6095,7 +6247,7 @@ function htmlHistoricoGuia(r, a) {
       ${P.checks.map(c => `<tr><td>${esc(c.campo)}</td><td class="num">${esc(c.pedido)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.recorte ? `<img class="mini" src="${c.recorte}" alt="">` : ''}</td><td>${tagSit(c.resultado)}${c.nota && !c.ignorado ? `<div class="dica">${esc(c.nota)}</div>` : ''}${ign(c.ignorado)}</td></tr>`).join('')}
       ${P.itens.map(l => `<tr><td>Item ${esc(l.codigo)}</td><td class="num">${l.qtdPedido ?? '—'}</td><td class="num"><b>${l.qtdSistema ?? '—'}</b>${l.status ? ` <span class="muted">${esc(ST_ROT[l.status] || l.status)}</span>` : ''}</td><td>${l.recorte ? `<img class="mini" src="${l.recorte}" alt="">` : ''}</td><td>${tagSit(l.resultado)}${l.nota && !l.ignorado ? `<div class="dica">${esc(l.nota)}</div>` : ''}${ign(l.ignorado)}</td></tr>`).join('')}
       </tbody></table></div>
-      ${P.imagens && P.imagens.length ? `<h3 style="margin-top:12px">Prints enviados (${P.imagens.length})</h3><div class="prints-hist">${P.imagens.map(x => `<figure><figcaption>${esc(x.tipo === 'guia' ? 'Dados da Guia' : x.tipo === 'proc' ? 'Procedimentos' : 'Print')} · ${fmtHora(x.em)}</figcaption><a href="${x.img}" target="_blank" rel="noopener" title="Abrir em tamanho real"><img src="${x.img}" alt="Print enviado"></a></figure>`).join('')}</div>` : '<p class="dica">Os prints não foram guardados (opção desligada em Preferências).</p>'}`
+      ${P.imagens && P.imagens.length ? `<h3 style="margin-top:12px">Prints enviados (${P.imagens.length})</h3>${a.printsApagadosEm ? `<p class="dica">As imagens foram apagadas em ${fmtData(a.printsApagadosEm)} pelo prazo de guarda; o texto lido continua aqui.</p>` : ''}<div class="prints-hist">${P.imagens.filter(x => x.img).map(x => `<figure><figcaption>${esc(x.tipo === 'guia' ? 'Dados da Guia' : x.tipo === 'proc' ? 'Procedimentos' : 'Print')} · ${fmtHora(x.em)}</figcaption><a href="${x.img}" target="_blank" rel="noopener" title="Abrir em tamanho real"><img src="${x.img}" alt="Print enviado"></a></figure>`).join('')}</div>` : '<p class="dica">Os prints não foram guardados (opção desligada em Preferências).</p>'}`
       : (r.conferencia && r.conferencia.prints ? `<p class="dica">${r.conferencia.prints.ok ? 'Conferido pelos prints' : 'Prints com divergência'} em ${fmtDH(r.conferencia.prints.em)}</p>${(r.conferencia.prints.divergencias || []).map(d => `<div class="dica">• ${esc(d)}</div>`).join('')}` : a && a.cega ? `<p class="dica">Conferência manual (cega): ${a.cega.ok ? 'concluída' : 'não concluída'}, ${pl(a.cega.tentativas, 'tentativa', 'tentativas')}.</p>` : '<p class="dica">Sem conferência pelos prints.</p>')}
     ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${pl(a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length, 'correção', 'correções')} e aceites)</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
     ${a && a.copiados.length ? `<h3 style="margin-top:16px">Copiado para o sistema</h3><div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Valor copiado</th></tr></thead><tbody>${a.copiados.map(c => `<tr><td>${esc(c.campo)}</td><td class="num">${esc(c.valor)}</td></tr>`).join('')}</tbody></table></div>` : ''}
@@ -6103,11 +6255,36 @@ function htmlHistoricoGuia(r, a) {
     ${(a ? a.alertas : [...(r.bloqueios || []).map(t => ({ modo: 'bloqueio', texto: t })), ...(r.alertas || []).map(x => ({ modo: x.m, texto: x.t, conferido: x.c }))]).map(x => `<div class="dica">• <b>${esc(TAG_MODO[x.modo] ? TAG_MODO[x.modo][2] : x.modo)}:</b> ${esc(x.texto)}${x.conferido ? ' <span class="tag ok">conferido</span>' : ''}</div>`).join('') || '<p class="dica">Nenhum alerta.</p>'}
     ${a && (a.resultado.obsAdicionais || a.resultado.motivo || a.resultado.semGuia) ? `<h3 style="margin-top:16px">Resposta</h3><dl class="email-meta">${linha('Sem guia', esc(a.resultado.semGuia))}${linha('Motivo', esc(a.resultado.motivo))}${linha('Observações adicionais', `<span style="white-space:pre-wrap">${esc(a.resultado.obsAdicionais)}</span>`)}</dl>` : ''}`;
 }
+/* ---------- Relatar problema: junta leitura dos prints, imagens, correções e histórico num arquivo ---------- */
+function montarRelato({ g, r, a, nota, imagens }) {
+  const mem = g ? PRINTS_MEM.get(g.id) : null;
+  let guia = a || null; if (!guia && g) { try { guia = Aud.montar(g, g.status); } catch (er) { guia = null; } }
+  guia = guia ? JSON.parse(JSON.stringify(guia)) : null;
+  if (guia && !imagens) semImagens(guia);
+  const campo = c => ({ valor: c.valor, incerto: !!c.incerto, origem: c.origem || '', variantes: c.var || null, ...(imagens && c.crop ? { recorte: c.crop } : {}) });
+  return {
+    tipo: 'relato-conferidor', versaoApp: VERSAO, em: agora(), operador: operador(), navegador: navigator.userAgent, tela: `${screen.width}×${screen.height} (zoom ${Math.round(devicePixelRatio * 100)}%)`,
+    oQueAconteceu: nota, registro: r ? { id: r.id, guia: r.guia, dia: r.dia, clinica: r.clinica, status: r.status } : null,
+    sistemaDosPrints: mem ? mem.sistema : null,
+    leituras: mem ? mem.leituras.map(l => ({ aba: l.tipo, layout: l.layout || null, diag: l.diag || null,
+      campos: l.campos ? Object.fromEntries(Object.entries(l.campos).map(([k, c]) => [k, campo(c || {})])) : null,
+      itens: l.itens ? l.itens.map(i => ({ codigo: i.codigo, qtd: i.qtd, status: i.st || '', variantesCodigo: i.varCod || null, variantesQtd: i.varQtd || null, ...(imagens && i.img ? { recorte: i.img } : {}) })) : null })) : [],
+    historico: guia
+  };
+}
+function abrirRelato(alvo) {
+  M = { tipo: 'relato', alvo };
+  abrirModal({ titulo: 'Relatar problema', sub: 'Gera um arquivo para enviar ao suporte do Conferidor', icone: 'help', tamanho: 'p',
+    corpo: `<label class="lbl" for="relNota">O que aconteceu? (ex.: “leu a carteira com um 1 a mais”, “não achou o código 50000616”)</label><textarea id="relNota" rows="4" autofocus></textarea>
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="relImg" checked><span>Incluir as imagens dos prints e os recortes (ajuda a corrigir a leitura)</span></label>
+      <p class="dica" style="margin-top:10px">${ic('lock', 'sm')} O arquivo tem dados do beneficiário (nome, carteira, pedido). Envie só por canal interno da Promédica.</p>`,
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="relatoOk">${ic('download', 'sm')}Baixar arquivo</button>` });
+}
 async function abrirHistoricoGuia(id) {
   const r = Reg.todos[id] || Reg.cache.find(x => x.id === id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }
   const a = await Aud.ler(r);
   abrirModal({ lateral: true, titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Beneficiário'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
-    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button>` });
+    rodape: `<button class="btn line" data-act="relatarHist" data-id="${esc(r.id)}">${ic('help', 'sm')}Relatar problema</button><span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button>` });
 }
 /* ---------- Auditar (aba Ações): busca em todos os registros ---------- */
 let AUD_BUSCA = { q: '', res: null, buscando: false };
@@ -6368,6 +6545,7 @@ function cfgAprendizado() {
 }
 Object.assign(acoes, {
   aprRegra(b) {
+    if (!Pin.liberado()) { pedirPin(() => acoes.aprRegra(b)); return; }
     const e = Apr.lista.find(y => Apr.chave(y) === b.dataset.k), cl = e && cfgEdit.clinicas.find(c => c.id === e.clinicaId); if (!e || !cl) return;
     if (regraSugerida(e) === 'troca') { const t = (cl.leitura.trocas || '').trim(); cl.leitura.trocas = (t ? t + '\n' : '') + `${e.lido} = ${e.correto}`; }
     else cl.leitura.qtdPadrao = Number(e.correto);
@@ -6508,6 +6686,56 @@ document.addEventListener('click', e => {
   if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
 });
 
+/* ---------- Quem está com o Conferidor aberto agora (batimento na pasta a cada minuto) ---------- */
+const Presenca = {
+  lista: [],
+  async bater() {
+    const op = operadorObj(); if (!Pasta.ok || !op || Abas.pausada) return;
+    try { await Pasta.gravar(['presenca'], slug(op.id || op.nome) + '.json', { operador: op.nome, operadorId: op.id, em: agora(), etapa: S ? S.vista : 0, atendendo: !!S, visivel: !document.hidden }); } catch (e) { }
+  },
+  async ler() {
+    if (!Pasta.ok) { this.lista = []; return []; }
+    const out = [];
+    for (const [n, h] of await Pasta.listar(['presenca'])) { if (!n.endsWith('.json')) continue; try { const d = JSON.parse(await (await h.getFile()).text()); if (Date.now() - new Date(d.em) < 3 * 60000) out.push(d); } catch (e) { } }
+    this.lista = out.sort((a, b) => (a.operador || '').localeCompare(b.operador || '')); return this.lista;
+  }
+};
+setInterval(() => Presenca.bater(), 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) Presenca.bater(); });
+function htmlPresenca() {
+  if (!Pasta.ok) return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2></div><p class="muted" style="margin:0">Conecte a pasta compartilhada para ver quem está on-line.</p></div>`;
+  const L = Presenca.lista;
+  return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2><span class="tag ${L.length ? 'ok' : ''}">${pl(L.length, 'pessoa', 'pessoas')}</span></div>
+    <div class="presenca">${L.map(d => { const o = cfg.operadores.find(x => x.id === d.operadorId); const min = Math.max(0, Math.round((Date.now() - new Date(d.em)) / 60000));
+      return `<div class="pres-op">${htmlAvatar(o)}<div><b>${esc(d.operador)}</b><small>${d.atendendo ? `em atendimento · etapa ${d.etapa}` : 'sem atendimento aberto'}${d.visivel === false ? ' · em outra janela' : ''} · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</small></div></div>`; }).join('') || '<p class="muted" style="margin:0">Ninguém além de você, no momento.</p>'}</div></div>`;
+}
+
+/* ---------- Notas fixas do beneficiário (por carteira), na pasta "notas" ---------- */
+const Notas = {
+  itens: {},
+  juntar(a, b) { const o = { ...(a || {}) }; Object.entries(b || {}).forEach(([k, v]) => { if (!o[k] || (v.em || '') > (o[k].em || '')) o[k] = v; }); return o; },
+  async carregar() {
+    const loc = LS.get('notasBenef', null); let it = (loc && loc.itens) || {};
+    if (Pasta.ok) { const p = await Pasta.ler(['notas'], 'beneficiarios.json'); if (p) it = this.juntar(p.itens, it); }
+    this.itens = it; LS.set('notasBenef', { atualizadoEm: agora(), itens: it });
+  },
+  de(cart) { const k = normCart(cart || ''); const n = k && this.itens[k]; return n && n.texto ? n : null; },
+  async salvar(cart, texto) {
+    const k = normCart(cart || ''); if (!k) return false;
+    await this.carregar(); this.itens[k] = { texto: texto.trim(), por: operador(), em: agora() };   // texto vazio = removida (fica a marca para não voltar)
+    const doc = { atualizadoEm: agora(), itens: this.itens }; LS.set('notasBenef', doc);
+    if (Pasta.ok) { try { await Pasta.gravar(['notas'], 'beneficiarios.json', doc); } catch (er) { toast('A nota ficou só neste computador: não consegui gravar na pasta.', 'bad'); } }
+    return true;
+  }
+};
+function htmlNotasFixas(g) {
+  const cl = clinicaDe(S), nc = cl && (cl.nota || '').trim(), cart = g.carteiraUsada || g.pedido.carteira, nb = Notas.de(cart);
+  const linhas = [];
+  if (nc) linhas.push(`<div class="nota-fixa">${ic('building', 'sm')}<div class="esp"><b>Nota da clínica ${esc(cl.nome)}:</b> ${esc(nc)}</div></div>`);
+  if (nb) linhas.push(`<div class="nota-fixa">${ic('user', 'sm')}<div class="esp"><b>Nota do beneficiário:</b> ${esc(nb.texto)} <span class="muted">— ${esc(nb.por || '')}, ${fmtData(nb.em)}</span></div><button class="btn sm ghost" data-act="notaBenef">${ic('edit', 'sm')}Editar</button></div>`);
+  return linhas.length ? `<div class="notas-fixas">${linhas.join('')}</div>` : '';
+}
+
 /* ---------- Lembrete de atendimento parado na mesma etapa ---------- */
 function htmlAvisoParado() {
   if (!S || !S.avisoParado) return '';
@@ -6568,7 +6796,9 @@ async function init() {
   await Param.carregar();
   await Reg.carregar();
   Reg.conferirLocais().catch(() => { });
+  Presenca.bater();
   await Apr.carregar();
+  await Notas.carregar();
   S = LS.get('atual', null);
   if (S && S.v !== 2) S = null;
   render();
