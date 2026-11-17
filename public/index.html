@@ -586,6 +586,10 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .prints-hist figure{margin:0;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;background:var(--surface-2)}
 .prints-hist figcaption{font-size:var(--fs-xs);color:var(--text-2);padding:6px 10px;border-bottom:1px solid var(--border)}
 .prints-hist img{display:block;width:100%;height:auto;background:#fff}
+.linha-tempo{display:grid;gap:4px;border-left:3px solid var(--border);padding-left:10px}
+.linha-tempo .ev{display:grid;grid-template-columns:44px 170px 1fr;gap:8px;font-size:var(--fs-sm);align-items:baseline}
+.linha-tempo .ev.corr b{color:var(--warn-fg)}
+@media (max-width:640px){.linha-tempo .ev{grid-template-columns:44px 1fr}.linha-tempo .ev span:last-child{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -1983,6 +1987,8 @@ const ALERTAS = {
   'qtd-unica': { grupo: 'Serviços', nome: 'Quantidade única aplicada a vários serviços', desc: 'Havia uma só quantidade no e-mail e ela foi aplicada a todos os serviços.', modo: 'atencao' },
   'qtd-inferida': { grupo: 'Serviços', nome: 'Quantidade inferida do fim da linha', desc: 'A quantidade foi lida como o número solto no fim da linha do serviço (sem a palavra Quantidade).', modo: 'atencao' },
   'sem-rotulo': { grupo: 'Serviços', nome: 'Códigos lidos sem o rótulo "Serviço"', desc: 'Os códigos vieram de linhas soltas do e-mail.', modo: 'atencao' },
+  'dup-semana': { grupo: 'Serviços', nome: 'Mesmo código e carteira já autorizados na semana', desc: 'O mesmo código já foi autorizado para a mesma carteira entre segunda e domingo desta semana, em outro e-mail. Pode ser pedido repetido.', modo: 'atencao' },
+  'aprendido': { grupo: 'E-mail', nome: 'Correção já feita antes nesta clínica', desc: 'O valor lido já foi corrigido por um operador em atendimentos anteriores desta clínica. Oferece aplicar a mesma correção.', modo: 'atencao' },
   'regra-clinica': { grupo: 'Serviços', nome: 'Ajuste feito pela regra de leitura da clínica', desc: 'Código corrigido ou quantidade preenchida pelas regras de leitura cadastradas na clínica (Configurações › Clínicas). Confira no e-mail.', modo: 'atencao' },
   'solto': { grupo: 'Serviços', nome: 'Número de 8 dígitos que não virou item', desc: 'Pode ser um serviço esquecido ou um telefone.', modo: 'atencao' },
   'serv-repetido-guias': { grupo: 'Serviços', nome: 'Mesmo serviço em outra guia do mesmo beneficiário', desc: 'Dois pedidos do mesmo beneficiário no e-mail pedem o mesmo código. Pode ser duplicidade ou contradição.', modo: 'atencao' },
@@ -2389,6 +2395,7 @@ function pedidosDoEmail(email, cl) {
 function novoEstado(email) {
   const achou = acharClinica(email), sug = achou ? null : sugerirClinica(email);
   const lp = pedidosDoEmail(email, achou ? achou.cl : null);
+  lp.blocos.forEach(b => { b.pedido.aprendidos = Apr.sugestoes(b.pedido, achou ? achou.cl : null); });
   relacionarBlocos(lp.blocos);
   const st = {
     v: 2, atendId: uid(), email, preambulo: lp.preambulo, ativa: 0, vista: 2,
@@ -2472,6 +2479,7 @@ function avaliar(g) {
   if (p.herdados && p.herdados.length) add('dados-comuns', `Dados escritos uma única vez no e-mail foram aplicados a esta guia: ${p.herdados.join(', ')}. Confira se valem para este beneficiário.`);
   if (p.semRotulo) add('sem-rotulo', 'O pedido não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.');
   (p.regras || []).forEach((t, k) => add('regra-clinica', t, { sub: String(k) }));
+  (p.aprendidos || []).forEach((e, k) => add('aprendido', `${{ codigo: 'Código', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data' }[e.campo] || e.campo} "${e.lido}" já foi corrigido para "${e.correto}" ${e.n} vez(es) em atendimentos desta clínica.`, { sub: e.campo + ':' + e.lido, aprendidoI: k }));
   p.soltos.forEach(n => add('solto', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`, { sub: n }));
   if (g.itensEditados) add('editado', 'Dados ou itens foram corrigidos à mão. Confira de novo com o e-mail original.');
   /* pedido médico */
@@ -2486,6 +2494,16 @@ function avaliar(g) {
   else if (!p.cid.split(' + ').every(c => /^[A-Z]\d{2}(\.?\d{1,2})?$/i.test(c))) add('cid-fmt', `CID "${p.cid}" fora do padrão (ex.: F84 ou F84.0). Confira no e-mail.`);
   if (em.anoInferido) add('em-inf', `A clínica escreveu "${em.bruto}" sem o ano; foi considerado ${fmtData(em.data)}. Confirme no pedido médico.`);
   if (!p.beneficiario && !p.carteiraBruta && !p.itens.length && !p.invalidos.length && !p.codigoSuspeito) add('nao-pedido', 'Este e-mail não traz beneficiário, carteira nem código de serviço: pode não ser um pedido de autorização (dúvida, retificação ou conversa).');
+  /* mesmo código já autorizado para a mesma carteira nesta semana (segunda a domingo), em outro e-mail */
+  const cartSem = normCart(g.carteiraUsada || p.carteira || '');
+  if (cartSem) {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0); ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7));
+    const daSemana = Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== g.id && r.messageId !== e.messageId && normCart(r.carteira || '') === cartSem && new Date(r.concluidoEm || r.atualizadoEm || 0) >= ini && ['autorizada', 'parcial'].includes(resultadoDe(r)));
+    p.itens.forEach(it => {
+      const r = daSemana.find(x => (x.itens || []).some(i => i.c === it.codigo && i.aut !== false));
+      if (r) add('dup-semana', `O código ${it.codigo} já foi autorizado para esta carteira nesta semana: guia ${r.guia || 'sem número'} em ${fmtDH(r.concluidoEm)}${r.operador ? ' por ' + r.operador : ''}${r.clinica ? ' (' + r.clinica + ')' : ''}. Confira se não é pedido repetido.`, { sub: it.codigo });
+    });
+  }
   /* e-mail */
   if (!cl) add('remetente', `Remetente ${e.remetente.email || '(sem endereço)'} não está no cadastro de clínicas.`, { vincular: true });
   else {
@@ -2587,6 +2605,7 @@ function montarRegistro(g, status, extra = {}) {
     alertas: A.filter(a => a.modo !== 'bloqueio').map(a => ({ k: a.tipo, m: a.modo, t: a.texto, c: !!(g.conf && g.conf[a.key]) })),
     bloqueios: A.filter(a => a.modo === 'bloqueio').map(a => a.texto),
     conferencia: { tentativas: g.cega.tentativas, divergencias: g.cega.historico, ...(g.prints ? { prints: { ok: g.prints.ok, em: g.prints.em, divergencias: g.prints.divergencias } } : {}) },
+    correcoes: (g.eventos || []).filter(e => EV_CORRECAO.includes(e.tipo)).length, ignorados: g.prints && g.prints.ign ? Object.keys(g.prints.ign).length : 0,
     editadoAMao: g.itensEditados, obsIncluidas: g.obsInc.length + g.respInc.length, duracaoSeg: Math.round((Date.now() - new Date(g.abertoEm)) / 1000), ...extra
   };
 }
@@ -2770,6 +2789,7 @@ function htmlUmAlerta(a, g) {
   let extra = '';
   if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button>`;
   if (a.acaoCarteira) extra += `<button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button>`;
+  if (a.aprendidoI != null) extra += `<button class="btn sm" data-act="aplicarAprendido" data-i="${a.aprendidoI}">${ic('check', 'sm')}Aplicar a mesma correção</button>`;
   if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
   const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
   if (pedeConferi(a)) extra += `<label class="chk conferi"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label>`;
@@ -3582,7 +3602,7 @@ const cfgModeloSel = { modelos: 'autorizada', obs: 'observacao', param: 'paramet
 const CFG_SECOES = [
   ['aparencia', 'palette', 'Aparência'], ['perfil', 'user', 'Perfil e identificação'], ['clinicas', 'building', 'Clínicas e cadastros'],
   ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['obsauto', 'bell', 'Observações automáticas'], ['param', 'layers', 'Parametrizações'],
-  ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['testes', 'search', 'Testar leitura (prints e e-mails)'], ['info', 'info', 'Informações e versão do sistema']
+  ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['testes', 'search', 'Testar leitura (prints e e-mails)'], ['aprendizado', 'book', 'Aprendizado (correções)'], ['info', 'info', 'Informações e versão do sistema']
 ];
 let cfgOpsIni = [];
 function iniciarCfgEdit() {
@@ -3676,6 +3696,7 @@ function htmlCfgSecao() {
     case 'prefs': return cfgPrefs();
     case 'info': return cfgInfo();
     case 'testes': return cfgTestes();
+    case 'aprendizado': return cfgAprendizado();
   }
   return '';
 }
@@ -4306,7 +4327,7 @@ async function lerPrintTela(file, aviso, sistema) {
       campos[k] = { valor, bruto: r.bruto, conf: r.conf, incerto, origem, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) };
       crops[k] = miniatura(cv, a, def.caixa);
     }
-    return { tipo, layout: G.nome, campos, crops, diag };
+    return { tipo, layout: G.nome, campos, crops, diag, ctx: { cv, anDe, G, ws } };
   }
   const Lg = G.linhas, caixaGrade = [Lg.cod[0], Lg.topo, Lg.qtd[1], Lg.topo + Lg.passo * Lg.max];
   an = refinarGrade(cv, cal ? anLocal(cal, L, caixaGrade) : an);
@@ -4329,7 +4350,7 @@ async function lerPrintTela(file, aviso, sistema) {
   const desl = [...cont.entries()].sort((a, b) => b[1] - a[1])[0];
   if (desl) itens.forEach(it => { it.n = desl[0] + it.fila; });
   diag.ajusteGrade = { dx: +an.dx.toFixed(1), dy: +an.dy.toFixed(1), nota: +(an.nota || 0).toFixed(3) };
-  return { tipo, layout: G.nome, maxLinhas: Lg.max, itens, crops, diag };
+  return { tipo, layout: G.nome, maxLinhas: Lg.max, itens, crops, diag, ctx: { cv, an, G } };
 }
 
 /* ---------- comparação com o pedido ---------- */
@@ -4369,7 +4390,11 @@ function avaliarPrints(g) {
   const campos = {}, itensSis = new Map();
   mem.leituras.forEach(l => { if (l.tipo === 'guia') Object.assign(campos, l.campos); else l.itens.forEach((it, k) => itensSis.set(it.n || ('x' + it.codigo + k), it)); });
   const p = g.pedido, C = [];
-  const add = (k, ped, lido, st, nota = '') => C.push({ k, rot: ROT_PRINT[k], ped, lido, st, nota });   // st: ok | warn | bad | info
+  const add = (k, ped, lido, st, nota = '') => {
+    const conhecida = (st === 'bad' || st === 'warn') && Apr.leituraConhecida(k, lido, ped);   // o mesmo erro de leitura já foi confirmado por um operador
+    if (conhecida) { st = 'warn'; nota = `Esta mesma leitura ("${lido}" no lugar de "${ped}") já foi confirmada ${conhecida.n} vez(es) como erro de leitura: confira a imagem.`; }
+    C.push({ k, rot: ROT_PRINT[k], ped, lido, st, nota });   // st: ok | warn | bad | info
+  };
   if (campos.guia) {
     const v = campos.guia.valor, ok8 = /^[TS]\d{7,8}$/.test(v);
     if (!g.numero) add('guia', '—', v, ok8 ? 'ok' : 'warn', ok8 ? 'Preenchido na etapa 4.' : 'Fora do padrão do app (T ou S + 7 ou 8 dígitos): confira.');
@@ -4466,7 +4491,7 @@ function aplicarPrints(g) {
   const av = avaliarPrints(g); if (!av) return null;
   const ign = (g.prints && g.prints.ign) || {};
   const lido = ((PRINTS_MEM.get(g.id).leituras.find(l => l.tipo === 'guia')) || {}).campos;
-  if (lido && lido.guia && !g.numero && /^[TS]\d{7,8}$/.test(lido.guia.valor)) { g.numero = lido.guia.valor; g.numeroOrigem = 'print'; }
+  if (lido && lido.guia && !g.numero && /^[TS]\d{7,8}$/.test(lido.guia.valor)) { g.numero = lido.guia.valor; g.numeroOrigem = 'print'; evento(g, 'numero', 'Nº da guia preenchido pelo print: ' + g.numero); }
   g.prints = resumoPrints(av, ign);
   if (av.ok) { if (!g.cega.ok) { g.cega.ok = true; g.cega.via = 'prints'; } }
   else if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; }
@@ -4483,7 +4508,8 @@ async function processarPrints(files) {
     try {
       msg('Lendo ' + (f.name || 'imagem colada') + '…');
       const r = await lerPrintTela(f, msg, sistemaPrint());
-      if (r.erro) { erros.push(r.erro); continue; }
+      if (r.erro) { erros.push(r.erro); evento(g, 'print-erro', `${f.name || 'print'}: ${r.erro}`); continue; }
+      evento(g, 'print', `${r.tipo === 'guia' ? 'Dados da Guia' : 'Procedimentos'} (${SISTEMAS_PRINT[sistemaPrint()]})${r.tipo === 'proc' ? ': ' + r.itens.map(i => `${i.codigo} × ${i.qtd ?? '?'}`).join(', ') : ''}`);
       if (r.tipo === 'guia') { const i = mem.leituras.findIndex(l => l.tipo === 'guia'); if (i >= 0) mem.leituras.splice(i, 1); }
       mem.leituras.push(r); mem.sistema = sistemaPrint();
       if (cfg.preferencias.guardarPrints !== false) { mem.imagens = mem.imagens || []; mem.imagens.push({ tipo: r.tipo, nome: f.name || 'print colado', em: agora(), img: await jpegDoPrint(f) }); }   // para o histórico da guia
@@ -4504,7 +4530,7 @@ function htmlCartaoPrints(g) {
     : res ? `<span class="tag ${res.ok ? 'ok' : 'warn'}">${ic(res.ok ? 'check' : 'alert', 'sm')}${res.ok ? 'Conferido pelos prints' + (nIgn ? ' (com ressalva)' : '') : 'Prints com divergência'} em ${fmtHora(res.em)}</span>` : (cegaExigida() ? '<span class="tag warn">Obrigatório</span>' : '<span class="tag">Opcional</span>');
   const st = { ok: ['ok', 'check', 'Confere'], warn: ['warn', 'alert', 'Conferir'], bad: ['bad', 'x', 'Diverge'], info: ['', 'info', 'Sem base'] };
   const tg = x => {
-    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span> <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>
+    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.leitura ? 'Erro de leitura' : x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span>${x.ign.motivo ? `<div class="dica" style="margin:4px 0 0">Motivo: ${esc(x.ign.motivo.texto)}${x.ign.motivo.detalhe ? ' — ' + esc(x.ign.motivo.detalhe) : ''}</div>` : ''} <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-obsp="${esc(x.chave)}" ${x.ign.on !== false ? 'checked' : ''}><span>Incluir na observação ao prestador<br><span class="muted" style="font-size:var(--fs-sm)">${esc(x.ign.linha)}</span></span></label>`;
     const [c, i, t] = st[x.st];
     return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>` + (x.st === 'bad' || x.st === 'warn' ? ` <button class="btn sm line" data-act="ignorarPrint" data-key="${esc(x.chave)}" title="Aceita esta divergência, gera a observação para o prestador e deixa continuar">${ic('shield', 'sm')}Ignorar</button>` : '');
@@ -4627,7 +4653,7 @@ const acoes = {
     if (!Pasta.suportado) { toast('Use o Google Chrome ou o Edge para acessar a pasta compartilhada.', 'bad'); return; }
     try {
       if (Pasta.handle && !Pasta.ok) await Pasta.reautorizar(); else await Pasta.conectar();
-      await carregarConfig(); await Param.carregar(); await Reg.carregar(); cfgEdit = null; cfgDirty = false; render();
+      await carregarConfig(); await Param.carregar(); await Reg.carregar(); await Apr.carregar(); cfgEdit = null; cfgDirty = false; render();
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
@@ -4650,16 +4676,6 @@ const acoes = {
       if (!fs.length) { toast('Não há imagem na área de transferência. Copie o print e clique em Colar (ou use Ctrl+V).', 'bad'); return; }
       processarPrints(fs);
     } catch (e) { toast('O navegador não liberou a área de transferência. Use Ctrl+V com a página selecionada.', 'bad'); }
-  },
-  ignorarPrint(b) {
-    const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
-    const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
-    g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {}; g.prints.ign[x.chave] = linhaIgnorada(x);
-    aplicarPrints(g); persistir(); render(); toast(g.prints.ign[x.chave].on !== false ? 'Divergência ignorada: a observação para o prestador foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência ignorada. Marque “Incluir na observação ao prestador” se quiser avisar a clínica.');
-  },
-  desfazerPrint(b) {
-    const g = guiaAtiva(); if (!g.prints || !g.prints.ign) return; delete g.prints.ign[b.dataset.key];
-    aplicarPrints(g); persistir(); render();
   },
   limparPrints() { const g = guiaAtiva(); PRINTS_MEM.delete(g.id); g.prints = null; sincronizarObsPrints(g); if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; } persistir(); render(); },
   obsAutoRestaurar() { if (!confirm('Restaurar os textos e as marcações padrão das observações automáticas?')) return; cfgEdit.obsAuto = obsAutoPadrao(); marcarSujo(); render(); },
@@ -4720,6 +4736,17 @@ const acoes = {
   cancelarItens() { const g = guiaAtiva(); g.editandoItens = false; g._edit = null; render(); },
   salvarItens() {
     const g = guiaAtiva(), p = g.pedido, it = lerTabelaEdicao().filter(x => x.codigo);
+    { // o que mudou na leitura: vai para a linha do tempo e para o aprendizado da clínica
+      const antes = p.itens.map(i => `${i.codigo} × ${i.qtd ?? '?'}`), depois = it.map(x => `${x.codigo} × ${x.qtd || '?'}`);
+      if (antes.join('|') !== depois.join('|')) evento(g, 'edicao-email', `Serviços: ${antes.join(', ') || '—'} → ${depois.join(', ') || '—'}`);
+      const cl = clinicaDe(S);
+      if (cl) {
+        const velhos = [...p.itens.map(i => i.codigo), ...p.invalidos], novos = it.map(x => x.codigo);
+        const sairam = velhos.filter(c => !novos.includes(c)), entraram = novos.filter(c => !velhos.includes(c));
+        if (sairam.length === 1 && entraram.length === 1) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'codigo', lido: sairam[0], correto: entraram[0] });
+        it.forEach(x => { const o = p.itens.find(i => i.codigo === x.codigo); if (o && String(o.qtd ?? '?') !== String(x.qtd || '?') && /^\d+$/.test(x.qtd)) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'quantidade', lido: o.qtd ?? '?', correto: x.qtd, ref: x.codigo }); });
+      }
+    }
     p.invalidos = it.filter(x => x.codigo.length !== 8).map(x => x.codigo);
     p.itens = it.filter(x => x.codigo.length === 8).map(x => ({ codigo: x.codigo, desc: x.desc, qtd: /^\d+$/.test(x.qtd) ? Number(x.qtd) : null, origemQtd: 'manual' }));
     const usados = new Set(p.itens.map(i => i.codigo)); p.soltos = p.soltos.filter(c => !usados.has(c));
@@ -5146,13 +5173,18 @@ document.addEventListener('change', async e => {
   }
   if (!S) return;
   const g = guiaAtiva();
-  if (t.dataset.conf) { g.conf = g.conf || {}; g.conf[t.dataset.conf] = t.checked; persistir(); render(); return; }
+  if (t.dataset.conf) { g.conf = g.conf || {}; g.conf[t.dataset.conf] = t.checked; const al = situacaoGuia(g).A.find(a => a.key === t.dataset.conf); evento(g, 'conferido', `${t.checked ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : t.dataset.conf}`); persistir(); render(); return; }
   if (t.dataset.campo) {
     const k = t.dataset.campo, v = t.value.trim(), p = g.pedido;
+    const antes = k === 'medico' ? [p.medico.nome, p.medico.crm && 'CRM ' + p.medico.crm].filter(Boolean).join(' ') : k === 'emissao' ? (p.emissao.estado === 'valida' ? fmtData(p.emissao.data) : p.emissao.bruto || '') : k === 'beneficiario' ? p.beneficiario : (p[k] || '');
+    if (String(antes || '') !== v) {
+      evento(g, 'edicao-campo', `${{ medico: 'Médico', emissao: 'Data do pedido', cid: 'CID', beneficiario: 'Beneficiário', local: 'Local' }[k] || k}: "${antes || '—'}" → "${v || '—'}"`);
+      const cl = clinicaDe(S); if (cl && k !== 'beneficiario') { const novo = k === 'medico' ? lerMedico(v) : null; if (k === 'medico') { if (p.medico.nome !== novo.nome) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'medico', lido: p.medico.nome, correto: novo.nome }); if (p.medico.crm !== novo.crm && novo.crm) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'crm', lido: p.medico.crm, correto: novo.crm }); } else Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: k, lido: antes, correto: v }); }
+    }
     if (k === 'medico') p.medico = lerMedico(v); else if (k === 'emissao') p.emissao = lerEmissao(v, S.email.data); else if (k === 'cid') p.cid = v.toUpperCase(); else if (k === 'beneficiario') { p.beneficiario = v; p.beneficiarios = v ? [v] : []; } else p[k] = v;
     g.itensEditados = true; persistir(); render(); return;
   }
-  if (t.id === 'cartUsada') { g.carteiraUsada = normCart(t.value); persistir(); render(); return; }
+  if (t.id === 'cartUsada') { const ant = g.carteiraUsada; g.carteiraUsada = normCart(t.value); if (ant !== g.carteiraUsada) evento(g, 'carteira', `Carteira usada no sistema: "${ant || '—'}" → "${g.carteiraUsada || '—'}"`); persistir(); render(); return; }
   if (t.dataset.cpcampo) { g.itensEditados = true; persistir(); return; }
   if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
   if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
@@ -5563,11 +5595,11 @@ const Aud = {
       editadoAMao: !!g.itensEditados,
       alertas: st.A.map(a => ({ tipo: a.tipo, modo: a.modo, texto: a.texto, conferido: !!(g.conf && g.conf[a.key]) })),
       copiados: Object.entries(g.copiados || {}).map(([k, v]) => ({ campo: k.startsWith('c:') ? 'Código ' + k.slice(2) : k.startsWith('q:') ? 'Quantidade de ' + k.slice(2) : (ROT_COPIA[k] || k), valor: v })),
-      numero: g.numero || '', numeroOrigem: g.numeroOrigem || (g.numero ? 'digitado' : ''),
+      numero: g.numero || '', numeroOrigem: g.numeroOrigem || (g.numero ? 'digitado' : ''), eventos: g.eventos || [],
       prints: av ? {
         sistema: mem.sistema || '', ok: av.ok, avisos: av.avisos,
-        checks: av.checks.map(c => ({ campo: c.rot, pedido: c.ped, lido: c.lido, resultado: c.sit, nota: c.nota || '', ignorado: c.ign ? { como: c.ign.t, obs: c.ign.linha, incluida: c.ign.on !== false } : null, recorte: guardar ? c.crop || '' : '' })),
-        itens: av.linhas.map(l => ({ codigo: l.codigo, qtdPedido: l.qPed, qtdSistema: l.qSis, status: l.stSis || '', resultado: l.sit, nota: l.nota || '', ignorado: l.ign ? { como: l.ign.t, obs: l.ign.linha, incluida: l.ign.on !== false } : null, recorte: guardar ? l.img || '' : '' })),
+        checks: av.checks.map(c => ({ campo: c.rot, pedido: c.ped, lido: c.lido, resultado: c.sit, nota: c.nota || '', ignorado: c.ign ? { como: c.ign.leitura ? 'leitura' : c.ign.t, obs: c.ign.linha, incluida: c.ign.on !== false, motivo: c.ign.motivo || null } : null, recorte: guardar ? c.crop || '' : '' })),
+        itens: av.linhas.map(l => ({ codigo: l.codigo, qtdPedido: l.qPed, qtdSistema: l.qSis, status: l.stSis || '', resultado: l.sit, nota: l.nota || '', ignorado: l.ign ? { como: l.ign.leitura ? 'leitura' : l.ign.t, obs: l.ign.linha, incluida: l.ign.on !== false, motivo: l.ign.motivo || null } : null, recorte: guardar ? l.img || '' : '' })),
         imagens: guardar ? (mem.imagens || []).map(x => ({ tipo: x.tipo, nome: x.nome, em: x.em, img: x.img })) : []
       } : (g.prints ? { resumo: g.prints } : null),
       cega: g.cega && g.cega.historico && g.cega.historico.length ? { ok: g.cega.ok, via: g.cega.via || 'cega', tentativas: g.cega.tentativas, historico: g.cega.historico } : null,
@@ -5588,7 +5620,7 @@ const SIT_PRINT = { ok: ['ok', 'Confere'], warn: ['warn', 'Conferir'], bad: ['ba
 function htmlHistoricoGuia(r, a) {
   const linha = (t, v) => v ? `<dt>${t}</dt><dd>${v}</dd>` : '';
   const tagSit = s => { const [c, t] = SIT_PRINT[s] || ['', s || '—']; return `<span class="tag ${c}">${esc(t)}</span>`; };
-  const ign = x => x ? `<div class="dica" style="margin:4px 0 0">${x.como === 'menor' ? 'Autorizado a menor' : 'Ignorado'}${x.obs ? ` · observação ${x.incluida ? 'incluída' : 'não incluída'}: “${esc(x.obs)}”` : ''}</div>` : '';
+  const ign = x => x ? `<div class="dica" style="margin:4px 0 0">${x.como === 'leitura' ? 'Erro de leitura do print' : x.como === 'menor' ? 'Autorizado a menor' : 'Ignorado'}${x.motivo ? ` · motivo: ${esc(x.motivo.texto)}${x.motivo.detalhe ? ' — ' + esc(x.motivo.detalhe) : ''}` : ''}${x.obs && x.como !== 'leitura' ? ` · observação ${x.incluida ? 'incluída' : 'não incluída'}: “${esc(x.obs)}”` : ''}</div>` : '';
   const P = a && a.prints;
   return `<dl class="email-meta">
       ${linha('Paciente', esc((a && a.paciente) || r.paciente || r.pacienteIni || '—'))}
@@ -5616,6 +5648,7 @@ function htmlHistoricoGuia(r, a) {
       </tbody></table></div>
       ${P.imagens && P.imagens.length ? `<h3 style="margin-top:12px">Prints enviados (${P.imagens.length})</h3><div class="prints-hist">${P.imagens.map(x => `<figure><figcaption>${esc(x.tipo === 'guia' ? 'Dados da Guia' : x.tipo === 'proc' ? 'Procedimentos' : 'Print')} · ${fmtHora(x.em)}</figcaption><a href="${x.img}" target="_blank" rel="noopener" title="Abrir em tamanho real"><img src="${x.img}" alt="Print enviado"></a></figure>`).join('')}</div>` : '<p class="dica">Os prints não foram guardados (opção desligada em Preferências).</p>'}`
       : (r.conferencia && r.conferencia.prints ? `<p class="dica">${r.conferencia.prints.ok ? 'Conferido pelos prints' : 'Prints com divergência'} em ${fmtDH(r.conferencia.prints.em)}</p>${(r.conferencia.prints.divergencias || []).map(d => `<div class="dica">• ${esc(d)}</div>`).join('')}` : a && a.cega ? `<p class="dica">Conferência manual (cega): ${a.cega.ok ? 'concluída' : 'não concluída'}, ${a.cega.tentativas} tentativa(s).</p>` : '<p class="dica">Sem conferência pelos prints.</p>')}
+    ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length} correção(ões) e aceite(s))</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
     ${a && a.copiados.length ? `<h3 style="margin-top:16px">Copiado para o sistema</h3><div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Valor copiado</th></tr></thead><tbody>${a.copiados.map(c => `<tr><td>${esc(c.campo)}</td><td class="num">${esc(c.valor)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <h3 style="margin-top:16px">Alertas</h3>
     ${(a ? a.alertas : [...(r.bloqueios || []).map(t => ({ modo: 'bloqueio', texto: t })), ...(r.alertas || []).map(x => ({ modo: x.m, texto: x.t, conferido: x.c }))]).map(x => `<div class="dica">• <b>${esc(TAG_MODO[x.modo] ? TAG_MODO[x.modo][2] : x.modo)}:</b> ${esc(x.texto)}${x.conferido ? ' <span class="tag ok">conferido</span>' : ''}</div>`).join('') || '<p class="dica">Nenhum alerta.</p>'}
@@ -5632,12 +5665,13 @@ let AUD_BUSCA = { q: '', res: null, buscando: false };
 function htmlAuditar() {
   const R = AUD_BUSCA.res;
   return `<div class="card" id="cardAuditar"><div class="card-h"><h2>${ic('search')} Auditar</h2></div>
-    <p class="dica" style="margin:0 0 8px">Busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia. O nome completo só está nos registros feitos a partir desta versão (nos antigos, só as iniciais).</p>
+    <p class="dica" style="margin:0 0 8px">Busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia (ou, com a caixa marcada e a busca vazia, lista todas as guias com correções). O nome completo só está nos registros feitos a partir desta versão (nos antigos, só as iniciais).</p>
     <div class="linha-flex"><input type="search" id="audQ" value="${esc(AUD_BUSCA.q)}" placeholder="Ex.: Maria Helena, 800000701023900IE ou T10068052" data-enter="auditarBuscar" style="flex:1;min-width:220px;width:auto" aria-label="Buscar paciente, carteira ou guia">
       <button class="btn pri" data-act="auditarBuscar">${ic('search')}Buscar</button></div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" id="audCorr" ${AUD_BUSCA.soCorr ? 'checked' : ''}><span>Só guias com correções, releituras ou divergências aceitas</span></label>
     ${AUD_BUSCA.buscando ? '<p class="muted" style="margin-top:8px">Buscando nos registros…</p>' : R ? `<p class="dica" style="margin-top:8px">${R.length} resultado(s)${R.length > 200 ? ' (mostrando os 200 mais recentes)' : ''}.</p>
     ${R.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Data</th><th>Paciente</th><th>Carteira</th><th>Guia</th><th>Clínica</th><th>Operador</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${R.slice(0, 200).map(r => `<tr><td class="num">${fmtDH(r.concluidoEm || r.abertoEm)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}</td><td class="num">${esc(r.carteira || '—')}</td><td class="num"><b>${esc(r.guia || '—')}</b></td><td>${esc(r.clinica || r.remetente || '—')}</td><td>${esc(r.operador || '—')}</td><td>${tagStatus(r.status)} ${tagResultado(resultadoDe(r))}</td>
+      ${R.slice(0, 200).map(r => `<tr><td class="num">${fmtDH(r.concluidoEm || r.abertoEm)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}${r.correcoes ? ` <span class="tag warn" title="Correções, releituras e aceites registrados">${r.correcoes} correção(ões)</span>` : ''}${r.ignorados ? ` <span class="tag obs">${r.ignorados} aceite(s)</span>` : ''}</td><td class="num">${esc(r.carteira || '—')}</td><td class="num"><b>${esc(r.guia || '—')}</b></td><td>${esc(r.clinica || r.remetente || '—')}</td><td>${esc(r.operador || '—')}</td><td>${tagStatus(r.status)} ${tagResultado(resultadoDe(r))}</td>
         <td class="c"><button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}">${ic('eye', 'sm')}Histórico</button></td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
   </div>`;
 }
@@ -5652,15 +5686,222 @@ function buscarRegistros(q) {
 }
 Object.assign(acoes, {
   async auditarBuscar() {
-    const q = ($('#audQ') || {}).value || ''; AUD_BUSCA.q = q;
-    if (norm(q).trim().length < 3) { toast('Digite ao menos 3 letras do nome, ou a carteira, ou o número da guia.', 'bad'); return; }
+    const q = ($('#audQ') || {}).value || ''; AUD_BUSCA.q = q; AUD_BUSCA.soCorr = !!($('#audCorr') || {}).checked;
+    if (norm(q).trim().length < 3 && !AUD_BUSCA.soCorr) { toast('Digite ao menos 3 letras do nome, ou a carteira, ou o número da guia.', 'bad'); return; }
     AUD_BUSCA.buscando = true; render();
     await Reg.carregarTudo();
-    AUD_BUSCA.res = buscarRegistros(q); AUD_BUSCA.buscando = false; render();
+    AUD_BUSCA.res = (norm(q).trim().length >= 3 ? buscarRegistros(q) : Object.values(Reg.todos).filter(r => !r.tipo).sort((a, b) => ((a.concluidoEm || a.abertoEm || '') < (b.concluidoEm || b.abertoEm || '') ? 1 : -1))).filter(r => !AUD_BUSCA.soCorr || r.correcoes || r.ignorados);
+    AUD_BUSCA.buscando = false; render();
   },
   verGuia(b) { abrirHistoricoGuia(b.dataset.id); }
 });
 
+/* ====================================================================
+   Linha do tempo da guia: tudo o que foi corrigido, editado, relido, ignorado (vai para o histórico e o Auditar)
+   ==================================================================== */
+function evento(g, tipo, texto, dados) {
+  g.eventos = g.eventos || [];
+  g.eventos.push({ em: agora(), op: operador(), tipo, texto, ...(dados ? { dados } : {}) });
+}
+const EV_ROT = { 'edicao-email': 'Leitura do e-mail corrigida', 'edicao-campo': 'Campo editado', carteira: 'Carteira usada', print: 'Print lido', 'print-erro': 'Print recusado', numero: 'Nº da guia', releitura: 'Releitura do print', ignorado: 'Divergência aceita', desfeito: 'Ignorar desfeito', conferido: 'Alerta conferido', aprendido: 'Correção aprendida aplicada', regra: 'Regra da clínica' };
+const EV_CORRECAO = ['edicao-email', 'edicao-campo', 'carteira', 'releitura', 'ignorado', 'aprendido'];
+
+/* ====================================================================
+   Aprendizado: cada correção feita pelos operadores fica registrada (pasta › aprendizado/correcoes.json).
+   Correções repetidas viram sugestão no próximo atendimento da mesma clínica e podem virar regra da clínica.
+   ==================================================================== */
+const Apr = {
+  lista: [], pronto: false,
+  async carregar() {
+    let d = LS.get('aprendizado', null);
+    if (Pasta.ok) { const p = await Pasta.ler(['aprendizado'], 'correcoes.json'); if (p) { d = p; LS.set('aprendizado', p); } }
+    this.lista = (d && Array.isArray(d.itens)) ? d.itens : []; this.pronto = true;
+  },
+  chave: e => [e.tipo, e.clinicaId || '', e.campo, e.lido, e.correto].join('|'),
+  async registrar(e) {
+    if (!e.lido && e.lido !== 0 || String(e.lido) === String(e.correto)) return;
+    await this.carregar();   // relê antes de gravar (outro operador pode ter gravado)
+    const k = this.chave(e), x = this.lista.find(y => this.chave(y) === k), op = operador();
+    if (x) { x.n++; x.ultimo = agora(); if (op && !x.ops.includes(op)) x.ops = [...x.ops, op].slice(-5); if (e.ref) x.ref = e.ref; }
+    else this.lista.push({ tipo: e.tipo, clinicaId: e.clinicaId || '', clinica: e.clinica || '', campo: e.campo, lido: String(e.lido), correto: String(e.correto), ref: e.ref || '', sistema: e.sistema || '', n: 1, primeiro: agora(), ultimo: agora(), ops: op ? [op] : [] });
+    const doc = { atualizadoEm: agora(), itens: this.lista };
+    LS.set('aprendizado', doc);
+    if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } }
+  },
+  async remover(k) { await this.carregar(); this.lista = this.lista.filter(y => this.chave(y) !== k); const doc = { atualizadoEm: agora(), itens: this.lista }; LS.set('aprendizado', doc); if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } } },
+  /* correções de e-mail desta clínica que batem com o que acabou de ser lido */
+  sugestoes(p, cl) {
+    if (!cl) return [];
+    const out = [], da = this.lista.filter(e => e.tipo === 'email' && e.clinicaId === cl.id);
+    const atual = { codigo: [...p.itens.map(i => i.codigo), ...p.invalidos], medico: [p.medico.nome], crm: [p.medico.crm], cid: [p.cid], local: [p.local], emissao: [p.emissao.bruto] };
+    for (const e of da) {
+      if (e.campo === 'quantidade') continue;   // quantidade vira sugestão de regra (Configurações › Aprendizado)
+      const vs = atual[e.campo] || []; if (vs.some(v => v && String(v) === e.lido)) out.push(e);
+    }
+    return out;
+  },
+  /* para o print: o mesmo erro de leitura (lido → correto) já confirmado antes? */
+  leituraConhecida(campo, lido, correto) { return this.lista.find(e => e.tipo === 'print' && e.campo === campo && e.lido === String(lido) && e.correto === String(correto)) || null; }
+};
+
+/* ====================================================================
+   Antes de aceitar uma divergência do print: lê de novo aquela parte com mais preparos e posições.
+   Se alguma leitura bate com o pedido, era erro de leitura e nada é ignorado.
+   ==================================================================== */
+const VAR_FUNDO = [3, 4, 5, 6].flatMap(a => [{ ampl: a }, { ampl: a, cinza: true }, { ampl: a, limite: -25 }, { ampl: a, limite: 25 }]);
+const deslocadas = c => [c, [c[0], c[1] - 2, c[2], c[3] - 2], [c[0], c[1] + 2, c[2], c[3] + 2], [c[0] - 2, c[1], c[2], c[3]], [c[0] + 2, c[1], c[2], c[3]], [c[0], c[1], c[2] + 8, c[3]]];
+async function relerDivergencia(g, x, aviso) {
+  const mem = PRINTS_MEM.get(g.id); if (!mem) return null;
+  const tentar = async (cv, a, caixas, vars, lista, norm, aceita) => {
+    for (const cx of caixas) for (const v of vars) {
+      const c = prepararCampo(cv, a, cx, v.ampl, v); const r = await OCR.ler(c.canvas, { psm: v.psm || '7', lista });
+      const val = norm(r.texto); if (val && aceita(val)) return val;
+    }
+    return null;
+  };
+  if (x.chave.startsWith('c:')) {
+    const k = x.chave.slice(2), lt = mem.leituras.find(l => l.tipo === 'guia'); if (!lt || !lt.ctx || !lt.campos[k]) return null;
+    const { cv, anDe, G } = lt.ctx, base = DEF_GUIA[k], orig = lt.campos[k].valor, norm = base.norm || (t => t);
+    if (aviso) aviso('Lendo de novo: ' + (ROT_PRINT[k] || k) + '…');
+    const confere = val => { if (val === orig || (base.valida && !base.valida(val))) return false; lt.campos[k].valor = val; const c = avaliarPrints(g).checks.find(y => y.chave === x.chave); const ok = c && c.st === 'ok'; lt.campos[k].valor = orig; return ok; };
+    const val = await tentar(cv, anDe(k), deslocadas(G[k]), VAR_FUNDO, base.lista, norm, confere);
+    if (!val) return null;
+    lt.campos[k].valor = val; lt.campos[k].incerto = false; lt.campos[k].releitura = { antes: orig, depois: val };
+    return { antes: orig, depois: val };
+  }
+  const codigo = x.chave.slice(2), ped = g.pedido.itens.find(i => i.codigo === codigo), pedCods = new Set(g.pedido.itens.map(i => i.codigo));
+  for (const l of mem.leituras.filter(l => l.tipo === 'proc' && l.ctx)) {
+    const { cv, an, G } = l.ctx, Lg = G.linhas, caixa = (i, col) => [col[0], Lg.topo + Lg.passo * i + 2, col[1], Lg.topo + Lg.passo * i + Lg.alt - 1];
+    const it = l.itens.find(i => i.codigo === codigo);
+    if (it && ped && ped.qtd != null && it.qtd !== ped.qtd) {   // quantidade diferente: relê só a quantidade daquela linha
+      if (aviso) aviso('Lendo de novo a quantidade de ' + codigo + '…');
+      const v = await tentar(cv, an, deslocadas(caixa(it.fila, Lg.qtd)), [...VAR_CURTO, ...VAR_FUNDO.map(x => ({ ...x, psm: '13' }))], '0123456789', soDigitos, v => v === String(ped.qtd));
+      if (v) { const antes = it.qtd; it.qtd = Number(v); return { antes: `${codigo} × ${antes ?? '?'}`, depois: `${codigo} × ${v}` }; }
+    }
+    if (!it) {   // não apareceu: relê as linhas cujo código não está no pedido (podem ser este código lido errado)
+      for (const o of l.itens.filter(i => !pedCods.has(i.codigo))) {
+        if (aviso) aviso('Lendo de novo a linha ' + (o.n || o.fila + 1) + ' da grade…');
+        const v = await tentar(cv, an, deslocadas(caixa(o.fila, Lg.cod)), VAR_FUNDO, '0123456789', t => { const d = soDigitos(t); return d.length > 8 ? d.slice(-8) : d; }, v => v === codigo);
+        if (v) { const antes = o.codigo; o.codigo = v; return { antes, depois: v }; }
+      }
+    }
+  }
+  return null;
+}
+/* motivo ao aceitar uma divergência (obrigatório para nome e carteira) */
+const MOTIVOS_IGN = {
+  comum: [['leitura', 'Erro de leitura do print: conferi na tela do sistema e está igual ao pedido']],
+  paciente: [['abreviado', 'Nome abreviado ou cortado no sistema'], ['cadastro', 'Nome diferente no cadastro (casamento, grafia, nome social)']],
+  ident: [['nova', 'Carteira nova ou trocada no sistema (o e-mail veio com a antiga)'], ['dependente', 'Titular/dependente: carteira diferente da informada']],
+  item: [['menor', 'Autorizado a menor (regra, limite ou saldo)'], ['naoLiberado', 'Item não liberado no sistema'], ['outroCodigo', 'Liberado com outro código equivalente']],
+  outro: [['outro', 'Outro motivo (descreva)']]
+};
+const exigeMotivo = chave => chave === 'c:paciente' || chave === 'c:ident';
+function abrirMotivoIgnorar(g, x) {
+  const k = x.chave.startsWith('i:') ? 'item' : x.chave.slice(2), ops = [...MOTIVOS_IGN.comum, ...(MOTIVOS_IGN[k] || []), ...MOTIVOS_IGN.outro], obrig = exigeMotivo(x.chave);
+  M = { tipo: 'motivoIgn', chave: x.chave };
+  abrirModal({ titulo: 'Aceitar divergência', sub: `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"`, icone: 'shield', tamanho: 'p',
+    corpo: `<p class="dica" style="margin:0 0 10px">O print já foi lido de novo e continua diferente. ${obrig ? '<b>Para nome e carteira o motivo é obrigatório.</b>' : 'Diga o motivo: ele fica no histórico da guia.'}</p>
+      <div class="stack" role="radiogroup">${ops.map(([v, t], i) => `<label class="chk"><input type="radio" name="motIgn" value="${v}" ${i === 0 && !obrig ? '' : ''}><span>${esc(t)}</span></label>`).join('')}</div>
+      <label class="lbl" for="motIgnTxt" style="margin-top:10px">Detalhe ${obrig ? '(obrigatório em "Outro")' : '(opcional)'}</label><textarea id="motIgnTxt" rows="2" placeholder="Ex.: no sistema está JANY G. DA SILVA"></textarea>`,
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="motivoIgnOk">${ic('check')}Aceitar divergência</button>` });
+}
+function confirmarIgnorar(g, x, motivo) {
+  g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {};
+  const ign = { ...linhaIgnorada(x), ...(motivo ? { motivo } : {}) };
+  if (motivo && motivo.tipo === 'leitura') { ign.on = false; ign.leitura = true; }   // erro de leitura: não vai observação ao prestador
+  g.prints.ign[x.chave] = ign;
+  evento(g, 'ignorado', `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"${motivo ? ' — ' + motivo.texto + (motivo.detalhe ? ': ' + motivo.detalhe : '') : ''}`, { chave: x.chave, motivo: motivo || null });
+  if (motivo && motivo.tipo === 'leitura') {
+    const campo = x.chave.startsWith('c:') ? x.chave.slice(2) : 'item';
+    Apr.registrar({ tipo: 'print', campo, lido: x.lido ?? x.qSis ?? '', correto: x.ped ?? x.qPed ?? '', sistema: (PRINTS_MEM.get(g.id) || {}).sistema || '', clinicaId: S.clinicaId, clinica: (clinicaDe(S) || {}).nome || '' });
+  }
+  aplicarPrints(g); persistir(); render();
+  toast(ign.leitura ? 'Marcado como erro de leitura do print. Sem observação para o prestador.' : ign.on !== false ? 'Divergência aceita: a observação para o prestador foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência aceita.');
+}
+Object.assign(acoes, {
+  async ignorarPrint(b) {
+    const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
+    const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
+    const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; };
+    b.disabled = true;
+    let rr = null; try { rr = await relerDivergencia(g, x, msg); } catch (e) { console.error(e); }
+    msg('');
+    const rot = x.rot || 'Item ' + x.codigo;
+    if (rr) { evento(g, 'releitura', `${rot}: lido de novo como "${rr.depois}" (antes "${rr.antes}") e agora confere com o pedido.`); aplicarPrints(g); persistir(); render(); toast('Lido de novo: agora confere com o pedido. Nada foi ignorado.'); return; }
+    evento(g, 'releitura', `${rot}: lido de novo e continua diferente do pedido.`);
+    b.disabled = false;
+    abrirMotivoIgnorar(g, x);
+  },
+  motivoIgnOk() {
+    const g = guiaAtiva(), av = avaliarPrints(g); const x = av && [...av.checks, ...av.linhas].find(y => y.chave === M.chave); if (!x) { fecharModal(true); return; }
+    const sel = $('input[name="motIgn"]:checked'), det = ($('#motIgnTxt') || {}).value.trim();
+    if (!sel) { toast('Escolha o motivo.', 'bad'); return; }
+    if (sel.value === 'outro' && det.length < 4) { toast('Descreva o motivo.', 'bad'); $('#motIgnTxt').focus(); return; }
+    const texto = sel.closest('label').textContent.trim();
+    fecharModal(true);
+    confirmarIgnorar(g, x, { tipo: sel.value, texto, detalhe: det });
+  },
+  desfazerPrint(b) {
+    const g = guiaAtiva(); if (!g.prints || !g.prints.ign) return;
+    const ant = g.prints.ign[b.dataset.key]; delete g.prints.ign[b.dataset.key];
+    evento(g, 'desfeito', `Desfeito o aceite de ${b.dataset.key.startsWith('c:') ? (ROT_PRINT[b.dataset.key.slice(2)] || b.dataset.key) : 'item ' + b.dataset.key.slice(2)}${ant && ant.motivo ? ' (motivo era: ' + ant.motivo.texto + ')' : ''}.`);
+    aplicarPrints(g); persistir(); render();
+  },
+  aplicarAprendido(b) {
+    const g = guiaAtiva(), p = g.pedido, e = (p.aprendidos || [])[+b.dataset.i]; if (!e) return;
+    if (e.campo === 'codigo') {
+      const it = p.itens.find(i => i.codigo === e.lido);
+      if (it) it.codigo = e.correto;
+      else {   // código que não virou item (dígito a mais/menos): relê o trecho do e-mail já com o código certo, para pegar a quantidade e a descrição
+        const re = new RegExp('(?<![\\dA-Za-z])' + e.lido + '(?![\\dA-Za-z])', 'g');
+        const novo = g.textoBloco ? lerPedido(g.textoBloco.replace(re, e.correto), S.email.data).itens.find(i => i.codigo === e.correto) : null;
+        p.itens.push(novo ? { ...novo } : { codigo: e.correto, desc: '', qtd: null, origemQtd: null });
+      }
+      p.invalidos = p.invalidos.filter(c => c !== e.lido);
+    } else if (e.campo === 'medico') p.medico = lerMedico(`${e.correto}${p.medico.crm ? ' CRM ' + p.medico.crm : ''}`);
+    else if (e.campo === 'crm') { p.medico.crm = e.correto; }
+    else if (e.campo === 'cid') p.cid = e.correto;
+    else if (e.campo === 'local') p.local = e.correto;
+    else if (e.campo === 'emissao') p.emissao = lerEmissao(e.correto, S.email.data);
+    p.aprendidos.splice(+b.dataset.i, 1);
+    evento(g, 'aprendido', `${e.campo}: "${e.lido}" → "${e.correto}" (correção já feita ${e.n} vez(es) nesta clínica).`);
+    persistir(); render(); toast('Correção aplicada. Confira no e-mail.');
+  }
+});
+
+/* ---------- Configurações › Aprendizado ---------- */
+const CAMPO_APR = { codigo: 'Código', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data do pedido', paciente: 'Nome do paciente', ident: 'Carteira', guia: 'Nº da guia', credNome: 'Credenciado', profissional: 'Médico (print)', registro: 'CRM (print)', dtSolic: 'Data (print)', item: 'Item' };
+function regraSugerida(e) {
+  if (e.tipo !== 'email') return '';
+  if (e.campo === 'codigo') return 'troca';
+  if (e.campo === 'quantidade' && e.lido === '?' && /^\d+$/.test(e.correto)) return 'qtdPadrao';
+  return '';
+}
+function cfgAprendizado() {
+  const L = [...Apr.lista].sort((a, b) => b.n - a.n || (a.ultimo < b.ultimo ? 1 : -1));
+  const em = L.filter(e => e.tipo === 'email'), pr = L.filter(e => e.tipo === 'print');
+  const linha = e => { const k = Apr.chave(e), rg = regraSugerida(e), cl = cfgEdit.clinicas.find(c => c.id === e.clinicaId);
+    const jaRegra = rg === 'troca' && cl && lerTrocas(cl.leitura.trocas).mapa[e.lido] === e.correto || rg === 'qtdPadrao' && cl && String(cl.leitura.qtdPadrao) === e.correto;
+    return `<tr><td>${esc(e.clinica || (e.tipo === 'print' ? SISTEMAS_PRINT[e.sistema] || '—' : '—'))}</td><td>${esc(CAMPO_APR[e.campo] || e.campo)}${e.ref ? ` <span class="muted">(${esc(e.ref)})</span>` : ''}</td><td class="num">${esc(e.lido || '—')}</td><td class="num"><b>${esc(e.correto || '—')}</b></td><td class="c"><span class="tag ${e.n >= 3 ? 'warn' : ''}">${e.n}×</span></td><td class="num">${fmtData(e.ultimo)}</td><td>${esc((e.ops || []).join(', '))}</td>
+      <td class="c"><div class="linha-flex" style="justify-content:center;gap:4px">${rg && cl ? (jaRegra ? '<span class="tag ok">já é regra</span>' : `<button class="btn sm" data-act="aprRegra" data-k="${esc(k)}" title="${rg === 'troca' ? 'Adiciona em “Códigos que a clínica escreve errado”' : 'Liga “Quantidade quando o e-mail não informar”'}">${ic('check', 'sm')}Virar regra</button>`) : ''}<button class="btn sm line" data-act="aprRemover" data-k="${esc(k)}" title="Esquecer esta correção">${ic('trash', 'sm')}</button></div></td></tr>`; };
+  const tabela = (lista, vazio) => lista.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Clínica / sistema</th><th>Campo</th><th>Lido</th><th>Correto</th><th>Vezes</th><th>Última</th><th>Operadores</th><th></th></tr></thead><tbody>${lista.map(linha).join('')}</tbody></table></div>` : `<p class="muted">${vazio}</p>`;
+  return `<div class="card">${cabSecao('Aprendizado (correções)')}
+    <p class="dica">Cada correção que os operadores fazem fica registrada aqui (pasta compartilhada › aprendizado). No e-mail, quando o mesmo valor aparece de novo na mesma clínica, o atendimento sugere a mesma correção. No print, um erro de leitura confirmado vira aviso de “leitura conhecida”. Correções frequentes de código ou de quantidade podem <b>virar regra da clínica</b> (depois clique em Salvar configurações).</p>
+    <div class="acoes" style="margin-top:0"><span class="tag">${em.length} do e-mail · ${pr.length} do print</span><span class="esp"></span><button class="btn" data-act="aprBaixar" ${L.length ? '' : 'disabled'}>${ic('download')}Baixar (.json) para ajuste dos leitores</button></div>
+    <h3>Leitura do e-mail</h3>${tabela(em, 'Nenhuma correção de e-mail registrada ainda.')}
+    <h3 style="margin-top:16px">Leitura dos prints (erros de leitura confirmados)</h3>${tabela(pr, 'Nenhum erro de leitura confirmado ainda.')}</div>`;
+}
+Object.assign(acoes, {
+  aprRegra(b) {
+    const e = Apr.lista.find(y => Apr.chave(y) === b.dataset.k), cl = e && cfgEdit.clinicas.find(c => c.id === e.clinicaId); if (!e || !cl) return;
+    if (regraSugerida(e) === 'troca') { const t = (cl.leitura.trocas || '').trim(); cl.leitura.trocas = (t ? t + '\n' : '') + `${e.lido} = ${e.correto}`; }
+    else cl.leitura.qtdPadrao = Number(e.correto);
+    marcarSujo(); render(); toast(`Regra adicionada em ${cl.nome}. Clique em Salvar configurações.`);
+  },
+  async aprRemover(b) { if (!confirm('Esquecer esta correção? Ela deixa de ser sugerida.')) return; await Apr.remover(b.dataset.k); render(); },
+  aprBaixar() { baixar(nomeArquivo('aprendizado', isoDia(new Date()), 'json'), JSON.stringify({ tipo: 'conferidor-aprendizado', versao: VERSAO, gerado: agora(), itens: Apr.lista }, null, 1), 'application/json'); }
+});
 async function init() {
   iniciarSoIcone();
   Tema.aplicar();
@@ -5672,6 +5913,7 @@ async function init() {
   await carregarConfig();
   await Param.carregar();
   await Reg.carregar();
+  await Apr.carregar();
   S = LS.get('atual', null);
   if (S && S.v !== 2) S = null;
   render();
