@@ -48,7 +48,7 @@
   --obs-bg:#f1f5f9; --obs-fg:#334155; --obs-br:#cbd5e1; --obs-solid:#64748b;
   --info-bg:#f2f6fb; --info-fg:#233c5c; --info-br:#c5d5e8; --info-solid:#4872a4;
   --neu-bg:#f1f5f9; --neu-fg:#334155; --neu-br:#e2e8f0;
-  --mark-ok:#bbf7d0; --mark-warn:#fde68a; --mark-cart:#dbeafe;
+  --mark-ok:#bbf7d0; --mark-warn:#fde68a; --mark-cart:#dbeafe; --mark-benef:#fce7f3; --mark-med:#e0e7ff; --mark-cid:#ffedd5; --mark-data:#ccfbf1;
   --overlay:rgba(8,15,30,.62);
   color-scheme:light;
 }
@@ -66,7 +66,7 @@
   --obs-bg:#212c40; --obs-fg:#cbd5e1; --obs-br:#3a4966; --obs-solid:#94a3b8;
   --info-bg:#1b2a42; --info-fg:#d3e2f6; --info-br:#37507a; --info-solid:#6a90bd;
   --neu-bg:#212c40; --neu-fg:#cbd5e1; --neu-br:#3a4966;
-  --mark-ok:#14532d; --mark-warn:#5b4410; --mark-cart:#1e3a6e;
+  --mark-ok:#14532d; --mark-warn:#5b4410; --mark-cart:#1e3a6e; --mark-benef:#5b2140; --mark-med:#2e3470; --mark-cid:#5a3412; --mark-data:#134e48;
   --overlay:rgba(0,0,0,.72);
   color-scheme:dark;
 }
@@ -372,6 +372,11 @@ mark{border-radius:3px;padding:0 3px;color:inherit}
 mark.m-ok{background:var(--mark-ok)}
 mark.m-warn{background:var(--mark-warn)}
 mark.m-cart{background:var(--mark-cart)}
+mark.m-benef{background:var(--mark-benef)}mark.m-med{background:var(--mark-med)}mark.m-cid{background:var(--mark-cid)}mark.m-data{background:var(--mark-data)}
+mark.acende{outline:2px solid var(--focus);outline-offset:1px;font-weight:700}
+.legenda-mk mark{margin-right:2px;white-space:nowrap}
+[data-mcampo="benef"] .lbl.mk::before,[data-mcampo="cart"] .lbl.mk::before,[data-mcampo="medico"] .lbl.mk::before,[data-mcampo="cid"] .lbl.mk::before,[data-mcampo="data"] .lbl.mk::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid var(--border-strong)}
+[data-mcampo="benef"] .lbl.mk::before{background:var(--mark-benef)}[data-mcampo="cart"] .lbl.mk::before{background:var(--mark-cart)}[data-mcampo="medico"] .lbl.mk::before{background:var(--mark-med)}[data-mcampo="cid"] .lbl.mk::before{background:var(--mark-cid)}[data-mcampo="data"] .lbl.mk::before{background:var(--mark-data)}
 mark.lacuna{background:var(--warn-bg);color:var(--warn-fg);outline:1px dashed var(--warn-br)}
 
 /* ===== Alertas ===== */
@@ -514,6 +519,18 @@ kbd{display:inline-block;min-width:18px;text-align:center;font:600 11.5px/1.4 va
 mark.dif{background:var(--bad-bg);color:var(--bad-fg);outline:1px solid var(--bad-br);border-radius:2px;padding:0 1px;font-weight:800}
 .dif-box{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2)}
 .dif-box .num{font-size:var(--fs-lg);font-weight:650;letter-spacing:.03em;overflow-wrap:anywhere}
+.sit-item{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.menu-resp{position:relative}
+.menu-resp > summary{list-style:none;cursor:pointer}.menu-resp > summary::-webkit-details-marker{display:none}
+.menu-lista{position:absolute;z-index:40;top:calc(100% + 4px);left:0;min-width:300px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);box-shadow:0 10px 30px rgba(15,23,42,.18);padding:4px;display:flex;flex-direction:column}
+.menu-lista .btn{justify-content:flex-start;width:100%;color:var(--text)}
+.guia-linha{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.guia-linha .btn-obs{min-height:58px;padding:0 18px;font-size:var(--fs-md);font-weight:650}
+.previa-provavel{opacity:.85;border-style:dashed}
+.orig{display:inline-flex;vertical-align:-1px;margin-left:3px;color:var(--text-3);cursor:help}
+.orig .ic{width:12px;height:12px}
+.orig-digitado{color:var(--warn-solid)}.orig-aprendido,.orig-regra{color:var(--accent)}
+.aviso-parado{margin-bottom:10px;align-items:center}
 /* ===== Esqueleto, combobox e dicas ===== */
 @keyframes brilho{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .esq-b{border-radius:6px;background:linear-gradient(90deg,var(--surface-3) 0,var(--surface-2) 50%,var(--surface-3) 100%);background-size:800px 100%;animation:brilho 1.2s linear infinite}
@@ -2197,7 +2214,7 @@ const OBS_AUTO = {
   cid: { nome: 'CID diferente', texto: 'CID no sistema difere do informado no pedido.', padrao: false }
 };
 const obsAutoPadrao = () => Object.fromEntries(Object.entries(OBS_AUTO).map(([k, v]) => [k, { texto: v.texto, padrao: v.padrao }]));
-const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10, guardarPrints: true };
+const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10, guardarPrints: true, minutosParado: 10 };
 
 /* Motor de modelos: campos entre chaves → texto/HTML. Falta de valor fica visível. */
 function modeloHtmlBruto(k) { return (cfg.modelos[k] || {}).html || ''; }
@@ -2273,6 +2290,7 @@ function mesclarConfig(base, c) {
     if (Number.isInteger(p.qtdMax) && p.qtdMax >= 1 && p.qtdMax <= 99) r.preferencias.qtdMax = p.qtdMax;
     if (typeof p.obsParametrizadoAuto === 'boolean') r.preferencias.obsParametrizadoAuto = p.obsParametrizadoAuto;
     if (Number.isInteger(p.acoesMinutos) && p.acoesMinutos >= 0 && p.acoesMinutos <= 1440) r.preferencias.acoesMinutos = p.acoesMinutos;
+    if (Number.isInteger(Number(p.minutosParado)) && Number(p.minutosParado) >= 0 && Number(p.minutosParado) <= 240) r.preferencias.minutosParado = Number(p.minutosParado);
     if (typeof p.guardarPrints === 'boolean') r.preferencias.guardarPrints = p.guardarPrints;
   }
   if (c.obsAuto) for (const k in OBS_AUTO) { const o = c.obsAuto[k]; if (!o) continue; if (typeof o.texto === 'string' && o.texto.trim()) r.obsAuto[k].texto = o.texto.trim(); if (typeof o.padrao === 'boolean') r.obsAuto[k].padrao = o.padrao; }
@@ -2582,7 +2600,7 @@ function pedidosDoEmail(email, cl) {
     }
     lp.blocos.forEach(b => {
       const p = b.pedido; p.regras = [];
-      c.correcoes.filter(x => p.itens.some(it => it.codigo === x.para)).forEach(x => p.regras.push(`Código ${x.de} lido como ${x.para} pela regra da clínica (${x.como === 'troca' ? 'código que a clínica escreve errado' : 'dígito a mais ou a menos, corrigido para o código cadastrado'}). Confira no e-mail.`));
+      c.correcoes.filter(x => p.itens.some(it => it.codigo === x.para)).forEach(x => { p.itens.filter(it => it.codigo === x.para).forEach(it => { it.origemCod = 'regra'; }); }); c.correcoes.filter(x => p.itens.some(it => it.codigo === x.para)).forEach(x => p.regras.push(`Código ${x.de} lido como ${x.para} pela regra da clínica (${x.como === 'troca' ? 'código que a clínica escreve errado' : 'dígito a mais ou a menos, corrigido para o código cadastrado'}). Confira no e-mail.`));
       p.itens.forEach(it => {
         if (it.qtd == null && R.qtdPadrao) { it.qtd = R.qtdPadrao; it.origemQtd = 'regra'; p.regras.push(`O e-mail não informa a quantidade de ${it.codigo}: usada ${R.qtdPadrao}, pela regra da clínica.`); }
         if (it.origemQtd === 'colada-crm') p.regras.push(`Quantidade 1 de ${it.codigo} separada do número colado no CRM (ex.: "119741" = 1 + CRM 19741). Confira no e-mail.`);
@@ -2774,8 +2792,8 @@ function textoParametrizacao(m) {
 function aplicarParametrizacao(g) {
   const prm = paramDaGuia(g); if (!prm) return false;
   const p = g.pedido, feitos = [];
-  if (!p.medico.nome && !p.medico.crm && prm.medico) { p.medico = lerMedico(prm.medico); feitos.push('médico'); }
-  if (p.emissao.estado === 'ausente' && prm.emissao) { p.emissao = lerEmissao(diaBR(prm.emissao), S.email.data); feitos.push('data do pedido'); }
+  if (!p.medico.nome && !p.medico.crm && prm.medico) { p.medico = lerMedico(prm.medico); feitos.push('médico'); marcarOrigem(g, 'medico', 'param'); }
+  if (p.emissao.estado === 'ausente' && prm.emissao) { p.emissao = lerEmissao(diaBR(prm.emissao), S.email.data); feitos.push('data do pedido'); marcarOrigem(g, 'emissao', 'param'); }
   p.itens.forEach(it => {
     const t = prm.terapias.find(x => (x.codigo && x.codigo === it.codigo) || (!x.codigo && it.desc && norm(x.descricao) === norm(it.desc)));
     if (!t) return;
@@ -3090,7 +3108,7 @@ function render() {
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
   const alvoId = 'etapa';
-  app.innerHTML = htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g)) + `<div id="${alvoId}"></div>`;
+  app.innerHTML = htmlAvisoParado() + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g)) + `<div id="${alvoId}"></div>`;
   const alvo = $('#' + alvoId);
   if (S.vista === 1) renderVisao(alvo); else if (g.status === 'concluido' && S.vista === 4) renderConcluida(alvo, g);
   else if (S.vista === 2) renderPedido(alvo, g); else if (S.vista === 3) renderGuia(alvo, g); else renderFinal(alvo, g);
@@ -3127,13 +3145,35 @@ function renderEntrada(app) {
   z.addEventListener('dragleave', () => z.classList.remove('sobre'));
   z.addEventListener('drop', ev => { ev.preventDefault(); z.classList.remove('sobre'); const f = ev.dataTransfer.files[0]; if (f) abrirArquivo(f); });
 }
+/* Realça no texto do e-mail o que foi lido: códigos, carteira, beneficiário, médico, CID e data (cores iguais às dos campos) */
 function realceEmail() {
-  const e = S.email, usados = new Set(S.guias.flatMap(g => g.pedido.itens.map(i => i.codigo)));
-  let html = esc(e.textoPrincipal).replace(/(?<!\d)(\d{8})(?!\d)/g, m => `<mark class="${usados.has(m) ? 'm-ok' : 'm-warn'}">${m}</mark>`);
-  S.guias.forEach(g => { if (g.pedido.carteiraBruta) { const c = esc(g.pedido.carteiraBruta); const i = html.indexOf(c); if (i >= 0) html = html.slice(0, i) + `<mark class="m-cart">${c}</mark>` + html.slice(i + c.length); } });
+  const e = S.email, txt = String(e.textoPrincipal || ''), usados = new Set(S.guias.flatMap(g => g.pedido.itens.map(i => i.codigo)));
+  const marcas = [], rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const m of txt.matchAll(/(?<!\d)(\d{8})(?!\d)/g)) marcas.push({ ini: m.index, fim: m.index + 8, cls: usados.has(m[1]) ? 'm-ok' : 'm-warn' });
+  const achar = (val, cls, campo, gi) => {
+    val = String(val || '').trim(); if (val.length < 2) return;
+    const re = new RegExp(val.split(/\s+/).map(rx).join('\\s+'), 'gi'); let m;
+    while ((m = re.exec(txt))) { const a = m.index, b = a + m[0].length; if (!marcas.some(x => a < x.fim && x.ini < b)) { marcas.push({ ini: a, fim: b, cls, campo, gi }); return; } if (!m[0].length) break; }
+  };
+  S.guias.forEach((g, gi) => { const p = g.pedido; achar(p.carteiraBruta, 'm-cart', 'cart', gi); achar(p.beneficiario, 'm-benef', 'benef', gi); achar(p.medico.bruto, 'm-med', 'medico', gi); if (!marcas.some(x => x.campo === 'medico' && x.gi === gi)) achar(p.medico.nome, 'm-med', 'medico', gi); achar(p.cid, 'm-cid', 'cid', gi); achar(p.emissao && p.emissao.bruto, 'm-data', 'data', gi); });
+  marcas.sort((a, b) => a.ini - b.ini);
+  let html = '', pos = 0;
+  for (const m of marcas) { if (m.ini < pos) continue; html += esc(txt.slice(pos, m.ini)) + `<mark class="${m.cls}"${m.campo ? ` data-mcampo="${m.campo}" data-g="${m.gi}"` : ''}>${esc(txt.slice(m.ini, m.fim))}</mark>`; pos = m.fim; }
+  html += esc(txt.slice(pos));
   if (e.cortado && e.restante) html += `\n\n<span class="hist">${esc(e.restante)}</span>`;
   return html;
 }
+/* passar o mouse (ou o foco) num campo acende o trecho correspondente no e-mail */
+function acenderTrecho(campo) {
+  $$('pre.original mark.acende').forEach(m => m.classList.remove('acende'));
+  if (!campo || !S) return;
+  const m = $(`pre.original mark[data-mcampo="${campo}"][data-g="${S.ativa}"]`); if (!m) return;
+  m.classList.add('acende');
+  const cx = m.closest('.col-fixa') || m.closest('pre.original');
+  if (cx) { const r = m.getBoundingClientRect(), c = cx.getBoundingClientRect(); if (r.top < c.top + 10 || r.bottom > c.bottom - 10) cx.scrollTop += r.top - c.top - c.height / 3; }
+}
+['mouseover', 'focusin'].forEach(t => document.addEventListener(t, ev => { const el = ev.target.closest && ev.target.closest('[data-mcampo]:not(mark)'); if (el) acenderTrecho(el.dataset.mcampo); }));
+['mouseout', 'focusout'].forEach(t => document.addEventListener(t, ev => { const el = ev.target.closest && ev.target.closest('[data-mcampo]:not(mark)'); if (el && !(ev.relatedTarget && el.contains(ev.relatedTarget))) acenderTrecho(null); }));
 function htmlUltimaGuia() {
   const cl = clinicaDe(S), linhas = [], vistos = new Set();
   S.guias.forEach(g => {
@@ -3154,7 +3194,7 @@ function htmlEmailCard() {
       ${e.anexos.length ? `<dt>Anexos</dt><dd><span class="tag info">${ic('clip', 'sm')}${pl(e.anexos.length, 'anexo', 'anexos')}</span> ${esc(e.anexos.join(', '))}</dd>` : ''}
     </dl>
     <pre class="original">${realceEmail()}</pre>
-    <p class="dica" style="margin-top:8px"><mark class="m-ok">verde</mark> código lido como item · <mark class="m-warn">amarelo</mark> 8 dígitos não usados · <mark class="m-cart">azul</mark> carteira</p></div>`;
+    <p class="dica legenda-mk" style="margin-top:8px"><mark class="m-ok">código lido</mark> <mark class="m-warn">8 dígitos não usados</mark> <mark class="m-cart">carteira</mark> <mark class="m-benef">beneficiário</mark> <mark class="m-med">médico</mark> <mark class="m-cid">CID</mark> <mark class="m-data">data</mark> · passe o mouse num campo para achar o trecho.</p></div>`;
 }
 function renderVisao(alvo) {
   const todas = S.guias.every(guiaTerminal), multi = S.guias.length > 1;
@@ -3190,11 +3230,11 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
     const cpCod = copiar ? `<button class="btn cp ${g.copiados['c:' + it.codigo] === it.codigo ? 'copiado' : ''}" data-act="copiarItem" data-tipo="c" data-codigo="${it.codigo}" aria-label="Copiar código ${it.codigo}">${g.copiados['c:' + it.codigo] === it.codigo ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
     const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
     return `<tr><td class="c">${i + 1}</td>
-      <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${cpCod}</div></td>
-      <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
-      <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria ? `<span class="tag obs" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Provisória</span> <button class="btn sm" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar código</button>` : ''}</td>
+      <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${it.origemCod ? htmlOrigem(it.origemCod) : ''}${cpCod}</div></td>
+      <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${ORIGEM_QTD[it.origemQtd] ? htmlOrigem(ORIGEM_QTD[it.origemQtd]) : ''}${it.qtd != null ? cpQtd : ''}</div></td>
+      <td>${esc(ref.texto) || '<span class="muted">—</span>'}</td>
       <td class="muted">${esc(it.desc) || '—'}</td>
-      <td>${tagItem(est)}</td></tr>`;
+      <td><div class="sit-item">${tagItem(est)}${ref.provisoria ? `<span class="tag" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Descrição provisória</span><button class="btn sm line" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar código</button>` : ''}</div></td></tr>`;
   }).join('') || `<tr><td colspan="6" class="muted">Nenhum item lido.</td></tr>`}
   </tbody></table></div>`;
 }
@@ -3217,6 +3257,34 @@ function htmlBannerParam(g) {
   if (prm) return `<div class="banner-param">${ic('layers', 'lg')}<div class="esp"><b>Parametrização encontrada</b> para ${esc(cl.nome)} e esta carteira (atualizada em ${fmtData(prm.atualizadoEm)}): médico ${esc(prm.medico)}, ${pl(prm.terapias.length, 'terapia', 'terapias')}. Ao aplicar, só são preenchidos dados que faltam no e-mail.</div><button class="btn sm line" data-act="parametrizar">${ic('eye', 'sm')}Ver parametrização</button><button class="btn sm pri" data-act="aplicarParam">${ic('check', 'sm')}Aplicar parametrização</button></div>`;
   return '';
 }
+/* Responder sem gerar guia: os 3 modelos mais usados pela equipe à vista; os outros num menu */
+function maisUsadosSemGuia() {
+  const n = {}; Reg.cache.forEach(r => { const m = r.resultado && r.resultado.situacao === 'sem_guia' && r.resultado.modelo; if (m && MODELOS_SEM_GUIA.includes(m)) n[m] = (n[m] || 0) + 1; });
+  const ord = [...MODELOS_SEM_GUIA].sort((a, b) => (n[b] || 0) - (n[a] || 0) || MODELOS_SEM_GUIA.indexOf(a) - MODELOS_SEM_GUIA.indexOf(b));
+  return { top: ord.slice(0, 3), n };
+}
+function htmlRespSemGuia() {
+  const { top, n } = maisUsadosSemGuia();
+  const btn = (k, cls) => `<button class="btn ${cls}" data-act="respSemGuia" data-modelo="${k}">${ic('mail', 'sm')}${esc(nomeModelo(k))}${n[k] ? ` <span class="muted">(${n[k]})</span>` : ''}</button>`;
+  return `<div class="linha-flex">${top.map(k => btn(k, 'line')).join('')}
+    <details class="menu-resp"><summary class="btn line">${ic('list', 'sm')}Responder sem guia ▾</summary><div class="menu-lista" role="menu">${MODELOS_SEM_GUIA.map(k => btn(k, 'ghost menu-op')).join('')}</div></details></div>
+    <p class="dica" style="margin:6px 0 0">À vista, as 3 respostas mais usadas pela equipe nos últimos dias.</p>`;
+}
+document.addEventListener('click', ev => { $$('details.menu-resp[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
+
+/* Origem de cada campo: e-mail, regra da clínica, aprendizado, digitado, parametrização, pedido anterior ou cadastro */
+const ORIGENS = { email: ['mail', 'Lido do e-mail'], regra: ['sliders', 'Ajustado pela regra da clínica'], aprendido: ['book', 'Correção aprendida aplicada'], digitado: ['edit', 'Digitado ou corrigido pelo operador'], param: ['layers', 'Preenchido pela parametrização'], anterior: ['undo', 'Do pedido anterior deste remetente'], cadastro: ['building', 'Do cadastro da clínica'] };
+const marcarOrigem = (g, campo, tipo) => { g.origem = g.origem || {}; g.origem[campo] = tipo; };
+function origemCampo(g, campo) {
+  const o = g.origem && g.origem[campo]; if (o) return o;
+  const p = g.pedido, v = { beneficiario: p.beneficiario, carteira: g.carteiraUsada, medico: p.medico.nome || p.medico.crm, cid: p.cid, emissao: p.emissao && p.emissao.bruto, local: p.local }[campo];
+  if (campo === 'executante') return g.executante != null ? 'digitado' : (clinicaDe(S) && clinicaDe(S).executante ? 'cadastro' : null);
+  return v ? 'email' : null;
+}
+const htmlOrigem = tipo => { const o = ORIGENS[tipo]; return o ? `<span class="orig orig-${tipo}" title="${o[1]}" aria-label="${o[1]}">${ic(o[0], 'sm')}</span>` : ''; };
+const origemDe = (g, campo) => htmlOrigem(origemCampo(g, campo));
+const ORIGEM_QTD = { regra: 'regra', parametrizacao: 'param', manual: 'digitado', 'colada-crm': 'regra', aprendido: 'aprendido' };
+
 function renderPedido(alvo, g) {
   const p = g.pedido, st = situacaoGuia(g), cl = clinicaDe(S);
   const cartInvalida = g.carteiraUsada && !cartValida(g.carteiraUsada);
@@ -3227,13 +3295,13 @@ function renderPedido(alvo, g) {
       <div class="card">
         <div class="card-h"><h2>Dados do pedido${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
         <div class="form-grid">
-          <div><label class="lbl" for="f-benef">Beneficiário</label><input type="text" id="f-benef" data-campo="beneficiario" value="${esc(p.beneficiario)}"></div>
-          <div><label class="lbl">Carteira informada no e-mail</label><div style="min-height:34px;display:flex;align-items:center" class="num">${esc(p.carteiraBruta || '—')}</div></div>
-          <div><label class="lbl" for="cartUsada">Carteira usada no sistema</label><div class="linha-flex" style="flex-wrap:nowrap;gap:6px"><input type="text" id="cartUsada" class="num ${cartInvalida ? 'invalido' : ''}" value="${esc(g.carteiraUsada)}" maxlength="30" placeholder="17 caracteres, sem espaços" aria-describedby="cartAjuda" style="flex:1;min-width:0">${btnCopiaCampo(g, 'carteira', 'cartUsada', 'carteira usada no sistema')}</div>${cartInvalida ? `<div class="campo-erro" id="cartAjuda">${ic('alert', 'sm')}Carteira fora do padrão (15 dígitos + 2 caracteres).</div>` : ''}</div>
-          <div><label class="lbl" for="f-medico">Médico</label><input type="text" id="f-medico" data-campo="medico" value="${esc(p.medico.bruto)}">${!p.medico.nome && LS.get(chaveMedico(), '') ? `<button type="button" class="btn sm line" style="margin-top:6px" data-act="usarMedicoAnterior" title="Médico do último pedido deste remetente (confira no anexo)">${ic('user', 'sm')}Usar ${esc(LS.get(chaveMedico(), ''))}</button>` : ''}</div>
-          <div><label class="lbl" for="f-cid">CID</label><input type="text" id="f-cid" data-campo="cid" value="${esc(p.cid)}"></div>
-          <div><label class="lbl" for="f-em">Data do pedido médico</label><input type="text" id="f-em" data-campo="emissao" value="${esc(p.emissao.bruto)}" placeholder="dd/mm/aaaa ou SEM DATA"></div>
-          <div><label class="lbl" for="f-local">Local do pedido</label><input type="text" id="f-local" data-campo="local" value="${esc(p.local)}"></div>
+          <div data-mcampo="benef"><label class="lbl mk" for="f-benef">Beneficiário ${origemDe(g, 'beneficiario')}</label><input type="text" id="f-benef" data-campo="beneficiario" value="${esc(p.beneficiario)}"></div>
+          <div data-mcampo="cart"><label class="lbl mk">Carteira informada no e-mail</label><div style="min-height:34px;display:flex;align-items:center" class="num">${esc(p.carteiraBruta || '—')}</div></div>
+          <div data-mcampo="cart"><label class="lbl mk" for="cartUsada">Carteira usada no sistema ${origemDe(g, 'carteira')}</label><div class="linha-flex" style="flex-wrap:nowrap;gap:6px"><input type="text" id="cartUsada" class="num ${cartInvalida ? 'invalido' : ''}" value="${esc(g.carteiraUsada)}" maxlength="30" placeholder="17 caracteres, sem espaços" aria-describedby="cartAjuda" style="flex:1;min-width:0">${btnCopiaCampo(g, 'carteira', 'cartUsada', 'carteira usada no sistema')}</div>${cartInvalida ? `<div class="campo-erro" id="cartAjuda">${ic('alert', 'sm')}Carteira fora do padrão (15 dígitos + 2 caracteres).</div>` : ''}</div>
+          <div data-mcampo="medico"><label class="lbl mk" for="f-medico">Médico ${origemDe(g, 'medico')}</label><input type="text" id="f-medico" data-campo="medico" value="${esc(p.medico.bruto)}">${!p.medico.nome && LS.get(chaveMedico(), '') ? `<button type="button" class="btn sm line" style="margin-top:6px" data-act="usarMedicoAnterior" title="Médico do último pedido deste remetente (confira no anexo)">${ic('user', 'sm')}Usar ${esc(LS.get(chaveMedico(), ''))}</button>` : ''}</div>
+          <div data-mcampo="cid"><label class="lbl mk" for="f-cid">CID ${origemDe(g, 'cid')}</label><input type="text" id="f-cid" data-campo="cid" value="${esc(p.cid)}"></div>
+          <div data-mcampo="data"><label class="lbl mk" for="f-em">Data do pedido médico ${origemDe(g, 'emissao')}</label><input type="text" id="f-em" data-campo="emissao" value="${esc(p.emissao.bruto)}" placeholder="dd/mm/aaaa ou SEM DATA"></div>
+          <div><label class="lbl" for="f-local">Local do pedido ${origemDe(g, 'local')}</label><input type="text" id="f-local" data-campo="local" value="${esc(p.local)}"></div>
           ${p.obs ? `<div style="grid-column:1/-1"><label class="lbl">Observações do pedido</label><div>${esc(p.obs)}</div></div>` : ''}
         </div>
         <div class="card-h" style="margin-top:18px"><h3 style="margin:0">Serviços do pedido (${p.itens.length})</h3><span class="esp"></span>
@@ -3244,7 +3312,7 @@ function renderPedido(alvo, g) {
       ${htmlBannerParam(g)}
       <div class="card">
         <div class="card-h"><h2>Responder sem gerar guia</h2></div>
-        <div class="linha-flex">${MODELOS_SEM_GUIA.map(k => `<button class="btn line" data-act="respSemGuia" data-modelo="${k}">${ic('mail')}${esc(nomeModelo(k))}</button>`).join('')}</div>
+        ${htmlRespSemGuia()}
       </div>
     </div>
   </div>
@@ -3290,16 +3358,16 @@ function renderGuia(alvo, g) {
   <div class="card">
     <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
     <div class="cp-grupo"><span class="eyebrow">Executante e solicitação</span>
-      <div class="cp-linha"><div class="rot">1. Credenciado executante${!exec ? '<small>Não cadastrado: informe aqui</small>' : ''}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
-      <div class="cp-linha"><div class="rot">2. Médico</div><div class="cp-campos">${campoCopia(g, { campo: 'medico_nome', rot: 'Nome do médico', sub: 'Nome' })}${campoCopia(g, { campo: 'medico_crm', rot: 'CRM do médico', sub: p.medico.conselho || 'CRM', curto: true, mono: true })}</div></div>
-      <div class="cp-linha"><div class="rot">3. Local do pedido</div><div class="cp-campos">${campoCopia(g, { campo: 'local', rot: 'Local do pedido' })}</div></div>
-      <div class="cp-linha"><div class="rot">4. Data do pedido médico</div><div class="cp-campos">${campoCopia(g, { campo: 'data', rot: 'Data do pedido médico', ph: 'dd/mm/aaaa', curto: true, mono: true })}</div></div>
+      <div class="cp-linha"><div class="rot">1. Credenciado executante ${origemDe(g, 'executante')}${!exec ? '<small>Não cadastrado: informe aqui</small>' : ''}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
+      <div class="cp-linha"><div class="rot">2. Médico ${origemDe(g, 'medico')}</div><div class="cp-campos">${campoCopia(g, { campo: 'medico_nome', rot: 'Nome do médico', sub: 'Nome' })}${campoCopia(g, { campo: 'medico_crm', rot: 'CRM do médico', sub: p.medico.conselho || 'CRM', curto: true, mono: true })}</div></div>
+      <div class="cp-linha"><div class="rot">3. Local do pedido ${origemDe(g, 'local')}</div><div class="cp-campos">${campoCopia(g, { campo: 'local', rot: 'Local do pedido' })}</div></div>
+      <div class="cp-linha"><div class="rot">4. Data do pedido médico ${origemDe(g, 'emissao')}</div><div class="cp-campos">${campoCopia(g, { campo: 'data', rot: 'Data do pedido médico', ph: 'dd/mm/aaaa', curto: true, mono: true })}</div></div>
     </div>
     <div class="cp-grupo"><span class="eyebrow">Beneficiário</span>
-      <div class="cp-linha"><div class="rot">5. Carteira / beneficiário</div><div class="cp-campos">${campoCopia(g, { campo: 'carteira', rot: 'Carteira', sub: 'Carteira', mono: true, mid: true })}${campoCopia(g, { campo: 'benef', rot: 'Nome do beneficiário', sub: 'Beneficiário' })}</div></div>
+      <div class="cp-linha"><div class="rot">5. Carteira / beneficiário ${origemDe(g, 'carteira')}</div><div class="cp-campos">${campoCopia(g, { campo: 'carteira', rot: 'Carteira', sub: 'Carteira', mono: true, mid: true })}${campoCopia(g, { campo: 'benef', rot: 'Nome do beneficiário', sub: 'Beneficiário' })}</div></div>
     </div>
     <div class="cp-grupo"><span class="eyebrow">Diagnóstico</span>
-      <div class="cp-linha"><div class="rot">6. CID</div><div class="cp-campos">${campoCopia(g, { campo: 'cid', rot: 'CID', curto: true, mono: true })}</div></div>
+      <div class="cp-linha"><div class="rot">6. CID ${origemDe(g, 'cid')}</div><div class="cp-campos">${campoCopia(g, { campo: 'cid', rot: 'CID', curto: true, mono: true })}</div></div>
     </div>
   </div>
   <div class="card">
@@ -3446,8 +3514,28 @@ function htmlCardObs(g) {
   <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs" data-rot="Copiar observação">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
 }
+/* Situação da autorização pela leitura dos prints: todos liberados = autorizada; alguns fora do sistema
+   ou não liberados = parcial (esses marcados); nenhum = não autorizada. O operador confere e pode trocar. */
+function situacaoPelosPrints(g) {
+  const av = prontoPrints(g) ? avaliarPrints(g) : null; if (!av || !av.linhas.length) return null;
+  const doPedido = av.linhas.filter(l => l.qPed != null);
+  if (!doPedido.length || av.avisos.some(a => /Falta o print/.test(a))) return null;
+  const naoLib = doPedido.filter(l => l.qSis == null || (l.stSis && l.stSis !== 'L')).map(l => l.codigo);
+  const menor = doPedido.filter(l => l.qSis != null && l.qPed != null && l.qSis < l.qPed).map(l => l.codigo);
+  const v = naoLib.length >= g.pedido.itens.length ? 'nao' : naoLib.length ? 'parcial' : 'autorizada';
+  return { v, naoLib, menor };
+}
+function aplicarSugestaoSituacao(g) {
+  const r = g.resultado; if (r.situacao || g.sitSug) return;
+  const s = situacaoPelosPrints(g); if (!s) return;
+  r.situacao = s.v; r.naoAut = {}; if (s.v === 'parcial') s.naoLib.forEach(c => { r.naoAut[c] = ''; });
+  g.sitSug = { v: s.v, menor: s.menor, em: agora() };
+  evento(g, 'regra', `Situação sugerida pelos prints: ${({ autorizada: 'autorizada', parcial: 'parcialmente autorizada', nao: 'não autorizada' })[s.v]}`);
+  persistir();
+}
 function renderFinal(alvo, g) {
   if (g.semGuia) return renderFinalSemGuia(alvo, g);
+  if (g.status !== 'concluido') aplicarSugestaoSituacao(g);
   const r = g.resultado, st = situacaoGuia(g), guiaOk = /^[TS]\d{7,8}$/.test(g.numero);
   const pend = pendenciasConclusao(g, st);
   const showResp = mostraResposta(g), multi = usaConsolidada(), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
@@ -3464,7 +3552,8 @@ function renderFinal(alvo, g) {
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
         ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> As observações marcadas na etapa 3 já estão nas <b>observações adicionais</b> abaixo (e vão para a resposta à clínica): detalhe o motivo. Você pode finalizar normalmente.</div></div>` : ''}
         <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
-          <input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
+          <div class="guia-linha"><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
+          <button class="btn cp btn-obs ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs" data-rot="Copiar observação da guia" title="Copia o texto da observação (abaixo) para colar no sistema">${g.copiados.obs === obsTxt ? ic('check') + 'Copiado' : ic('copy') + 'Copiar observação da guia'}</button></div>
           <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
         <div class="form-grid">
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail da clínica</label>
@@ -3473,6 +3562,7 @@ function renderFinal(alvo, g) {
             </div>` : ''}
         </div>
         <h3>Situação da autorização</h3>
+        ${g.sitSug && r.situacao === g.sitSug.v ? `<div class="aviso-simples" style="margin-bottom:8px">${ic('info', 'sm')}<div><b>Sugerida pelos prints.</b> Confira antes de concluir; se não for isso, escolha outra.${g.sitSug.menor && g.sitSug.menor.length ? ` ${pl(g.sitSug.menor.length, 'item veio', 'itens vieram')} com quantidade menor (${g.sitSug.menor.join(', ')}): veja se é parcial.` : ''}</div></div>` : ''}
         ${htmlSituacao(g)}
         <div style="margin-top:12px"><div class="linha-flex" style="justify-content:space-between;margin-bottom:3px"><label class="lbl" for="rObs" style="margin:0">Observações adicionais (entram na resposta à clínica)</label><button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
       </div>
@@ -3482,7 +3572,8 @@ function renderFinal(alvo, g) {
       <div class="card">
         <div class="card-h"><h2>${multi ? 'Resposta à clínica (todas as guias)' : 'Resposta à clínica'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
           ${!multi && r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
-        ${!resp ? `<div class="aviso">${ic('info')}<div>Selecione a situação da autorização. O modelo da resposta é definido pelo resultado real da guia: autorizada, parcial ou não autorizada.</div></div>` : `
+        ${!resp ? (() => { const sv = r.situacao; r.situacao = 'autorizada'; let pv = null; try { pv = respostaDaGuia(g, true); } catch (er) { } r.situacao = sv;
+          return `<div class="aviso-simples" style="margin-bottom:8px">${ic('info', 'sm')}<div>Prévia com o modelo provável (<b>autorizada</b>). Escolha a situação para confirmar o modelo e liberar a cópia.</div></div>${pv ? `<div class="previa previa-provavel"><div class="previa-c">${pv.html}</div></div>` : ''}`; })() : `
         ${resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Preencha-os acima ou edite o texto.</div></div>` : ''}
         ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
         <div class="acoes"><button class="btn pri" data-act="copiarResp" ${guiaOk ? '' : 'disabled'} title="${guiaOk ? 'Copia texto formatado, para colar no e-mail' : 'Informe o número da guia'}">${ic('copy')}Copiar com formatação</button>
@@ -3750,6 +3841,7 @@ async function renderPainel(app) {
   </div>
   ${longo ? '' : `<div class="card">
     <div class="card-h"><h2>Amostragem do apoio</h2></div>
+    <p class="dica" style="margin:0 0 8px">Sorteia até 10 guias concluídas no dia (primeiro as com 4 ou mais itens) para a equipe de apoio conferir por amostragem no sistema. A lista aparece aqui depois do sorteio e não fica gravada.</p>
     <div class="acoes" style="margin-top:0"><button class="btn" data-act="sortear">${ic('refresh')}Sortear amostra</button></div>
     ${amostra ? `<div class="tabela-scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Guia</th><th>Resultado</th><th>Carteira</th><th>Itens (código × qtd.)</th></tr></thead><tbody>${amostra.map(r => `<tr><td class="num">${esc(r.guia)}</td><td>${tagResultado(resultadoDe(r))}</td><td class="num">${esc(r.carteira)}</td><td class="num">${r.itens.map(i => i.c + ' × ' + i.q).join(' · ')}</td></tr>`).join('')}</tbody></table></div>` : ''}
   </div>
@@ -4112,6 +4204,7 @@ function cfgPrefs() {
       <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência da grade antes de finalizar (pelos prints ou, sem prints, a conferência cega)</b></span></label>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.guardarPrints" ${p.guardarPrints !== false ? 'checked' : ''}><span><b>Guardar os prints e o que foi lido no histórico de cada guia</b> (pasta compartilhada › auditoria). Usado em “Histórico” do Painel e em Ações › Auditar. Contém dados do beneficiário.</span></label>
       <div style="max-width:300px"><label class="lbl" for="pAcoes">Limpar da aba Ações após (minutos sem movimento; 0 = não limpar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
+      <div style="max-width:300px"><label class="lbl" for="pParado">Avisar “atendimento parado” após (minutos na mesma etapa; 0 = não avisar)</label><input type="number" id="pParado" min="0" max="240" data-cfg="preferencias.minutosParado" value="${p.minutosParado ?? 10}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
     </div></div>
@@ -4871,12 +4964,13 @@ async function depoisDeGuiaTratada(g, texto) {
   persistir(); render(); window.scrollTo(0, 0);
 }
 function mudarVista(v) {
-  const g = guiaAtiva(); S.vista = v;
+  const g = guiaAtiva(); if (S.vista !== v) { S.vistaDesde = agora(); S.avisoParado = null; } S.vista = v;
   if (v >= 2) { g.vista = v; g.etapa = Math.max(g.etapa, v); if (g.status === 'em_andamento') gravarGuia(g, 'em_andamento'); }
   persistir(); render(); window.scrollTo(0, 0);
 }
 const alterarCampoGuia = (g, campo, v) => {
   const p = g.pedido; v = v.trim();
+  if (v !== valorCopia(g, campo).trim()) marcarOrigem(g, { medico_nome: 'medico', medico_crm: 'medico', data: 'emissao', benef: 'beneficiario' }[campo] || campo, 'digitado');
   switch (campo) {
     case 'executante': g.executante = v; break;
     case 'medico_nome': p.medico = { ...p.medico, nome: v, bruto: [v, p.medico.crm ? `${p.medico.conselho || 'CRM'} ${p.medico.crm}` : ''].filter(Boolean).join(' ') }; break;
@@ -4924,7 +5018,7 @@ const acoes = {
         <p class="dica" style="margin-top:12px">A extensão só atua no webmail da Promédica e nesta página. Nada é enviado nem respondido automaticamente.</p>`,
       rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button><a class="btn pri" href="extensao/conferidor-guias-extensao.zip" download>${ic('download')}Baixar extensão (.zip)</a>` });
   },
-  usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
+  usarMedicoAnterior() { const g = guiaAtiva(); g.pedido.medico = lerMedico(LS.get(chaveMedico(), '')); marcarOrigem(g, 'medico', 'anterior'); persistir(); render(); toast('Médico preenchido com o do último pedido deste remetente. Confira no anexo.'); },
   async colarPrint() {
     try {
       const itens = await navigator.clipboard.read(), fs = [];
@@ -5014,7 +5108,8 @@ const acoes = {
       }
     }
     p.invalidos = it.filter(x => x.codigo.length !== 8).map(x => x.codigo);
-    p.itens = it.filter(x => x.codigo.length === 8).map(x => ({ codigo: x.codigo, desc: x.desc, qtd: /^\d+$/.test(x.qtd) ? Number(x.qtd) : null, origemQtd: 'manual' }));
+    p.itens = it.filter(x => x.codigo.length === 8).map(x => { const o = p.itens.find(i => i.codigo === x.codigo), q = /^\d+$/.test(x.qtd) ? Number(x.qtd) : null;
+      return { codigo: x.codigo, desc: x.desc, qtd: q, origemQtd: o && o.qtd === q ? o.origemQtd : 'manual', origemCod: o ? o.origemCod : 'digitado' }; });
     const usados = new Set(p.itens.map(i => i.codigo)); p.soltos = p.soltos.filter(c => !usados.has(c));
     p.semRotulo = false; p.qtdUnicaAplicada = false;
     g.itensEditados = true; g.editandoItens = false; g._edit = null;
@@ -5088,7 +5183,7 @@ const acoes = {
 
   /* ---- etapa 4: resultado, observação e resposta ---- */
   setGlosa(b) { const g = guiaAtiva(), gl = glosaDe(g); gl.resp = b.dataset.v; if (gl.resp === 'nao') gl.itens = {}; persistir(); render(); },
-  setSit(b) { const g = guiaAtiva(), r = g.resultado; r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; if (r.situacao === 'nao') glosaDe(g).itens = {}; g.respEdit = null; persistir(); render(); },
+  setSit(b) { const g = guiaAtiva(), r = g.resultado; if (g.sitSug && g.sitSug.v !== b.dataset.v) evento(g, 'edicao-campo', `Situação trocada: sugerida ${g.sitSug.v}, escolhida ${b.dataset.v}`); r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; if (r.situacao === 'nao') glosaDe(g).itens = {}; g.respEdit = null; persistir(); render(); },
   async copiarEmail(b) {
     const g = guiaAtiva(), v = $('#emailPrest').value.trim();
     if (!emailValido(v)) { toast('Informe um e-mail da clínica válido para copiar.', 'bad'); return; }
@@ -5098,7 +5193,7 @@ const acoes = {
   async copiarObs(b) {
     const g = guiaAtiva(), v = $('#txtObs').value;
     if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
-    g.copiados.obs = v; persistir(); estadoCopiaBtn(b, true); toast('Observação copiada (texto simples).');
+    g.copiados.obs = v; persistir(); $$('[data-act=copiarObs]').forEach(x => estadoCopiaBtn(x, true)); toast('Observação copiada (texto simples).');
   },
   resetObs() { const g = guiaAtiva(); g.obsEdit = null; g.obsExtras = []; g.obsInc = []; persistir(); render(); },
   incluirObs() { abrirModalObs(); },
@@ -5213,6 +5308,7 @@ const acoes = {
     g.conf = g.conf || {}; g.conf[k] = on; const al = situacaoGuia(g).A.find(a => a.key === k);
     evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
   },
+  okParado() { if (S) { S.vistaDesde = agora(); S.avisoParado = null; persistir(); render(); } },
   verAlertas() { const el = $('.painel-al'); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
@@ -5412,7 +5508,7 @@ document.addEventListener('input', e => {
     clearTimeout(window._tg); window._tg = setTimeout(() => { const pos = t.selectionStart; render(); const gi = $('#guia'); if (gi) { gi.focus(); gi.setSelectionRange(pos, pos); } }, 400);
     return;
   }
-  if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && bt.classList.contains('copiado') && g.copiados.obs !== t.value) estadoCopiaBtn(bt, false); return; }
+  if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && g.copiados.obs !== t.value) $$('[data-act=copiarObs].copiado').forEach(x => estadoCopiaBtn(x, false)); return; }
   if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); persistir(); return; }
   if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return; }
 });
@@ -5457,9 +5553,10 @@ document.addEventListener('change', async e => {
       const cl = clinicaDe(S); if (cl && k !== 'beneficiario') { const novo = k === 'medico' ? lerMedico(v) : null; if (k === 'medico') { if (p.medico.nome !== novo.nome) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'medico', lido: p.medico.nome, correto: novo.nome }); if (p.medico.crm !== novo.crm && novo.crm) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'crm', lido: p.medico.crm, correto: novo.crm }); } else Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: k, lido: antes, correto: v }); }
     }
     if (k === 'medico') p.medico = lerMedico(v); else if (k === 'emissao') p.emissao = lerEmissao(v, S.email.data); else if (k === 'cid') p.cid = v.toUpperCase(); else if (k === 'beneficiario') { p.beneficiario = v; p.beneficiarios = v ? [v] : []; } else p[k] = v;
+    marcarOrigem(g, { beneficiario: 'beneficiario', medico: 'medico', emissao: 'emissao', cid: 'cid', local: 'local' }[k] || k, 'digitado');
     g.itensEditados = true; persistir(); render(); return;
   }
-  if (t.id === 'cartUsada') { const ant = g.carteiraUsada; g.carteiraUsada = normCart(t.value); if (ant !== g.carteiraUsada) evento(g, 'carteira', `Carteira usada no sistema: "${ant || '—'}" → "${g.carteiraUsada || '—'}"`); persistir(); render(); return; }
+  if (t.id === 'cartUsada') { const ant = g.carteiraUsada; g.carteiraUsada = normCart(t.value); if (ant !== g.carteiraUsada) marcarOrigem(g, 'carteira', 'digitado'); if (ant !== g.carteiraUsada) evento(g, 'carteira', `Carteira usada no sistema: "${ant || '—'}" → "${g.carteiraUsada || '—'}"`); persistir(); render(); return; }
   if (t.dataset.cpcampo) {
     g.itensEditados = true;
     const k = t.dataset.cpcampo, de = t.dataset.orig ?? '', para = t.value.trim();
@@ -6228,11 +6325,11 @@ Object.assign(acoes, {
     const g = guiaAtiva(), p = g.pedido, e = (p.aprendidos || [])[+b.dataset.i]; if (!e) return;
     if (e.campo === 'codigo') {
       const it = p.itens.find(i => i.codigo === e.lido);
-      if (it) it.codigo = e.correto;
+      if (it) { it.codigo = e.correto; it.origemCod = 'aprendido'; }
       else {   // código que não virou item (dígito a mais/menos): relê o trecho do e-mail já com o código certo, para pegar a quantidade e a descrição
         const re = new RegExp('(?<![\\dA-Za-z])' + e.lido + '(?![\\dA-Za-z])', 'g');
         const novo = g.textoBloco ? lerPedido(g.textoBloco.replace(re, e.correto), S.email.data).itens.find(i => i.codigo === e.correto) : null;
-        p.itens.push(novo ? { ...novo } : { codigo: e.correto, desc: '', qtd: null, origemQtd: null });
+        p.itens.push(novo ? { ...novo, origemCod: 'aprendido' } : { codigo: e.correto, desc: '', qtd: null, origemQtd: null, origemCod: 'aprendido' });
       }
       p.invalidos = p.invalidos.filter(c => c !== e.lido);
     } else if (e.campo === 'medico') p.medico = lerMedico(`${e.correto}${p.medico.crm ? ' CRM ' + p.medico.crm : ''}`);
@@ -6240,6 +6337,7 @@ Object.assign(acoes, {
     else if (e.campo === 'cid') p.cid = e.correto;
     else if (e.campo === 'local') p.local = e.correto;
     else if (e.campo === 'emissao') p.emissao = lerEmissao(e.correto, S.email.data);
+    if (e.campo !== 'codigo') marcarOrigem(g, e.campo === 'crm' ? 'medico' : e.campo, 'aprendido');
     p.aprendidos.splice(+b.dataset.i, 1);
     evento(g, 'aprendido', `${e.campo}: "${e.lido}" → "${e.correto}" (correção já feita ${pl(e.n, 'vez', 'vezes')} nesta clínica).`);
     persistir(); render(); toast('Correção aplicada. Confira no e-mail.');
@@ -6409,6 +6507,18 @@ document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-mact]'); if (!b) return;
   if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
 });
+
+/* ---------- Lembrete de atendimento parado na mesma etapa ---------- */
+function htmlAvisoParado() {
+  if (!S || !S.avisoParado) return '';
+  return `<div class="aviso aviso-parado" role="status">${ic('pause')}<div class="esp">Este atendimento está parado há <b>${S.avisoParado} min</b> na etapa ${S.vista}. Continue, ou responda à clínica se estiver esperando algo.</div><button class="btn sm" data-act="okParado">${ic('check', 'sm')}Ok, continuar</button></div>`;
+}
+setInterval(() => {
+  const lim = Number(cfg.preferencias.minutosParado ?? 10); if (!S || !lim || Abas.pausada || document.hidden) return;
+  if (!S.vistaDesde) { S.vistaDesde = agora(); return; }
+  const min = Math.floor((Date.now() - new Date(S.vistaDesde)) / 60000);
+  if (min >= lim && S.avisoParado !== min && (!S.avisoParado || min - S.avisoParado >= lim)) { S.avisoParado = min; if (aba === 'atend' && !M) render(); }
+}, 30000);
 
 /* ---------- Uma aba por vez: duas abas abertas gravariam o atendimento no mesmo lugar do navegador ---------- */
 const Abas = {
