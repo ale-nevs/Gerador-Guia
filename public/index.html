@@ -25,7 +25,7 @@
 :root{
   /* Tipografia */
   --font-sans:"Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
-  --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:14px; --fs-lg:16px; --fs-xl:19px; --fs-2xl:22px;
+  --fs-xs:12.5px; --fs-sm:13px; --fs-md:14px; --fs-lg:16px; --fs-xl:19px; --fs-2xl:22px;
   --lh:1.5;
   /* Espaçamento e forma */
   --r-sm:8px; --r:12px; --r-lg:16px; --h-ctl:34px; --h-sm:28px;
@@ -36,17 +36,17 @@
   --accent-600:#17786b; --accent-700:#155f56; --accent-800:#144d47; --accent-900:#12403b;
   /* Tokens semânticos (tema claro) */
   --bg:#f4f6f9; --surface:#ffffff; --surface-2:#f8fafc; --surface-3:#eef2f7;
-  --border:#e2e8f0; --border-strong:#cbd5e1; --grid:#0f172a;
-  --text:#1c2431; --text-2:#566174; --text-3:#7b8596;
+  --border:#e2e8f0; --border-strong:#cbd5e1; --grid:#d5dde8;
+  --text:#1c2431; --text-2:#566174; --text-3:#64748b;
   --primary:#2c4a70; --primary-hover:#233c5c; --primary-press:#1e3350; --on-primary:#ffffff;
   --soft:#f2f6fb; --soft-2:#e1eaf4; --soft-br:#c5d5e8; --soft-fg:#233c5c;
   --accent:#17786b; --accent-bg:#effaf8; --accent-br:#a7e0d5; --accent-fg:#155f56;
-  --focus:#1f9282; --field:#ffffff; --th:#1d4f91; --on-th:#ffffff; --shadow:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.04);
+  --focus:#1f9282; --field:#ffffff; --th:#eef2f7; --on-th:#334155; --shadow:none;
   --ok-bg:#ecfdf5; --ok-fg:#166534; --ok-br:#86efac; --ok-solid:#16a34a;
   --warn-bg:#fffbeb; --warn-fg:#78350f; --warn-br:#fcd34d; --warn-solid:#d97706;
   --bad-bg:#fef2f2; --bad-fg:#7f1d1d; --bad-br:#fca5a5; --bad-solid:#dc2626;
-  --obs-bg:#f5f3ff; --obs-fg:#4c1d95; --obs-br:#c4b5fd; --obs-solid:#7c3aed;
-  --info-bg:#eff6ff; --info-fg:#1e3a8a; --info-br:#bfdbfe; --info-solid:#2563eb;
+  --obs-bg:#f1f5f9; --obs-fg:#334155; --obs-br:#cbd5e1; --obs-solid:#64748b;
+  --info-bg:#f2f6fb; --info-fg:#233c5c; --info-br:#c5d5e8; --info-solid:#4872a4;
   --neu-bg:#f1f5f9; --neu-fg:#334155; --neu-br:#e2e8f0;
   --mark-ok:#bbf7d0; --mark-warn:#fde68a; --mark-cart:#dbeafe;
   --overlay:rgba(8,15,30,.62);
@@ -59,12 +59,12 @@
   --primary:#3d6cab; --primary-hover:#4a7bbd; --primary-press:#355f9a; --on-primary:#ffffff;
   --soft:#1b2a42; --soft-2:#243652; --soft-br:#37507a; --soft-fg:#d3e2f6;
   --accent:#3aae9c; --accent-bg:#11302d; --accent-br:#1f5e55; --accent-fg:#8fe0d2;
-  --focus:#4cc2ae; --field:#111826; --th:#1f4a82; --on-th:#f4f8ff; --shadow:0 1px 2px rgba(0,0,0,.4);
+  --focus:#4cc2ae; --field:#111826; --th:#212c40; --on-th:#cbd5e1; --shadow:none;
   --ok-bg:#10301f; --ok-fg:#86efac; --ok-br:#1f6b3a; --ok-solid:#22c55e;
   --warn-bg:#32280a; --warn-fg:#fcd34d; --warn-br:#7a5c0a; --warn-solid:#f59e0b;
   --bad-bg:#3a1515; --bad-fg:#fca5a5; --bad-br:#7f2a2a; --bad-solid:#ef4444;
-  --obs-bg:#292049; --obs-fg:#c4b5fd; --obs-br:#5b46a0; --obs-solid:#8b5cf6;
-  --info-bg:#142849; --info-fg:#93c5fd; --info-br:#2a4f8a; --info-solid:#60a5fa;
+  --obs-bg:#212c40; --obs-fg:#cbd5e1; --obs-br:#3a4966; --obs-solid:#94a3b8;
+  --info-bg:#1b2a42; --info-fg:#d3e2f6; --info-br:#37507a; --info-solid:#6a90bd;
   --neu-bg:#212c40; --neu-fg:#cbd5e1; --neu-br:#3a4966;
   --mark-ok:#14532d; --mark-warn:#5b4410; --mark-cart:#1e3a6e;
   --overlay:rgba(0,0,0,.72);
@@ -169,14 +169,14 @@ body.topo-mini .chip select{max-width:46vw}
   .topo-in{padding-top:6px;padding-bottom:6px;gap:6px 10px}
   .marca .logo{height:30px}
   .marca h1{font-size:var(--fs-lg)}
-  .marca .sub{font-size:10px;letter-spacing:.06em}
+  .marca .sub{font-size:var(--fs-xs);letter-spacing:.04em}
   .topo-acoes{gap:5px;width:100%;justify-content:flex-end}
   .chip select{min-width:80px;max-width:36vw}
 }
 .avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:50%;background:var(--c-bg,var(--surface-3));color:var(--c-fg,var(--text-2));border:1px solid var(--c-br,var(--border))}
 .avatar .emoji{font-size:18px;line-height:1}.avatar.lg .emoji{font-size:29px}.tag .emoji{font-size:15px;line-height:1}.av-op .emoji{font-size:27px;line-height:1}
 .avatar.lg{width:44px;height:44px}.avatar.lg .ic{width:19px;height:19px}
-.sq{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:6px;background:var(--c-bg);color:var(--c-fg);border:1px solid var(--c-br);font-size:10.5px;font-weight:750;letter-spacing:.02em}
+.sq{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:6px;background:var(--c-bg);color:var(--c-fg);border:1px solid var(--c-br);font-size:var(--fs-xs);font-weight:750;letter-spacing:.02em}
 .sq.lg{width:34px;height:34px;font-size:13px;border-radius:9px}
 
 /* ===== Abas e etapas ===== */
@@ -245,13 +245,15 @@ main > * + *{margin-top:10px}
 .btn.line:hover{background:var(--surface-3)}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
 .btn.ghost:hover{background:var(--surface-3);color:var(--text)}
-.btn.dng{background:transparent;border-color:var(--bad-br);color:var(--bad-fg)}
-.btn.dng:hover{background:var(--bad-bg)}
-:root[data-theme=light] .btn.dng{color:#b91c1c}
-.btn.cp{background:var(--accent-bg);border-color:var(--accent-br);color:var(--accent-fg);min-height:var(--h-sm);padding:0 10px;font-size:var(--fs-xs)}
-.btn.cp:hover{background:var(--accent-br)}
-:root[data-theme=dark] .btn.cp:hover{background:#17463f}
+.btn.dng{background:transparent;border-color:var(--border-strong);color:var(--text-2)}
+.btn.dng:hover,.btn.dng:focus-visible{background:var(--bad-bg);border-color:var(--bad-br);color:var(--bad-fg)}
+.btn.cp{background:var(--surface);border-color:var(--border-strong);color:var(--text-2);min-height:var(--h-sm);padding:0 10px;font-size:var(--fs-xs)}
+.btn.cp:hover{background:var(--surface-3);color:var(--text)}
 .btn.cp.copiado{background:var(--ok-bg);border-color:var(--ok-br);color:var(--ok-fg)}
+.cp-campo:has(.btn.cp.copiado) :is(input,select){border-color:var(--ok-br);background:var(--ok-bg)}
+.t td:has(.btn.cp.copiado){background:var(--ok-bg)}
+.btn.link{background:none;border:0;color:var(--accent);padding:0 2px;min-height:var(--h-sm);text-decoration:underline;text-underline-offset:2px;font-weight:600}
+.btn.link:hover{background:none;color:var(--accent-fg)}
 .btn.sm{min-height:var(--h-sm);padding:0 10px;font-size:var(--fs-xs)}
 .btn.ico{padding:0;width:var(--h-ctl)}
 .btn.sm.ico{width:var(--h-sm)}
@@ -343,10 +345,10 @@ mark.lacuna{background:var(--warn-bg);color:var(--warn-fg);outline:1px dashed va
 .painel-al.compacto .al-h{padding:6px 12px}.painel-al.compacto .al-h h2{font-size:var(--fs-sm)}.painel-al.compacto .al-corpo{padding:8px 12px}
 .painel-al.compacto .alertas{gap:4px}
 .painel-al.compacto .al{padding:5px 9px;font-size:var(--fs-xs);grid-template-columns:auto 1fr;gap:2px 8px;line-height:1.35}
-.painel-al.compacto .al .tag{font-size:10.5px;padding:2px 6px}
+.painel-al.compacto .al .tag{font-size:var(--fs-xs);padding:2px 6px}
 .painel-al.compacto .al .al-t{font-weight:700}
 .al .acoes-al{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
-.al .acoes-al .btn.sm{min-height:24px;font-size:11px;padding:0 8px}
+.al .acoes-al .btn.sm{min-height:26px;font-size:var(--fs-xs);padding:0 8px}
 label.chk.conferi{font-size:var(--fs-xs);font-weight:650;align-items:center;gap:5px}
 .al-infos{margin-top:6px}.al-infos summary{font-size:var(--fs-xs);color:var(--text-2);font-weight:600}
 .al-infos .alertas{margin-top:4px}
@@ -363,15 +365,22 @@ label.chk.conferi{font-size:var(--fs-xs);font-weight:650;align-items:center;gap:
 .al .acoes-al select{width:auto;min-width:220px;min-height:var(--h-sm);padding:2px 8px;font-size:var(--fs-xs)}
 .al .tag{background:transparent}
 
-/* ===== Tabelas (cabeçalho azul, grade fina) ===== */
+/* ===== Tabelas (cabeçalho claro, grade fina, linha colorida pelo resultado) ===== */
 .tabela-scroll{overflow:auto;max-height:64vh;border-radius:var(--r-sm)}
 table.t{border-collapse:collapse;width:100%}
 .t th,.t td{text-align:left;padding:4px 7px;border:1px solid var(--grid);vertical-align:middle;font-size:var(--fs-sm)}
-.t th{font-weight:700;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;background:var(--th);color:var(--on-th);text-align:center;position:sticky;top:0;z-index:1}
+.t th{font-weight:650;font-size:var(--fs-xs);text-transform:none;letter-spacing:0;background:var(--th);color:var(--on-th);text-align:center;position:sticky;top:0;z-index:1}
+.t tr.r-ok > td{background:color-mix(in srgb,var(--ok-bg) 75%,transparent)}
+.t tr.r-warn > td{background:color-mix(in srgb,var(--warn-bg) 85%,transparent)}
+.t tr.r-bad > td{background:color-mix(in srgb,var(--bad-bg) 85%,transparent)}
+.t tr.r-ign > td{background:var(--surface-2)}
+:root[data-theme=dark] .t tr.r-ok > td{background:color-mix(in srgb,var(--ok-bg) 45%,var(--surface))}
+:root[data-theme=dark] .t tr.r-warn > td{background:color-mix(in srgb,var(--warn-bg) 55%,var(--surface))}
+:root[data-theme=dark] .t tr.r-bad > td{background:color-mix(in srgb,var(--bad-bg) 55%,var(--surface))}
 .t td.pri{background:var(--soft);color:var(--soft-fg);font-weight:650}
 .t td.c,.t th.c{text-align:center}
 .t tr.novo td{background:var(--accent-bg)}
-.qtd{font-size:var(--fs-lg);font-weight:750;color:var(--accent-fg);font-variant-numeric:tabular-nums}
+.qtd{font-size:var(--fs-lg);font-weight:750;color:var(--text);font-variant-numeric:tabular-nums}
 @keyframes arco{to{background-position:200% 0}}
 .qtd.multi{display:inline-block;font-size:26px;font-weight:900;line-height:1.1;padding:0 4px;background:linear-gradient(90deg,#ff1744,#ff9100,#ffea00,#00e676,#00b0ff,#d500f9,#ff1744);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:arco 1.6s linear infinite;filter:drop-shadow(0 0 5px rgba(255,255,255,.55)) drop-shadow(0 0 2px rgba(0,0,0,.35))}
 @media (prefers-reduced-motion:reduce){.qtd.multi{animation:none}}
@@ -430,13 +439,19 @@ table.t{border-collapse:collapse;width:100%}
 .modal-fundo{position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;padding:12px}
 .modal{background:var(--surface);color:var(--text);border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,.4);width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border)}
 .modal.g{max-width:1024px}.modal.p{max-width:640px}
-.modal-h{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--brand-800);color:#fff}
-:root[data-theme=dark] .modal-h{background:#1d3150}
-.modal-h .caixa{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;flex:none}
-.modal-h h2{font-size:var(--fs-lg);font-weight:700;color:#fff;line-height:1.25}
-.modal-h p{font-size:var(--fs-sm);color:var(--brand-200);margin-top:1px}
-.modal-h .btn{margin-left:auto;background:transparent;border-color:transparent;color:#fff}
-.modal-h .btn:hover{background:rgba(255,255,255,.15)}
+.modal-h{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface);color:var(--text);border-bottom:1px solid var(--border)}
+.modal-h .caixa{width:34px;height:34px;border-radius:9px;background:var(--soft);color:var(--primary);display:flex;align-items:center;justify-content:center;flex:none}
+:root[data-theme=dark] .modal-h .caixa{color:var(--soft-fg)}
+.modal-h h2{font-size:var(--fs-lg);font-weight:700;color:var(--soft-fg);line-height:1.25}
+.modal-h p{font-size:var(--fs-sm);color:var(--text-2);margin-top:1px}
+.modal-h .btn{margin-left:auto;background:transparent;border-color:transparent;color:var(--text-2)}
+.modal-h .btn:hover{background:var(--surface-3);color:var(--text)}
+.modal.risco-warn .modal-h{background:var(--warn-bg);border-bottom-color:var(--warn-br)}
+.modal.risco-warn .modal-h .caixa{background:var(--surface);color:var(--warn-solid)}
+.modal.risco-warn .modal-h h2{color:var(--warn-fg)}
+.modal.risco-bad .modal-h{background:var(--bad-bg);border-bottom-color:var(--bad-br)}
+.modal.risco-bad .modal-h .caixa{background:var(--surface);color:var(--bad-solid)}
+.modal.risco-bad .modal-h h2{color:var(--bad-fg)}
 .modal-b{padding:16px 18px;overflow:auto;flex:1}
 .modal-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface-2)}
 .modal-f .dica{margin:0;flex:1;min-width:180px}
@@ -690,6 +705,12 @@ const LS = {
 /* ---------- Ícones (traço fino, estilo Lucide) ---------- */
 const ICONES = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  calweek: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M7 15h10"/>',
+  calmonth: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  pip: '<rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/>',
+  rows: '<rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/>',
   user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
@@ -871,10 +892,10 @@ const escH = s => esc(s).replace(/\n/g, '<br>');
 
 /* ---------- Modal ---------- */
 let modalAtual = null;
-function abrirModal({ titulo, sub = '', icone = 'info', corpo, rodape = '', tamanho = '', aoFechar = null }) {
+function abrirModal({ titulo, sub = '', icone = 'info', corpo, rodape = '', tamanho = '', aoFechar = null, risco = '' }) {
   fecharModal(true);
   const fundo = document.createElement('div'); fundo.className = 'modal-fundo'; fundo.id = 'modalFundo';
-  fundo.innerHTML = `<div class="modal ${tamanho}" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+  fundo.innerHTML = `<div class="modal ${tamanho} ${risco ? 'risco-' + risco : ''}" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
     <div class="modal-h"><span class="caixa">${ic(icone, 'lg')}</span><div><h2 id="modalTitulo">${esc(titulo)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
       <button class="btn ico" data-act="fecharModal" aria-label="Fechar" title="Fechar">${ic('x')}</button></div>
     <div class="modal-b" id="modalCorpo">${corpo}</div>${rodape ? `<div class="modal-f" id="modalRodape">${rodape}</div>` : ''}</div>`;
@@ -2814,14 +2835,13 @@ function renderTopo() {
     return;
   }
   $('#topoAcoes').innerHTML = `
-    <span class="chip ctx" title="${aba === 'painel' ? 'Dia selecionado no Painel' : 'Data de hoje'}">${ic('calendar', 'sm')}${dataTxt}</span>
     <label class="chip chip-op" style="${op ? estiloOp(op) : ''}" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
     ${extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     <button class="chip mini-btn" data-act="topoMini" title="Ocultar menu e topo (modo compacto)" aria-label="Ocultar menu e topo">${ic('chevup', 'sm')}</button>`;
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'layers', 'Ações'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
     .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
   $('#verRodape').textContent = 'v' + VERSAO;
   document.title = 'Conferidor de Guias · Promédica';
@@ -3149,7 +3169,7 @@ function renderGuia(alvo, g) {
       <button class="btn sm" data-act="parametrizar">${ic('layers', 'sm')}Parametrizar</button></div>
     ${g.editandoItens ? htmlEditarItens(g) : !g.cega.iniciada ? `
     ${htmlTabelaItens(g, { copiar: true })}
-    <div class="acoes">${cegaExigida() ? `<button class="btn pri" data-act="iniciarCega" ${p.itens.length ? '' : 'disabled'}>${ic('eye')}Sem prints: conferir a grade manualmente (conferência cega)</button>` : ''}</div>` :
+    <div class="acoes">${cegaExigida() ? `<button class="btn link" data-act="iniciarCega" ${p.itens.length ? '' : 'disabled'}>Sem prints? Conferir a grade manualmente (conferência cega)</button>` : ''}</div>` :
       `<p class="muted">Lista oculta durante a conferência cega. <button class="btn sm line" data-act="verItens">${ic('refresh', 'sm')}Ver itens de novo (reinicia a conferência)</button></p>`}
   </div>
   ${htmlCartaoPrints(g)}
@@ -3287,7 +3307,7 @@ function htmlCardObs(g) {
   <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
 </div>
   <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
-  <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs">${g.copiados.obs === obsTxt ? ic('check', 'sm') : ic('copy', 'sm') + 'Copiar observação (texto simples)'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
+  <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs" data-rot="Copiar observação">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
 }
 function renderFinal(alvo, g) {
@@ -3556,7 +3576,7 @@ async function renderPainel(app) {
   const per = mes ? 'mês' : sem ? 'semana' : 'dia';
   app.innerHTML = `
   <div class="card"><div class="linha-flex">
-    <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!longo}" class="${!longo ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${sem}" class="${sem ? 'on igual' : ''}" data-act="painelModo" data-v="semana">${ic('calendar', 'sm')} Semana</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('layers', 'sm')} Mês</button></div>
+    <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!longo}" class="${!longo ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${sem}" class="${sem ? 'on igual' : ''}" data-act="painelModo" data-v="semana">${ic('calweek', 'sm')} Semana</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('calmonth', 'sm')} Mês</button></div>
     ${sem ? `<div><label class="lbl" for="painelSemana">Semana</label><input type="week" id="painelSemana" value="${painelSemana}" style="width:auto"></div>` : mes ? `<div><label class="lbl" for="painelMes">Mês</label><input type="month" id="painelMes" value="${painelMes}" style="width:auto"></div>` : `<div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>`}
     <button class="btn" data-act="atualizarPainel" style="align-self:flex-end">${ic('refresh')}Atualizar</button>
     <span style="flex:1"></span>
@@ -3693,7 +3713,7 @@ let cfgEdit = null, cfgSecao = 'aparencia', cfgDirty = false, cfgErros = [], cfg
 const cfgModeloSel = { modelos: 'autorizada', obs: 'observacao', param: 'parametrizacao' };
 const CFG_SECOES = [
   ['aparencia', 'palette', 'Aparência'], ['perfil', 'user', 'Perfil e identificação'], ['clinicas', 'building', 'Clínicas e cadastros'],
-  ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['obsauto', 'bell', 'Observações automáticas'], ['param', 'layers', 'Parametrizações'],
+  ['modelos', 'mail', 'Modelos de e-mail'], ['obs', 'message', 'Modelo de observação da guia'], ['obsauto', 'zap', 'Observações automáticas'], ['param', 'layers', 'Parametrizações'],
   ['alertas', 'bell', 'Alertas e regras de validação'], ['export', 'download', 'Exportação'], ['prefs', 'sliders', 'Preferências operacionais'], ['testes', 'search', 'Testar leitura (prints e e-mails)'], ['aprendizado', 'book', 'Aprendizado (correções)'], ['info', 'info', 'Informações e versão do sistema']
 ];
 let cfgOpsIni = [];
@@ -4631,11 +4651,11 @@ function htmlCartaoPrints(g) {
     ${av.avisos.map(a => `<div class="aviso" style="margin:8px 0">${ic('info')}<div>${esc(a)}</div></div>`).join('')}
     ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${av.ressalvas} divergência(s) ignorada(s).</b> Marque, em cada uma, se quer incluir a observação para o prestador (vai para as <b>observações adicionais</b>, etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Campo</th><th>Pedido</th><th>Lido no print</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
-      ${av.checks.map(c => `<tr><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
+      ${av.checks.map(c => `<tr class="r-${c.ign ? 'ign' : c.st}"><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
     </tbody></table></div>
     <h3>Itens: pedido × sistema (${av.nPedido} no pedido, ${av.nSistema} nos prints)</h3>
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Código</th><th>Qtd. pedido</th><th>Qtd. no sistema</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
-      ${av.linhas.map(l => `<tr><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}${l.stSis ? `<div class="dica">${esc(ST_ROT[l.stSis] || l.stSis)}</div>` : ''}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
+      ${av.linhas.map(l => `<tr class="r-${l.ign ? 'ign' : l.st}"><td class="num"><b>${esc(l.codigo)}</b></td><td class="num">${l.qPed ?? '—'}</td><td class="num">${l.qSis ?? '—'}${l.stSis ? `<div class="dica">${esc(ST_ROT[l.stSis] || l.stSis)}</div>` : ''}</td><td>${l.img ? `<img class="mini" src="${l.img}" alt="">` : ''}</td><td>${tg(l)}${l.nota && !l.ign ? `<div class="dica">${esc(l.nota)}</div>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Nenhum item lido nos prints.</td></tr>'}
     </tbody></table></div>
     <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button></div>` : '';
   return `<div class="card" id="cartaoPrints">
@@ -4644,7 +4664,7 @@ function htmlCartaoPrints(g) {
     ${htmlSeletorSistema()}
     <div class="acoes" style="margin-top:0">
       ${htmlBotoesCaptura()}
-      <button class="btn pri" data-act="colarPrint" title="Cola o print que está na área de transferência (o mesmo que Ctrl+V)">${ic('clip')}Colar print</button>
+      <button class="btn ${Captura.ativa() ? 'line' : 'pri'}" data-act="colarPrint" title="Cola o print que está na área de transferência (o mesmo que Ctrl+V)">${ic('clip')}Colar print</button>
       <label class="btn line" for="arqPrints" id="zonaPrints" title="Ou escolha/arraste os arquivos de imagem">${ic('upload')}Escolher arquivos</label>
       <input type="file" id="arqPrints" accept="image/*" multiple class="oculto">
     </div>
@@ -4731,7 +4751,7 @@ function atualizarConcluir(g) {
   const pend = pendenciasConclusao(g, situacaoGuia(g)), bt = $('[data-act=concluirGuia]'); if (bt) bt.disabled = pend.length > 0;
   const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
 }
-function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); b.innerHTML = ok ? `${ic('check', 'sm')}` : `${ic('copy', 'sm')}`; }
+function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); const r = b.dataset.rot; b.innerHTML = ok ? `${ic('check', 'sm')}${r ? 'Copiado' : ''}` : `${ic('copy', 'sm')}${r ? esc(r) : ''}`; }
 
 /* ====================================================================
    Ações (data-act)
@@ -4926,7 +4946,7 @@ const acoes = {
   async copiarObs(b) {
     const g = guiaAtiva(), v = $('#txtObs').value;
     if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
-    g.copiados.obs = v; persistir(); b.classList.add('copiado'); b.innerHTML = `${ic('check', 'sm')}`; toast('Observação copiada (texto simples).');
+    g.copiados.obs = v; persistir(); estadoCopiaBtn(b, true); toast('Observação copiada (texto simples).');
   },
   resetObs() { const g = guiaAtiva(); g.obsEdit = null; g.obsExtras = []; g.obsInc = []; persistir(); render(); },
   incluirObs() { abrirModalObs(); },
@@ -5232,7 +5252,7 @@ document.addEventListener('input', e => {
     clearTimeout(window._tg); window._tg = setTimeout(() => { const pos = t.selectionStart; render(); const gi = $('#guia'); if (gi) { gi.focus(); gi.setSelectionRange(pos, pos); } }, 400);
     return;
   }
-  if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && bt.classList.contains('copiado') && g.copiados.obs !== t.value) { bt.classList.remove('copiado'); bt.innerHTML = `${ic('copy', 'sm')}Copiar observação (texto simples)`; } return; }
+  if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && bt.classList.contains('copiado') && g.copiados.obs !== t.value) estadoCopiaBtn(bt, false); return; }
   if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); persistir(); return; }
   if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return; }
 });
@@ -5905,7 +5925,7 @@ const exigeMotivo = chave => chave === 'c:paciente' || chave === 'c:ident';
 function abrirMotivoIgnorar(g, x) {
   const k = x.chave.startsWith('i:') ? 'item' : x.chave.slice(2), ops = [...MOTIVOS_IGN.comum, ...(MOTIVOS_IGN[k] || []), ...MOTIVOS_IGN.outro], obrig = exigeMotivo(x.chave);
   M = { tipo: 'motivoIgn', chave: x.chave };
-  abrirModal({ titulo: 'Aceitar divergência', sub: `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"`, icone: 'shield', tamanho: 'p',
+  abrirModal({ risco: 'warn', titulo: 'Aceitar divergência', sub: `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"`, icone: 'shield', tamanho: 'p',
     corpo: `<p class="dica" style="margin:0 0 10px">O print já foi lido de novo e continua diferente. ${obrig ? '<b>Para nome e carteira o motivo é obrigatório.</b>' : 'Diga o motivo: ele fica no histórico da guia.'}</p>
       <div class="stack" role="radiogroup">${ops.map(([v, t], i) => `<label class="chk"><input type="radio" name="motIgn" value="${v}" ${i === 0 && !obrig ? '' : ''}><span>${esc(t)}</span></label>`).join('')}</div>
       <label class="lbl" for="motIgnTxt" style="margin-top:10px">Detalhe ${obrig ? '(obrigatório em "Outro")' : '(opcional)'}</label><textarea id="motIgnTxt" rows="2" placeholder="Ex.: no sistema está JANY G. DA SILVA"></textarea>`,
@@ -6043,8 +6063,8 @@ async function capturarJanela(nav) {
 function htmlBotoesCaptura() {
   if (!Captura.suportada()) return '';
   return Captura.ativa()
-    ? `<button class="btn pri" data-act="capturarJanela" title="Captura a janela do sistema agora (deixe aberta a aba que quer conferir)">${ic('eye')}Capturar a janela do sistema</button><button class="btn sm line" data-act="trocarJanela" title="Escolher outra janela">${ic('refresh', 'sm')}Trocar janela</button>`
-    : `<button class="btn" data-act="capturarJanela" title="Escolha a janela do sistema uma vez; depois cada clique captura a tela atual, sem Print Screen">${ic('eye')}Conectar à janela do sistema</button>`;
+    ? `<button class="btn pri" data-act="capturarJanela" title="Captura a janela do sistema agora (deixe aberta a aba que quer conferir)">${ic('monitor')}Capturar a janela do sistema</button><button class="btn sm line" data-act="trocarJanela" title="Escolher outra janela">${ic('refresh', 'sm')}Trocar janela</button>`
+    : `<button class="btn" data-act="capturarJanela" title="Escolha a janela do sistema uma vez; depois cada clique captura a tela atual, sem Print Screen">${ic('monitor')}Conectar à janela do sistema</button>`;
 }
 
 /* ====================================================================
