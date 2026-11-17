@@ -2951,6 +2951,8 @@ function pintarProgresso() {
 }
 setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
+const EXT_VERSAO = '1.2.0';   // versão da extensão publicada junto com o site
+const extDesatualizada = () => { const v = extInstalada(); if (!v) return false; const a = v.split('.').map(Number), b = EXT_VERSAO.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); } return false; };
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
   const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : painelModo === 'semana' ? 'Semana: ' + rotuloSemana(painelSemana) : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
@@ -2978,7 +2980,7 @@ function renderTopo() {
     <label class="chip chip-op" style="${op ? estiloOp(op) : ''}" title="Operador (identificação de contexto e registro)">${htmlAvatar(op)}<select id="operador" aria-label="Operador">
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
-    ${extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
+    ${extDesatualizada() ? `<button class="chip pasta alerta" data-act="baixarExtensao" title="A extensão instalada (v${esc(extInstalada())}) é mais antiga que a do site (v${EXT_VERSAO}). Baixe a nova e recarregue em chrome://extensions." aria-label="Atualizar extensão">${ic('download', 'sm')}<span class="txt-fino">Atualizar extensão</span></button>` : extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     ${htmlSeletorVis(false)}`;
   $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
@@ -3590,6 +3592,7 @@ function renderFinal(alvo, g) {
         ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
         <div class="acoes"><button class="btn pri" data-act="copiarResp" ${guiaOk ? '' : 'disabled'} title="${guiaOk ? 'Copia texto formatado, para colar no e-mail' : 'Informe o número da guia'}">${ic('copy')}Copiar com formatação</button>
           <button class="btn line" data-act="copiarRespSimples" ${guiaOk ? '' : 'disabled'}>${ic('copy')}Copiar texto simples</button>
+          ${extInstalada() ? `<button class="btn line" data-act="responderWebmail" ${guiaOk ? '' : 'disabled'} title="Leva a resposta para o webmail: lá ela é colada no corpo da resposta com um clique. O envio continua sendo feito por você no webmail.">${ic('send')}Responder no webmail</button>` : ''}
           ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}
           ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>`}
       </div>
@@ -5025,19 +5028,35 @@ const webmailParaEmail = m => emailDeWebmail({
   uid: m.uid, folder: m.folder, messageId: m.messageId, assunto: m.assunto, fromNome: m.de && m.de.nome, fromEmail: m.de && m.de.email,
   plain: m.plain, html: m.html, data: m.data, datas: m.datas, anexos: m.anexos
 });
+const nomesAtend = () => S ? unicos(S.guias.map(g => nomeCurto(g.pedido.beneficiario)).filter(Boolean)) : [];
 async function abrirDoWebmail(m) {
-  let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return; }
-  if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return; }
-  if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return; }
-  if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return;
+  let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Não consegui ler este e-mail.' }; }
+  if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Escolha o operador no Conferidor.' }; }
+  if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
+  if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return { ok: false, motivo: 'O atendimento aberto foi mantido.' };
   aba = 'atend';
-  try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); }
+  try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); return { ok: false, motivo: e.message }; }
+  return { ok: !!S, nomes: nomesAtend() };
+}
+/* para o botão do webmail: este e-mail já está em atendimento ou já foi atendido? */
+async function statusWebmail(m) {
+  let id; try { id = webmailParaEmail(m).messageId; } catch (e) { return { info: null }; }
+  if (S && S.email && S.email.messageId === id) return { info: { nivel: 'info', texto: 'Já está aberto no Conferidor.' } };
+  try { await Reg.carregar(); } catch (e) { }
+  const rs = Reg.cache.filter(r => r.messageId === id && !r.tipo).sort((a, b) => (carimboReg(a) < carimboReg(b) ? 1 : -1));
+  const r = rs[0]; if (!r) return { info: null };
+  if (r.status === 'concluido') return { info: { nivel: 'ok', texto: `Já atendido por ${r.operador || 'operador'} em ${fmtDH(r.concluidoEm || r.atualizadoEm)}${r.guia ? ' · guia ' + r.guia : ''}` } };
+  if (r.status === 'em_andamento') return { info: { nivel: 'warn', texto: `Em atendimento ${r.operador === operador() ? 'por você' : 'agora por ' + (r.operador || 'outro operador')} desde ${fmtHora(r.abertoEm || r.atualizadoEm)}` } };
+  return { info: { nivel: 'info', texto: `${STATUS[r.status] || r.status} por ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)}` } };
 }
 window.addEventListener('message', ev => {
   const d = ev.data;
   if (ev.source !== window || ev.origin !== location.origin || !d) return;
   if (d.__conferidorExt === 'instalada') { render(); return; }
-  if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg); }
+  const responder = r => { if (d.pid) window.postMessage({ __conferidorPagina: 'resposta', pid: d.pid, ...r }, location.origin); };
+  if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg).then(responder, () => responder({ ok: false })); }
+  if (d.__conferidorExt === 'status' && d.msg) statusWebmail(d.msg).then(responder, () => responder({ info: null }));
+  if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
 });
 async function iniciar(email) {
   await Reg.carregarTudo(); await Param.carregar();
@@ -5310,6 +5329,13 @@ const acoes = {
     const r = await copiarRico(htmlParaEmail(html), texto);
     if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
+  },
+  responderWebmail() {
+    const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
+    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
+    const quem = nomesAtend(); 
+    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' } }, location.origin);
+    g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
   },
   async copiarRespSimples() {
     const g = guiaAtiva(), texto = htmlPlano(serializarEditor($('#edResp')));
