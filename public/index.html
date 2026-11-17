@@ -214,6 +214,9 @@ main > * + *{margin-top:10px}
 .passo.atencao .bola{background:var(--warn-bg);border-color:var(--warn-solid);color:var(--warn-fg)}
 .passo.atencao .tx small{color:var(--warn-fg);font-weight:650}
 .passo:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.passo .passo-selo{margin-left:auto;display:none}
+@media (min-width:760px){.passo .passo-selo{display:inline-flex}}
+.passo.atual.atencao .bola{background:var(--warn-bg);border-color:var(--warn-solid);color:var(--warn-fg)}
 
 /* ===== Cartões ===== */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;box-shadow:var(--shadow)}
@@ -676,6 +679,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const semAcento = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+/* singular/plural pela quantidade: pl(2, 'bloqueio', 'bloqueios') → "2 bloqueios" */
+const pl = (n, s, p) => `${n} ${Number(n) === 1 ? s : p}`;
 const slug = s => semAcento(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const norm = s => semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim();
 const pad = n => String(n).padStart(2, '0');
@@ -1807,7 +1812,7 @@ A carteira informada ({CARTEIRA_INFORMADA}) não pertence a {BENEFICIARIO}.
 Por gentileza, confirme o nome completo e o número da carteira Promédica do beneficiário.
 
 Permanecemos à disposição.` },
-  outra_clinica: { nome: 'Paciente já realiza atendimento em outra clínica', texto:
+  outra_clinica: { nome: 'Beneficiário já realiza atendimento em outra clínica', texto:
 `{SAUDACAO}!
 
 Informamos que, na verificação realizada, consta que o beneficiário {BENEFICIARIO} (carteira {CARTEIRA}) já realiza atendimento em outra clínica para o(s) serviço(s) solicitado(s):
@@ -1819,7 +1824,7 @@ Por esse motivo, a solicitação depende de análise e regularização, conforme
 {OBS_ADICIONAIS}
 
 Permanecemos à disposição para eventuais esclarecimentos.` },
-  excluido_carencia: { nome: 'Paciente excluído ou com carência', texto:
+  excluido_carencia: { nome: 'Beneficiário excluído ou com carência', texto:
 `{SAUDACAO}!
 
 Informamos que não foi possível realizar a autorização do(s) serviço(s) solicitado(s) para o beneficiário {BENEFICIARIO} (carteira {CARTEIRA}), devido à situação identificada na verificação realizada (exclusão ou carência, conforme o resultado da consulta).
@@ -1832,7 +1837,7 @@ Serviços solicitados:
 Em caso de dúvidas, responda este e-mail.
 
 Permanecemos à disposição.` },
-  sem_direito_local: { nome: 'Paciente sem direito no local ou prestador', texto:
+  sem_direito_local: { nome: 'Beneficiário sem direito no local ou prestador', texto:
 `{SAUDACAO}!
 
 Informamos que não foi possível autorizar o(s) serviço(s) solicitado(s) para o beneficiário {BENEFICIARIO} (carteira {CARTEIRA}) no local ou prestador informado ({CLINICA}), de acordo com o resultado da verificação realizada.
@@ -1976,7 +1981,7 @@ const CAMPOS = [
   { k: 'CLINICA', cat: 'Dados da clínica', nome: 'Nome da clínica', desc: 'Clínica identificada pelo remetente.', ex: 'Clínica Exemplo', fn: c => (clinicaDe(c.S) || {}).nome || '' },
   { k: 'EXECUTANTE', cat: 'Dados da clínica', nome: 'Credenciado executante', desc: 'Nome como aparece no sistema oficial.', ex: 'CLINICA EXEMPLO LTDA', fn: c => c.g.executante ?? (clinicaDe(c.S) || {}).executante ?? '' },
   { k: 'REMETENTE', cat: 'Dados da clínica', nome: 'Remetente do e-mail', desc: 'Nome e endereço de quem enviou o pedido.', ex: 'Atendimento <contato@clinicaexemplo.com.br>', fn: c => c.S.email.remetente.nome ? `${c.S.email.remetente.nome} <${c.S.email.remetente.email}>` : c.S.email.remetente.email },
-  { k: 'EMAIL_PRESTADOR', cat: 'Dados da clínica', nome: 'E-mail do prestador', desc: 'Endereço para a resposta (etapa Finalizar).', ex: 'contato@clinicaexemplo.com.br', opc: true, fn: c => c.g.resultado.emailPrestador },
+  { k: 'EMAIL_PRESTADOR', cat: 'Dados da clínica', nome: 'E-mail da clínica', desc: 'Endereço para a resposta (etapa Finalizar).', ex: 'contato@clinicaexemplo.com.br', opc: true, fn: c => c.g.resultado.emailPrestador },
   // Médico
   { k: 'MEDICO', cat: 'Dados do médico', nome: 'Nome do médico', desc: 'Médico solicitante lido no pedido.', ex: 'Dr. João Pereira', fn: c => c.g.pedido.medico.nome },
   { k: 'CRM', cat: 'Dados do médico', nome: 'Conselho e número', desc: 'Registro profissional do médico.', ex: 'CRM 12345', opc: true, fn: c => c.g.pedido.medico.crm ? `${c.g.pedido.medico.conselho || 'CRM'} ${c.g.pedido.medico.crm}` : '' },
@@ -2583,7 +2588,7 @@ function avaliar(g) {
   if (p.herdados && p.herdados.length) add('dados-comuns', `Dados escritos uma única vez no e-mail foram aplicados a esta guia: ${p.herdados.join(', ')}. Confira se valem para este beneficiário.`);
   if (p.semRotulo) add('sem-rotulo', 'O pedido não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.');
   (p.regras || []).forEach((t, k) => add('regra-clinica', t, { sub: String(k) }));
-  (p.aprendidos || []).forEach((e, k) => add('aprendido', `${{ codigo: 'Código', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data' }[e.campo] || e.campo} "${e.lido}" já foi corrigido para "${e.correto}" ${e.n} vez(es) em atendimentos desta clínica.`, { sub: e.campo + ':' + e.lido, aprendidoI: k }));
+  (p.aprendidos || []).forEach((e, k) => add('aprendido', `${{ codigo: 'Código', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data' }[e.campo] || e.campo} "${e.lido}" já foi corrigido para "${e.correto}" ${pl(e.n, 'vez', 'vezes')} em atendimentos desta clínica.`, { sub: e.campo + ':' + e.lido, aprendidoI: k }));
   p.soltos.forEach(n => add('solto', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`, { sub: n }));
   if (g.itensEditados) add('editado', 'Dados ou itens foram corrigidos à mão. Confira de novo com o e-mail original.');
   /* pedido médico */
@@ -2800,7 +2805,7 @@ function listaProgresso() {
   return [...porOp.values()].map(r => {
     const o = cfg.operadores.find(x => x.id === r.operadorId) || cfg.operadores.find(x => x.nome === r.operador) || null;
     const v = r.vista || r.etapa || 2, p = v <= 2 ? 33 : v >= 4 ? 100 : 66;
-    const tip = `${r.operador || (o && o.nome) || 'Operador'}: ${r.paciente || r.pacienteIni || 'paciente'} × ${r.clinica || r.remetente || 'clínica não identificada'}${(r.totalGuias || 1) > 1 ? ` (guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias})` : ''} · ${ROT_ETAPA[p]} (${p}%)`;
+    const tip = `${r.operador || (o && o.nome) || 'Operador'}: ${r.paciente || r.pacienteIni || 'beneficiário'} × ${r.clinica || r.remetente || 'clínica não identificada'}${(r.totalGuias || 1) > 1 ? ` (guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias})` : ''} · ${ROT_ETAPA[p]} (${p}%)`;
     return { o, p, tip };
   });
 }
@@ -2893,7 +2898,7 @@ document.addEventListener('paste', e => {
 /* ---------- Alertas (painel abaixo do conteúdo) ---------- */
 function htmlUmAlerta(a, g) {
   let extra = '';
-  if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Usar só neste pedido</button>`;
+  if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Só para este e-mail</button>`;
   if (a.acaoCarteira) extra += `<button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button>`;
   if (a.aprendidoI != null) extra += `<button class="btn sm" data-act="aplicarAprendido" data-i="${a.aprendidoI}">${ic('check', 'sm')}Aplicar a mesma correção</button>`;
   if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
@@ -2908,14 +2913,14 @@ function htmlAlertas(g, st) {
   const principais = st.A.filter(a => !(a.modo === 'atencao' && a.nivel === 'info')).sort((a, b) => ordem(a) - ordem(b));
   const infos = st.A.filter(a => a.modo === 'atencao' && a.nivel === 'info');
   const l1 = principais.map(a => htmlUmAlerta(a, g)).join('');
-  const l2 = infos.length ? `<details class="al-infos"><summary>${infos.length} informativo(s)</summary><div class="alertas">${infos.map(a => htmlUmAlerta(a, g)).join('')}</div></details>` : '';
+  const l2 = infos.length ? `<details class="al-infos"><summary>${pl(infos.length, 'informativo', 'informativos')}</summary><div class="alertas">${infos.map(a => htmlUmAlerta(a, g)).join('')}</div></details>` : '';
   return (l1 || l2) ? l1 + l2 : `<div class="al info"><span>${ic('check', 'sm')}</span><div class="tx">Nenhum alerta para esta guia.</div></div>`;
 }
 function htmlPainelAlertas(g, st) {
   const tot = st.A.filter(pedeConferi).length, pend = atencaoPendente(g, st).length;
   return `<section class="card painel-al compacto ${st.bloqueios.length ? 'tem-bloqueio' : ''}" aria-label="Alertas e ocorrências">
     <div class="al-h">${ic(st.bloqueios.length ? 'ban' : 'bell')}<h2>Alertas e ocorrências</h2>
-      ${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : '<span class="tag ok">' + ic('check', 'sm') + 'Sem bloqueios</span>'}
+      ${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}</span>` : '<span class="tag ok">' + ic('check', 'sm') + 'Sem bloqueios</span>'}
       ${st.obs.length ? `<span class="tag obs">${ic('message', 'sm')}${st.obs.length} com observação</span>` : ''}
       ${tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Conferido</span>`) : ''}</div>
     <div class="al-corpo"><div class="alertas" id="alertas">${htmlAlertas(g, st)}</div></div></section>`;
@@ -2928,21 +2933,23 @@ function htmlBarraGuias() {
     const st = guiaTerminal(g) ? null : situacaoGuia(g);
     return `<button class="guia-tab ${i === S.ativa && S.vista > 1 ? 'ativa' : ''}" role="tab" aria-selected="${i === S.ativa}" data-act="selGuia" data-i="${i}">
       <span class="sq lg idc idc-${i % 10}">${i + 1}</span><span style="min-width:0"><span class="t1" style="display:block">${esc(nomeGuia(g))}</span>
-      <span class="t2">${g.pedido.itens.length} item(ns) · ${g.status === 'concluido' ? tagResultado(g.resultado.situacao) : tagStatus(g.status)}${st && st.bloqueios.length ? ` <span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length}</span>` : ''}</span></span></button>`;
+      <span class="t2">${pl(g.pedido.itens.length, 'item', 'itens')} · ${g.status === 'concluido' ? tagResultado(g.resultado.situacao) : tagStatus(g.status)}${st && st.bloqueios.length ? ` <span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length}</span>` : ''}</span></span></button>`;
   }).join('')}</div>`;
 }
 function htmlPassos(g) {
   const st = situacaoGuia(g), v = S.vista, fin = g.status === 'concluido';
   const cegaPend = cegaExigida() && g.cega.iniciada && g.cega.resultado && !g.cega.resultado.ok;
+  /* nome da etapa fixo; o estado vai num selo (s = texto, c = cor do selo) */
+  const nb = st.bloqueios.length;
   const def = [
-    { n: 1, t: 'E-mail', e: v === 1 ? 'atual' : 'feito', s: v === 1 ? 'Você está aqui' : 'Pedido recebido', ok: true },
-    { n: 2, t: 'Pedido e alertas', e: v === 2 ? 'atual' : st.bloqueios.length ? 'atencao' : (g.etapa > 2 || fin ? 'feito' : 'futuro'), s: st.bloqueios.length ? `${st.bloqueios.length} bloqueio(s)` : v === 2 ? 'Você está aqui' : g.etapa > 2 ? 'Concluída' : 'A fazer', ok: true },
-    { n: 3, t: 'Guia e conferência', e: v === 3 ? 'atual' : cegaPend ? 'atencao' : ((g.cega.ok || !cegaExigida()) && g.etapa > 3) || fin ? 'feito' : 'futuro', s: !st.pode ? 'Resolva os bloqueios' : cegaPend ? 'Conferência divergente' : v === 3 ? 'Você está aqui' : g.cega.ok ? 'Conferida' : 'A fazer', ok: st.pode },
-    { n: 4, t: usaConsolidada() ? (ehUltima(g) ? 'Finalizar e-mail' : 'Resultado e observação') : 'Finalizar', e: v === 4 ? 'atual' : fin ? 'feito' : 'futuro', s: fin ? 'Concluída' : v === 4 ? 'Você está aqui' : !podeFinal(g, st) ? 'Falta conferir' : 'A fazer', ok: podeFinal(g, st) || fin }
+    { n: 1, t: 'E-mail', e: v === 1 ? 'atual' : 'feito', s: v === 1 ? 'Agora' : 'Concluída', c: v === 1 ? 'info' : 'ok', ok: true },
+    { n: 2, t: 'Pedido e alertas', e: v === 2 && !nb ? 'atual' : nb ? (v === 2 ? 'atual atencao' : 'atencao') : (g.etapa > 2 || fin ? 'feito' : 'futuro'), s: nb ? pl(nb, 'bloqueio', 'bloqueios') : v === 2 ? 'Agora' : g.etapa > 2 || fin ? 'Concluída' : 'Pendente', c: nb ? 'bad' : v === 2 ? 'info' : g.etapa > 2 || fin ? 'ok' : '', ok: true },
+    { n: 3, t: 'Guia e conferência', e: v === 3 ? 'atual' : cegaPend ? 'atencao' : ((g.cega.ok || !cegaExigida()) && g.etapa > 3) || fin ? 'feito' : 'futuro', s: !st.pode ? 'Bloqueada' : cegaPend ? 'Divergente' : v === 3 ? 'Agora' : g.cega.ok || fin ? 'Conferida' : 'Pendente', c: !st.pode ? '' : cegaPend ? 'warn' : v === 3 ? 'info' : g.cega.ok || fin ? 'ok' : '', ok: st.pode },
+    { n: 4, t: 'Finalizar', e: v === 4 ? 'atual' : fin ? 'feito' : 'futuro', s: fin ? 'Concluída' : v === 4 ? 'Agora' : !podeFinal(g, st) ? 'Falta conferir' : 'Pendente', c: fin ? 'ok' : v === 4 ? 'info' : '', ok: podeFinal(g, st) || fin }
   ];
-  return `<nav class="passos" aria-label="Etapas do atendimento">${def.map(d => `<button class="passo ${d.e}" data-act="irVista" data-v="${d.n}" ${d.ok ? '' : 'disabled'} ${d.e === 'atual' ? 'aria-current="step"' : ''} title="${esc(d.t + ' — ' + d.s)}">
-    <span class="bola">${d.e === 'feito' ? ic('check', 'sm') : d.e === 'atencao' ? ic('alert', 'sm') : d.n}</span>
-    <span class="tx"><small>Etapa ${d.n} · ${esc(d.s)}</small><b>${d.t}</b></span></button>`).join('')}</nav>`;
+  return `<nav class="passos" aria-label="Etapas do atendimento">${def.map(d => `<button class="passo ${d.e}" data-act="irVista" data-v="${d.n}" ${d.ok ? '' : 'disabled'} ${/atual/.test(d.e) ? 'aria-current="step"' : ''} title="${esc('Etapa ' + d.n + ': ' + d.t + ' — ' + d.s)}">
+    <span class="bola">${d.e === 'feito' ? ic('check', 'sm') : /atencao/.test(d.e) ? ic('alert', 'sm') : d.n}</span>
+    <span class="tx"><small>Etapa ${d.n}</small><b>${d.t}</b></span><span class="tag ${d.c} passo-selo">${esc(d.s)}</span></button>`).join('')}</nav>`;
 }
 
 /* ---------- Tela principal do atendimento ---------- */
@@ -3002,7 +3009,7 @@ function htmlUltimaGuia() {
     const outra = r.clinicaId && cl && r.clinicaId !== cl.id || (!cl && r.clinica);
     linhas.push(`<div class="ult-linha">${S.guias.length > 1 ? `<span class="muted">${esc(nomeGuia(g))}:</span> ` : ''}<b class="num">${esc(r.guia)}</b> <span class="muted">· ${fmtData(r.concluidoEm)}</span>${outra ? ` <span class="tag obs">${ic('building', 'sm')}${esc(r.clinica)}</span>` : ''}</div>`);
   });
-  return linhas.length ? `<div class="ult-guia">${ic('clip')}<div><div class="eyebrow">Última guia gerada para ${vistos.size > 1 ? 'estes pacientes' : 'este paciente'}</div>${linhas.join('')}</div></div>` : '';
+  return linhas.length ? `<div class="ult-guia">${ic('clip')}<div><div class="eyebrow">Última guia gerada para ${vistos.size > 1 ? 'estes beneficiários' : 'este beneficiário'}</div>${linhas.join('')}</div></div>` : '';
 }
 function htmlEmailCard() {
   const e = S.email, cl = clinicaDe(S);
@@ -3011,7 +3018,7 @@ function htmlEmailCard() {
       <dt>De</dt><dd>${esc(e.remetente.nome)} <span class="num">&lt;${esc(e.remetente.email)}&gt;</span> ${cl ? htmlClinica(cl) : `<span class="tag obs">${ic('info', 'sm')}Remetente não cadastrado</span>`}</dd>
       <dt>Recebido</dt><dd>${fmtDH(e.data)}</dd>
       <dt>Assunto</dt><dd>${esc(e.assunto)}</dd>
-      ${e.anexos.length ? `<dt>Anexos</dt><dd><span class="tag info">${ic('clip', 'sm')}${e.anexos.length} anexo(s)</span> ${esc(e.anexos.join(', '))}</dd>` : ''}
+      ${e.anexos.length ? `<dt>Anexos</dt><dd><span class="tag info">${ic('clip', 'sm')}${pl(e.anexos.length, 'anexo', 'anexos')}</span> ${esc(e.anexos.join(', '))}</dd>` : ''}
     </dl>
     <pre class="original">${realceEmail()}</pre>
     <p class="dica" style="margin-top:8px"><mark class="m-ok">verde</mark> código lido como item · <mark class="m-warn">amarelo</mark> 8 dígitos não usados · <mark class="m-cart">azul</mark> carteira</p></div>`;
@@ -3020,13 +3027,13 @@ function renderVisao(alvo) {
   const todas = S.guias.every(guiaTerminal), multi = S.guias.length > 1;
   alvo.innerHTML = `<div class="stack">
   ${htmlEmailCard()}
-  <div class="card"><div class="card-h"><h2>${multi ? `Guias deste e-mail (${S.guias.length})` : 'Solicitação deste e-mail'}</h2><span class="esp"></span>${multi ? `<span class="tag ${S.guias.filter(g => g.pedido && chaveBenef(g.pedido)).length ? 'ac' : ''}">${ic('user', 'sm')}${unicos(S.guias.map(g => g.chave)).length} beneficiário(s) diferente(s)</span>` : ''}</div>
+  <div class="card"><div class="card-h"><h2>${multi ? `Guias deste e-mail (${S.guias.length})` : 'Solicitação deste e-mail'}</h2><span class="esp"></span>${multi ? `<span class="tag ${S.guias.filter(g => g.pedido && chaveBenef(g.pedido)).length ? 'ac' : ''}">${ic('user', 'sm')}${pl(unicos(S.guias.map(g => g.chave)).length, 'beneficiário diferente', 'beneficiários diferentes')}</span>` : ''}</div>
     
     <div class="tabela-scroll"><table class="t"><thead><tr><th>Guia</th><th>Beneficiário</th><th>Carteira</th><th>Serviços (código × qtd.)</th><th>Estado</th><th>Alertas</th><th></th></tr></thead><tbody>
     ${S.guias.map((g, i) => { const st = situacaoGuia(g); return `<tr><td class="c"><span class="sq idc idc-${i % 10}">${i + 1}</span></td><td class="pri">${esc(nomeGuia(g))}</td><td class="num">${esc(g.carteiraUsada || g.pedido.carteiraBruta || '—')}</td>
       <td class="num">${g.pedido.itens.map(it => `${it.codigo} × ${it.qtd ?? '?'}`).join('<br>') || '—'}</td>
       <td>${g.status === 'concluido' ? tagResultado(g.resultado.situacao) + (g.numero && !g.semGuia ? ' <span class="num">' + esc(g.numero) + '</span>' : '') : tagStatus(g.status)} ${tagParam(g.param)}</td>
-      <td>${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s)</span>` : ''} ${st.obs.length + atencaoPendente(g, st).length ? `<span class="tag warn">${ic('alert', 'sm')}${st.obs.length + atencaoPendente(g, st).length}</span>` : ''}</td>
+      <td>${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}</span>` : ''} ${st.obs.length + atencaoPendente(g, st).length ? `<span class="tag warn">${ic('alert', 'sm')}${st.obs.length + atencaoPendente(g, st).length}</span>` : ''}</td>
       <td class="c"><button class="btn sm pri" data-act="selGuia" data-i="${i}">${g.status === 'concluido' ? 'Ver guia' : 'Abrir guia'}${ic('right', 'sm')}</button></td></tr>`; }).join('')}
     </tbody></table></div>
     ${todas ? `<div class="ultimo" style="margin-top:12px">${ic('check')}<div>Todas as guias deste e-mail foram processadas.</div></div>` : ''}
@@ -3052,7 +3059,7 @@ function htmlTabelaItens(g, { copiar = false } = {}) {
     return `<tr><td class="c">${i + 1}</td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${cpCod}</div></td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${it.qtd != null ? cpQtd : ''}</div></td>
-      <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria ? `<span class="tag obs" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Provisória</span> <button class="btn sm" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar</button>` : ''}</td>
+      <td>${esc(ref.texto) || '<span class="muted">—</span>'} ${ref.provisoria ? `<span class="tag obs" title="Sem cadastro: a descrição do e-mail é a referência provisória.">Provisória</span> <button class="btn sm" data-act="cadastrarCodigo" data-codigo="${it.codigo}">${ic('plus', 'sm')}Cadastrar código</button>` : ''}</td>
       <td class="muted">${esc(it.desc) || '—'}</td>
       <td>${tagItem(est)}</td></tr>`;
   }).join('') || `<tr><td colspan="6" class="muted">Nenhum item lido.</td></tr>`}
@@ -3074,7 +3081,7 @@ function htmlBannerParam(g) {
     const feitos = (g.param.preenchido || []);
     return `<div class="banner-param">${ic('layers', 'lg')}<div class="esp"><b>Atendimento parametrizado</b> (${g.param.origem === 'criada' ? 'parametrização criada neste atendimento' : 'parametrização aplicada'}).${feitos.length ? ` Preenchido a partir dela: ${esc(feitos.join(', '))}.` : ''}</div><button class="btn sm line" data-act="parametrizar">${ic('edit', 'sm')}Ver ou editar</button></div>`;
   }
-  if (prm) return `<div class="banner-param">${ic('layers', 'lg')}<div class="esp"><b>Parametrização encontrada</b> para ${esc(cl.nome)} e esta carteira (atualizada em ${fmtData(prm.atualizadoEm)}): médico ${esc(prm.medico)}, ${prm.terapias.length} terapia(s). Ao aplicar, só são preenchidos dados que faltam no e-mail.</div><button class="btn sm line" data-act="parametrizar">${ic('eye', 'sm')}Ver</button><button class="btn sm pri" data-act="aplicarParam">${ic('check', 'sm')}Aplicar parametrização</button></div>`;
+  if (prm) return `<div class="banner-param">${ic('layers', 'lg')}<div class="esp"><b>Parametrização encontrada</b> para ${esc(cl.nome)} e esta carteira (atualizada em ${fmtData(prm.atualizadoEm)}): médico ${esc(prm.medico)}, ${pl(prm.terapias.length, 'terapia', 'terapias')}. Ao aplicar, só são preenchidos dados que faltam no e-mail.</div><button class="btn sm line" data-act="parametrizar">${ic('eye', 'sm')}Ver parametrização</button><button class="btn sm pri" data-act="aplicarParam">${ic('check', 'sm')}Aplicar parametrização</button></div>`;
   return '';
 }
 function renderPedido(alvo, g) {
@@ -3150,7 +3157,7 @@ function renderGuia(alvo, g) {
   <div class="stack">
   <div class="card">
     <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
-    <div class="cp-grupo"><span class="eyebrow">Prestador e solicitação</span>
+    <div class="cp-grupo"><span class="eyebrow">Executante e solicitação</span>
       <div class="cp-linha"><div class="rot">1. Credenciado executante${!exec ? '<small>Não cadastrado: informe aqui</small>' : ''}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
       <div class="cp-linha"><div class="rot">2. Médico</div><div class="cp-campos">${campoCopia(g, { campo: 'medico_nome', rot: 'Nome do médico', sub: 'Nome' })}${campoCopia(g, { campo: 'medico_crm', rot: 'CRM do médico', sub: p.medico.conselho || 'CRM', curto: true, mono: true })}</div></div>
       <div class="cp-linha"><div class="rot">3. Local do pedido</div><div class="cp-campos">${campoCopia(g, { campo: 'local', rot: 'Local do pedido' })}</div></div>
@@ -3182,7 +3189,7 @@ function renderGuia(alvo, g) {
       <div id="cegaLinhas">${htmlLinhasCega(g)}</div>
       ${ambiguos(g).length ? `<p class="dica" style="margin-top:8px">Os códigos terminados em ${ambiguos(g).join(', ')} se repetem neste pedido: para eles, digite os 8 dígitos.</p>` : ''}
       ${g.cega.resultado ? htmlResultadoCega(g.cega.resultado) : ''}
-      <div class="acoes">${g.cega.ok ? '' : (g.cega.resultado && !g.cega.resultado.ok ? `<button class="btn pri" data-act="refazerCega">${ic('refresh')}Corrigi no sistema: conferir de novo</button>` : `<button class="btn pri" data-act="conferir">${ic('check')}Conferir</button>`)}</div>
+      <div class="acoes">${g.cega.ok ? '' : (g.cega.resultado && !g.cega.resultado.ok ? `<button class="btn pri" data-act="refazerCega">${ic('refresh')}Corrigi no sistema: conferir de novo</button>` : `<button class="btn pri" data-act="conferir">${ic('check')}Conferir a grade</button>`)}</div>
     </div>
   </div>` : ''}
   ${htmlPainelAlertas(g, st)}
@@ -3218,7 +3225,7 @@ function compararCega(itens, n, entradas) {
     lin.push({ i, fim, qtd, match: cands.length === 1 ? cands[0] : null, ambig: cands.length > 1 });
   }
   if (res.erros.length) { res.ok = false; res.incompleto = true; return res; }
-  if (n !== itens.length) res.erros.push(`A grade tem ${n} linha(s) e o pedido tem ${itens.length} item(ns).`);
+  if (n !== itens.length) res.erros.push(`A grade tem ${pl(n, 'linha', 'linhas')} e o pedido tem ${pl(itens.length, 'item', 'itens')}.`);
   for (const it of itens) {
     const ls = lin.filter(l => l.match === it);
     if (!ls.length) res.porItem.push({ it, st: 'omitido' });
@@ -3231,7 +3238,7 @@ function compararCega(itens, n, entradas) {
   return res;
 }
 function htmlResultadoCega(r) {
-  if (r.ok) return `<div class="res-ok" style="margin-top:12px">${ic('check')}Grade confere com o pedido: ${r.m} item(ns), códigos e quantidades corretos.</div>`;
+  if (r.ok) return `<div class="res-ok" style="margin-top:12px">${ic('check')}Grade confere com o pedido: ${pl(r.m, 'item', 'itens')}, códigos e quantidades corretos.</div>`;
   const li = [];
   r.erros.forEach(e => li.push(e));
   if (!r.incompleto) {
@@ -3250,7 +3257,7 @@ function htmlResultadoCega(r) {
    ==================================================================== */
 function pendenciasConclusao(g, st) {
   const P = [], r = g.resultado;
-  if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.'); return P; }
+  if (g.semGuia) { if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail da clínica não parece válido.'); return P; }
   if (!/^[TS]\d{7,8}$/.test(g.numero)) P.push('Informe o número da guia gerada no sistema oficial (T ou S + 7 ou 8 dígitos).');
   if (!r.situacao) P.push('Selecione a situação da autorização.');
   if (r.situacao === 'autorizada' || r.situacao === 'parcial') {
@@ -3267,7 +3274,7 @@ function pendenciasConclusao(g, st) {
     if (!n) P.push('Marque os itens que não foram autorizados.');
     else if (n >= g.pedido.itens.length) P.push('Todos os itens estão marcados como não autorizados: use a situação “Não autorizada”.');
   }
-  if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail do prestador não parece válido.');
+  if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail da clínica não parece válido.');
   if (!st.pode) P.push('Há bloqueio nesta guia (veja Alertas e ocorrências).');
   if (cegaExigida() && !g.cega.ok) P.push('Falta concluir a conferência da grade.');
   return P;
@@ -3320,31 +3327,31 @@ function renderFinal(alvo, g) {
   const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
   const emailOk = r.emailPrestador && g.copiados.email === r.emailPrestador;
   alvo.innerHTML = `
-  ${multi && !showResp ? `<div class="aviso">${ic('info')}<div>Este e-mail tem ${guiasAtivas().length} guias. Aqui você registra o número, o resultado e a observação desta guia. A <b>resposta ao prestador, com todas as guias</b>, aparece na última guia (faltam ${faltam}).</div></div>` : ''}
+  ${multi && !showResp ? `<div class="aviso">${ic('info')}<div>Este e-mail tem ${guiasAtivas().length} guias. Aqui você registra o número, o resultado e a observação desta guia. A <b>resposta à clínica, com todas as guias</b>, aparece na última guia (faltam ${faltam}).</div></div>` : ''}
   ${multi && showResp ? `<div class="banner-param">${ic('mail', 'lg')}<div class="esp"><b>Última guia do e-mail.</b> A resposta abaixo reúne o resultado de todas as guias geradas neste e-mail.</div></div>` : ''}
   <div class="${showResp ? 'grid2' : ''}">
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
-        ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> As observações marcadas na etapa 3 já estão nas <b>observações adicionais</b> abaixo (e vão para a resposta ao prestador): detalhe o motivo. Você pode finalizar normalmente.</div></div>` : ''}
+        ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> As observações marcadas na etapa 3 já estão nas <b>observações adicionais</b> abaixo (e vão para a resposta à clínica): detalhe o motivo. Você pode finalizar normalmente.</div></div>` : ''}
         <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
           <input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
           <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
         <div class="form-grid">
-          ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail do prestador</label>
+          ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail da clínica</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
-              <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
+              <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" aria-label="Copiar somente o e-mail da clínica">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
             </div>` : ''}
         </div>
         <h3>Situação da autorização</h3>
         ${htmlSituacao(g)}
-        <div style="margin-top:12px"><div class="linha-flex" style="justify-content:space-between;margin-bottom:3px"><label class="lbl" for="rObs" style="margin:0">Observações adicionais (entram na resposta ao prestador)</label><button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
+        <div style="margin-top:12px"><div class="linha-flex" style="justify-content:space-between;margin-bottom:3px"><label class="lbl" for="rObs" style="margin:0">Observações adicionais (entram na resposta à clínica)</label><button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
       </div>
       ${htmlCardObs(g)}
     </div>
     ${showResp ? `<div class="stack">
       <div class="card">
-        <div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
+        <div class="card-h"><h2>${multi ? 'Resposta à clínica (todas as guias)' : 'Resposta à clínica'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
           ${!multi && r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
         ${!resp ? `<div class="aviso">${ic('info')}<div>Selecione a situação da autorização. O modelo da resposta é definido pelo resultado real da guia: autorizada, parcial ou não autorizada.</div></div>` : `
         ${resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Preencha-os acima ou edite o texto.</div></div>` : ''}
@@ -3375,9 +3382,9 @@ function renderFinalSemGuia(alvo, g) {
     ${multi && !showResp ? `<div class="aviso" style="margin-top:10px">${ic('info')}<div>A resposta única com todas as guias aparece na última guia (faltam ${faltam}). Abaixo, o trecho desta guia.</div></div>` : ''}
     ${multi ? `<h3>Trecho desta guia na resposta única</h3><div class="previa"><div class="previa-c">${frag.html}</div></div>` : ''}
   </div>
-  ${showResp ? `<div class="card"><div class="card-h"><h2>${multi ? 'Resposta ao prestador (todas as guias)' : 'Resposta ao prestador'}</h2><span class="esp"></span></div>
-    <div class="cp-campo" style="margin-bottom:10px"><div class="wrapin"><label class="lbl" for="emailPrest">E-mail do prestador</label><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}"></div>
-      <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail do prestador">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
+  ${showResp ? `<div class="card"><div class="card-h"><h2>${multi ? 'Resposta à clínica (todas as guias)' : 'Resposta à clínica'}</h2><span class="esp"></span></div>
+    <div class="cp-campo" style="margin-bottom:10px"><div class="wrapin"><label class="lbl" for="emailPrest">E-mail da clínica</label><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}"></div>
+      <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail da clínica">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
     ${resp && resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
     ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
     <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
@@ -3399,7 +3406,7 @@ function renderConcluida(alvo, g) {
       <div class="acoes"><button class="btn line" data-act="reabrirGuia">${ic('edit')}Reabrir para correção</button><span class="esp"></span>
         ${prox >= 0 ? `<button class="btn pri" data-act="selGuia" data-i="${prox}">Próxima guia pendente${ic('right')}</button>` : ''}
         ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${g.semGuia ? '' : htmlCardObs(g)}</div>
-    ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta ao prestador${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
+    ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta à clínica${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
       <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
 }
@@ -3412,8 +3419,8 @@ function abrirRespostaEmail() {
   const r = renderModelo('resposta_multipla', ctxDe(g), { marcar: true });
   M = { tipo: 'resp', modelo: 'resposta_multipla', semGuia: false, copiou: false };
   abrirModal({
-    titulo: 'Resposta do e-mail', sub: `${S.guias.filter(x => x.status !== 'descartado').length} guia(s) neste e-mail`, icone: 'mail', tamanho: 'g',
-    corpo: `${pend ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>${pend} guia(s) ainda não foi(ram) processada(s). O texto indica essas guias como pendentes; envie esta resposta só se for o caso.</div></div>` : ''}
+    titulo: 'Resposta do e-mail', sub: `${pl(S.guias.filter(x => x.status !== 'descartado').length, 'guia', 'guias')} neste e-mail`, icone: 'mail', tamanho: 'g',
+    corpo: `${pend ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>${pend === 1 ? '1 guia ainda não foi processada' : pend + ' guias ainda não foram processadas'}. O texto indica essas guias como pendentes; envie esta resposta só se for o caso.</div></div>` : ''}
       ${htmlEditor({ id: 'edModal', valor: r.html, minAltura: 280 })}`,
     rodape: `<span class="dica" id="modalEstado"></span><button class="btn" data-act="fecharModal">Fechar</button><button class="btn line" data-act="copiarModalSimples">${ic('copy')}Copiar texto simples</button><button class="btn pri" data-act="copiarModalRico">${ic('copy')}Copiar com formatação</button>`
   });
@@ -3441,8 +3448,8 @@ function abrirModalObs() {
   const g = guiaAtiva(), st = situacaoGuia(g), itens = opcoesObservacao(g, st);
   M = { tipo: 'obs', g, itens, sel: new Set(itens.filter(i => i.pre).map(i => i.id)), txt: '', editado: false };
   M.txt = textoSelObs();
-  abrirModal({ titulo: 'Incluir observação', sub: 'Vai para as observações adicionais da resposta ao prestador', icone: 'message', tamanho: 'g', corpo: htmlModalObs(),
-    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="inserirObs">${ic('check')}Inserir</button>` });
+  abrirModal({ titulo: 'Incluir observação', sub: 'Vai para as observações adicionais da resposta à clínica', icone: 'message', tamanho: 'g', corpo: htmlModalObs(),
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="inserirObs">${ic('check')}Inserir observação</button>` });
 }
 
 /* ---------- Parametrização ---------- */
@@ -3486,7 +3493,7 @@ function abrirModalCadCodigo(codigo) {
   abrirModal({ titulo: 'Cadastrar código', sub: codigo, icone: 'tag', tamanho: 'p',
     corpo: `<div class="form-grid"><div style="grid-column:1/-1"><label class="lbl" for="ccClinica">Clínica</label><select id="ccClinica"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${esc(c.id)}" ${S.clinicaId === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
       <div style="grid-column:1/-1"><label class="lbl" for="ccDesc">Descrição da terapia</label><input type="text" id="ccDesc" value="${esc((it && it.desc) || '')}" autofocus></div></div>`,
-    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cadCodigoOk">${ic('check')}Cadastrar</button>` });
+    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cadCodigoOk">${ic('check')}Cadastrar código</button>` });
 }
 
 function htmlModalCorrigir() {
@@ -3519,7 +3526,7 @@ const descreverDivergencias = divs => divs.map((d, i) => `Tentativa ${i + 1}: ` 
 function obsCelula(r) {
   const T = [], rs = r.resultado || {}, divs = (r.conferencia && r.conferencia.divergencias) || [];
   if (r.parametrizado) T.push(tagParam(r.parametrizado));
-  if (divs.length) T.push(`<span class="tag warn" title="${esc(descreverDivergencias(divs))}">${ic('alert', 'sm')}${divs.length} divergência(s)</span>`);
+  if (divs.length) T.push(`<span class="tag warn" title="${esc(descreverDivergencias(divs))}">${ic('alert', 'sm')}${pl(divs.length, 'divergência', 'divergências')}</span>`);
   const ao = (r.alertas || []).filter(a => a.m === 'obs'); if (ao.length) T.push(`<span class="tag obs" title="${esc(ao.map(a => a.t).join('\n'))}">${ic('message', 'sm')}Aviso c/ obs.</span>`);
   if (rs.situacao === 'sem_guia') T.push(`<span class="tag obs" title="${esc('Sem guia gerada: ' + nomeModelo(rs.modelo) + ((r.bloqueios || []).length ? '\n' + r.bloqueios.join('\n') : ''))}">${ic('mail', 'sm')}Sem guia: ${esc(nomeModelo(rs.modelo))}</span>`);
   if ((rs.glosas || []).length) T.push(`<span class="tag warn" title="${esc(rs.glosas.map(x => `${x.c}: glosa ${x.g || '—'}\nMotivo da retirada: ${x.m || '—'}`).join('\n\n'))}">${ic('check', 'sm')}Glosa retirada</span>`);
@@ -3609,7 +3616,7 @@ async function renderPainel(app) {
       <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
       <td>${tagResultado(resultadoDe(r))}</td>
       <td>${obsCelula(r)}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${r.id}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
+      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${r.id}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
     }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`}
     </tbody></table></div>
   </div>
@@ -3658,7 +3665,7 @@ async function conciliarEmails(files) {
   }
   const ehResposta = e => /^\s*(re|res)\s*:/i.test(e.assunto);
   const lin = (e, x) => `<li><b>${fmtHora(e.data)}</b> · ${esc(e.remetente.email)} · ${esc(e.assunto)}${x ? ' — ' + x : ''}</li>`;
-  conc = `<h3>Resultado: ${emails.length} e-mail(s) lido(s)</h3>
+  conc = `<h3>Resultado: ${pl(emails.length, 'e-mail lido', 'e-mails lidos')}</h3>
   <p class="linha-flex"><span class="tag ${semReg.length ? 'bad' : 'ok'}">${ic(semReg.length ? 'alert' : 'check', 'sm')}${semReg.length} sem nenhum registro</span> <span class="tag ${naoConcl.length ? 'warn' : 'ok'}">${ic(naoConcl.length ? 'alert' : 'check', 'sm')}${naoConcl.length} com guia sem conclusão</span> <span class="tag ${varias.length ? 'bad' : 'ok'}">${ic(varias.length ? 'alert' : 'check', 'sm')}${varias.length} com a mesma guia concluída mais de uma vez</span></p>
   ${semReg.length ? `<p class="dica">Sem registro: não passaram pela página (podem ser respostas, evoluções ou pedidos esquecidos).</p><ul>${semReg.map(e => lin(e, ehResposta(e) ? 'resposta' : '')).join('')}</ul>` : ''}
   ${naoConcl.length ? `<p class="dica">Abertos mas não concluídos:</p><ul>${naoConcl.map(([e, rs]) => lin(e, rs.map(r => `guia ${(r.idxGuia || 0) + 1}: ${STATUS[r.status]}`).join(', '))).join('')}</ul>` : ''}
@@ -3696,13 +3703,13 @@ async function renderQuadro(app) {
     [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
-  app.innerHTML = htmlAuditar() + `<div class="card"><div class="card-h"><h2>Ações em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? lista.length + ' guia(s)' : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar</button></div>
-    <p class="dica" style="margin:0">Paciente × clínica de cada guia aberta, na etapa em que está.${lim ? ` Some da lista após ${lim} min sem movimento.` : ''}</p></div>
+  app.innerHTML = htmlAuditar() + `<div class="card"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
+    <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está.${lim ? ` Some da lista após ${lim} min sem movimento.` : ''}</p></div>
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
     ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
-      return `<div class="card-q"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Paciente')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
-      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${(r.itens || []).length} item(ns) · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
+      return `<div class="card-q"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
+      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl((r.itens || []).length, 'item', 'itens')} · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
       <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }
 
@@ -3847,7 +3854,7 @@ function cfgClinicas() {
   return `<div class="card">${cabSecao(`Clínicas e cadastros (${cls.length})`, 'Informações usadas para reconhecer o remetente, preencher o credenciado executante e mostrar a descrição oficial de cada código. Campos sem informação ficam vazios: nada é preenchido por suposição.')}
   <div class="mestre"><div>
     <div class="linha-flex"><div class="busca" style="flex:1;min-width:150px"><span class="sr"><label for="buscaCl">Buscar clínica</label></span>${ic('search', 'sm')}<input type="search" id="buscaCl" placeholder="Nome, cidade, e-mail ou código" data-filtro="cl"></div><button class="btn sm pri" data-act="clNova">${ic('plus', 'sm')}Nova clínica</button><button class="btn sm line" data-act="clImportar" title="Cola a lista de clínicas da planilha (nome, cidade e e-mails)">${ic('upload', 'sm')}Importar lista</button></div>
-    <div class="lista-cl" id="listaCl">${cls.map((c, i) => `<button class="cl-item idc ${corClinica(c)} ${i === cfgClinicaSel ? 'ativa' : ''}" data-act="clSel" data-i="${i}" data-busca="${esc(norm([c.nome, c.cidade, c.emails.join(' '), Object.keys(c.codigos || {}).join(' '), c.apelidos].join(' ')))}"><span class="sq">${esc(iniciais(c.nome))}</span><span><span class="n" data-eco="clinicas.${i}.nome">${esc(c.nome || 'Sem nome')}</span><br><span class="s">${esc(c.cidade || 'Cidade não informada')} · ${c.emails.length} e-mail(s) · ${c._lista.filter(x => x.c).length} código(s)</span></span></button>`).join('') || '<p class="muted">Nenhuma clínica cadastrada.</p>'}</div>
+    <div class="lista-cl" id="listaCl">${cls.map((c, i) => `<button class="cl-item idc ${corClinica(c)} ${i === cfgClinicaSel ? 'ativa' : ''}" data-act="clSel" data-i="${i}" data-busca="${esc(norm([c.nome, c.cidade, c.emails.join(' '), Object.keys(c.codigos || {}).join(' '), c.apelidos].join(' ')))}"><span class="sq">${esc(iniciais(c.nome))}</span><span><span class="n" data-eco="clinicas.${i}.nome">${esc(c.nome || 'Sem nome')}</span><br><span class="s">${esc(c.cidade || 'Cidade não informada')} · ${pl(c.emails.length, 'e-mail', 'e-mails')} · ${pl(c._lista.filter(x => x.c).length, 'código', 'códigos')}</span></span></button>`).join('') || '<p class="muted">Nenhuma clínica cadastrada.</p>'}</div>
   </div>
   <div>${cl ? cfgClinicaDetalhe(cl, cfgClinicaSel) : '<div class="vazio"><h2>Nenhuma clínica selecionada</h2><p>Cadastre a primeira clínica para começar.</p><button class="btn pri" data-act="clNova">' + ic('plus') + 'Nova clínica</button></div>'}</div></div></div>`;
 }
@@ -3960,7 +3967,7 @@ function cfgObsAuto() {
       <label class="switch"><input type="checkbox" data-cfg="obsAuto.${k}.padrao" ${o[k].padrao ? 'checked' : ''}><span>Marcada por padrão</span></label></div>
     <label class="lbl" for="oa-${k}">Texto da observação</label><input type="text" id="oa-${k}" data-cfg="obsAuto.${k}.texto" value="${esc(o[k].texto)}"></div>`;
   return `<div class="card">${cabSecao('Observações automáticas')}
-    <p class="dica">Quando você usa <b>Ignorar</b> numa divergência da conferência pelos prints, o sistema sugere uma observação para o prestador. Aqui você muda o texto e define se ela já vem <b>marcada</b>. Em qualquer caso, ela só entra na resposta se estiver marcada (a marcação pode ser mudada em cada atendimento).</p>
+    <p class="dica">Quando você usa <b>Ignorar</b> numa divergência da conferência pelos prints, o sistema sugere uma observação para a clínica. Aqui você muda o texto e define se ela já vem <b>marcada</b>. Em qualquer caso, ela só entra na resposta se estiver marcada (a marcação pode ser mudada em cada atendimento).</p>
     <p class="dica">Campos para os itens: <code>{CODIGO}</code>, <code>{QTD_PEDIDO}</code>, <code>{QTD_SISTEMA}</code> e <code>{STATUS}</code>.</p>
     <h3>Itens</h3>${Object.entries(OBS_AUTO).filter(([, v]) => v.itens).map(linha).join('')}
     <h3>Campos da guia</h3>${Object.entries(OBS_AUTO).filter(([, v]) => !v.itens).map(linha).join('')}
@@ -3971,7 +3978,7 @@ function cfgPrefs() {
   return `<div class="card">${cabSecao('Preferências operacionais')}
     <div class="stack">
       <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência da grade antes de finalizar (pelos prints ou, sem prints, a conferência cega)</b></span></label>
-      <label class="switch"><input type="checkbox" data-cfg="preferencias.guardarPrints" ${p.guardarPrints !== false ? 'checked' : ''}><span><b>Guardar os prints e o que foi lido no histórico de cada guia</b> (pasta compartilhada › auditoria). Usado em “Histórico” do Painel e em Ações › Auditar. Contém dados do paciente.</span></label>
+      <label class="switch"><input type="checkbox" data-cfg="preferencias.guardarPrints" ${p.guardarPrints !== false ? 'checked' : ''}><span><b>Guardar os prints e o que foi lido no histórico de cada guia</b> (pasta compartilhada › auditoria). Usado em “Histórico” do Painel e em Ações › Auditar. Contém dados do beneficiário.</span></label>
       <div style="max-width:300px"><label class="lbl" for="pAcoes">Limpar da aba Ações após (minutos sem movimento; 0 = não limpar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
@@ -4495,7 +4502,7 @@ function nomeConfere(ped, lido) {
 }
 const prefixo = (a, b) => { a = limparNome(a).replace(/ /g, ''); b = limparNome(b).replace(/ /g, ''); return a.length >= 8 && b.length >= 8 && (a.startsWith(b) || b.startsWith(a)); };
 const ST_ROT = { L: 'Liberada', C: 'Cancelada', N: 'Negada', A: 'Aberta', '?': 'status não reconhecido' };
-const ROT_PRINT = { profissional: 'Médico solicitante', registro: 'Registro do médico (CRM)', dtSolic: 'Data da solicitação', guia: 'Nº da guia', paciente: 'Nome do paciente', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
+const ROT_PRINT = { profissional: 'Médico solicitante', registro: 'Registro do médico (CRM)', dtSolic: 'Data da solicitação', guia: 'Nº da guia', paciente: 'Nome do beneficiário', credNome: 'Credenciado executante', ident: 'Carteira (identificação)', cid: 'CID' };
 
 function avaliarPrints(g) {
   const mem = PRINTS_MEM.get(g.id); if (!mem) return null;
@@ -4504,7 +4511,7 @@ function avaliarPrints(g) {
   const p = g.pedido, C = [];
   const add = (k, ped, lido, st, nota = '') => {
     const conhecida = (st === 'bad' || st === 'warn') && Apr.leituraConhecida(k, lido, ped);   // o mesmo erro de leitura já foi confirmado por um operador
-    if (conhecida) { st = 'warn'; nota = `Esta mesma leitura ("${lido}" no lugar de "${ped}") já foi confirmada ${conhecida.n} vez(es) como erro de leitura: confira a imagem.`; }
+    if (conhecida) { st = 'warn'; nota = `Esta mesma leitura ("${lido}" no lugar de "${ped}") já foi confirmada ${pl(conhecida.n, 'vez', 'vezes')} como erro de leitura: confira a imagem.`; }
     C.push({ k, rot: ROT_PRINT[k], ped, lido, st, nota });   // st: ok | warn | bad | info
   };
   if (campos.guia) {
@@ -4558,8 +4565,8 @@ function avaliarPrints(g) {
   const temProc = mem.leituras.some(l => l.tipo === 'proc'), temGuia = mem.leituras.some(l => l.tipo === 'guia');
   const faltam = linhas.filter(l => l.nota === 'Não aparece nos prints.').length, sobram = linhas.filter(l => l.nota.startsWith('Está')).length, qtdDif = linhas.filter(l => l.nota === 'Quantidade diferente.').length;
   const avisos = [];
-  if (!temGuia) avisos.push('Falta o print da aba "Dados da Guia".');
-  if (!temProc) avisos.push('Falta o print da aba "Procedimentos".');
+  if (!temGuia) avisos.push('Falta o print da aba Dados da Guia: abra essa aba no sistema e cole (ou capture) o print.');
+  if (!temProc) avisos.push('Falta o print da aba Procedimentos: abra essa aba no sistema e cole (ou capture) o print.');
   const maxLin = Math.min(...mem.leituras.filter(l => l.tipo === 'proc').map(l => l.maxLinhas || 6));
   if (temProc && faltam && sis.length >= maxLin) avisos.push('A grade mostra só ' + maxLin + ' itens por vez: se há mais, envie outro print com a barra de rolagem no fim da lista.');
   const ign = (g.prints && g.prints.ign) || {};
@@ -4577,7 +4584,7 @@ function resumoPrints(av, ign) {
   return { em: agora(), ok: av.ok, completo: av.completo, itens: av.nSistema, ign: ign || {}, ressalvas: av.ressalvas,
     divergencias: [...av.checks.filter(c => c.sit === 'bad' || c.sit === 'warn').map(c => c.rot + (c.sit === 'bad' ? ': diverge' : ': conferir')), ...av.linhas.filter(l => l.sit !== 'ok' && l.sit !== 'ign').map(l => `${l.codigo}: ${l.nota}`)] };
 }
-/* texto que vai para as observações adicionais da resposta ao prestador (sem nome, CID ou carteira) */
+/* texto que vai para as observações adicionais da resposta à clínica (sem nome, CID ou carteira) */
 function linhaIgnorada(x) {
   let key, t = 'ign';
   if (x.chave.startsWith('i:')) {
@@ -4623,9 +4630,12 @@ async function processarPrints(files) {
       if (r.erro) { erros.push(r.erro); evento(g, 'print-erro', `${f.name || 'print'}: ${r.erro}`); continue; }
       evento(g, 'print', `${r.tipo === 'guia' ? 'Dados da Guia' : 'Procedimentos'} (${SISTEMAS_PRINT[sistemaPrint()]})${r.tipo === 'proc' ? ': ' + r.itens.map(i => `${i.codigo} × ${i.qtd ?? '?'}`).join(', ') : ''}`);
       if (r.tipo === 'guia') { const i = mem.leituras.findIndex(l => l.tipo === 'guia'); if (i >= 0) mem.leituras.splice(i, 1); }
+      const ABA_N = { guia: 'Dados da Guia', proc: 'Procedimentos' }, outraAba = r.tipo === 'guia' ? 'proc' : 'guia';
+      if (mem.leituras.some(l => l.tipo === r.tipo) && !mem.leituras.some(l => l.tipo === outraAba) && files.length === 1)
+        erros.push(`Este print é de novo da aba ${ABA_N[r.tipo]}. Falta a aba ${ABA_N[outraAba]}: abra-a no sistema e capture (ou cole) de novo.`);
       mem.leituras.push(r); mem.sistema = sistemaPrint();
       if (cfg.preferencias.guardarPrints !== false) { mem.imagens = mem.imagens || []; mem.imagens.push({ tipo: r.tipo, nome: f.name || 'print colado', em: agora(), img: await jpegDoPrint(f) }); }   // para o histórico da guia
-    } catch (e) { console.error(e); erros.push(e.message || 'Falha ao ler a imagem.'); }
+    } catch (e) { console.error(e); erros.push(e.message || 'Não consegui ler esta imagem. Tire o print de novo (a janela inteira do sistema) e cole aqui.'); }
   }
   msg('');
   aplicarPrints(g);
@@ -4642,14 +4652,14 @@ function htmlCartaoPrints(g) {
     : res ? `<span class="tag ${res.ok ? 'ok' : 'warn'}">${ic(res.ok ? 'check' : 'alert', 'sm')}${res.ok ? 'Conferido pelos prints' + (nIgn ? ' (com ressalva)' : '') : 'Prints com divergência'} em ${fmtHora(res.em)}</span>` : (cegaExigida() ? '<span class="tag warn">Obrigatório</span>' : '<span class="tag">Opcional</span>');
   const st = { ok: ['ok', 'check', 'Confere'], warn: ['warn', 'alert', 'Conferir'], bad: ['bad', 'x', 'Diverge'], info: ['', 'info', 'Sem base'] };
   const tg = x => {
-    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.leitura ? 'Erro de leitura' : x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span>${x.ign.motivo ? `<div class="dica" style="margin:4px 0 0">Motivo: ${esc(x.ign.motivo.texto)}${x.ign.motivo.detalhe ? ' — ' + esc(x.ign.motivo.detalhe) : ''}</div>` : ''} <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer</button>
-      <label class="chk" style="margin-top:6px"><input type="checkbox" data-obsp="${esc(x.chave)}" ${x.ign.on !== false ? 'checked' : ''}><span>Incluir na observação ao prestador<br><span class="muted" style="font-size:var(--fs-sm)">${esc(x.ign.linha)}</span></span></label>`;
+    if (x.ign) return `<span class="tag obs">${ic('alert', 'sm')}${x.ign.leitura ? 'Erro de leitura' : x.ign.t === 'menor' ? 'Autorizado a menor' : 'Ignorado'}</span>${x.ign.motivo ? `<div class="dica" style="margin:4px 0 0">Motivo: ${esc(x.ign.motivo.texto)}${x.ign.motivo.detalhe ? ' — ' + esc(x.ign.motivo.detalhe) : ''}</div>` : ''} <button class="btn sm ghost" data-act="desfazerPrint" data-key="${esc(x.chave)}">${ic('undo', 'sm')}Desfazer aceite</button>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" data-obsp="${esc(x.chave)}" ${x.ign.on !== false ? 'checked' : ''}><span>Incluir na observação à clínica<br><span class="muted" style="font-size:var(--fs-sm)">${esc(x.ign.linha)}</span></span></label>`;
     const [c, i, t] = st[x.st];
-    return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>` + (x.st === 'bad' || x.st === 'warn' ? ` <button class="btn sm line" data-act="ignorarPrint" data-key="${esc(x.chave)}" title="Aceita esta divergência, gera a observação para o prestador e deixa continuar">${ic('shield', 'sm')}Ignorar</button>` : '');
+    return `<span class="tag ${c}">${ic(i, 'sm')}${t}</span>` + (x.st === 'bad' || x.st === 'warn' ? ` <button class="btn sm line" data-act="ignorarPrint" data-key="${esc(x.chave)}" title="Aceita esta divergência, gera a observação para a clínica e deixa continuar">${ic('shield', 'sm')}Ignorar</button>` : '');
   };
   const corpo = av ? `
     ${av.avisos.map(a => `<div class="aviso" style="margin:8px 0">${ic('info')}<div>${esc(a)}</div></div>`).join('')}
-    ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${av.ressalvas} divergência(s) ignorada(s).</b> Marque, em cada uma, se quer incluir a observação para o prestador (vai para as <b>observações adicionais</b>, etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
+    ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${pl(av.ressalvas, 'divergência ignorada', 'divergências ignoradas')}.</b> Marque, em cada uma, se quer incluir a observação para a clínica (vai para as <b>observações adicionais</b>, etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Campo</th><th>Pedido</th><th>Lido no print</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
       ${av.checks.map(c => `<tr class="r-${c.ign ? 'ign' : c.st}"><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
     </tbody></table></div>
@@ -4693,7 +4703,7 @@ const webmailParaEmail = m => emailDeWebmail({
   plain: m.plain, html: m.html, data: m.data, datas: m.datas, anexos: m.anexos
 });
 async function abrirDoWebmail(m) {
-  let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail.', 'bad'); return; }
+  let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return; }
   if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return; }
   if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return; }
   if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return;
@@ -4719,7 +4729,7 @@ function finalizarAtendimento(texto) {
   if (texto) { ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido); }
   S = null; persistir(); render(); window.scrollTo(0, 0); toast('Registrado.');
 }
-function resumoUltimo(g) { const cl = clinicaDe(S); if (g.semGuia) return `Sem guia gerada (${nomeModelo(g.semGuia)}) · ${cl ? cl.nome : S.email.remetente.email}`; return `${g.numero || 'sem número'} — ${SIT_ROTULO[g.resultado.situacao] || STATUS[g.status]} · ${g.pedido.itens.length} item(ns), ${cl ? cl.nome : S.email.remetente.email}`; }
+function resumoUltimo(g) { const cl = clinicaDe(S); if (g.semGuia) return `Sem guia gerada (${nomeModelo(g.semGuia)}) · ${cl ? cl.nome : S.email.remetente.email}`; return `${g.numero || 'sem número'} — ${SIT_ROTULO[g.resultado.situacao] || STATUS[g.status]} · ${pl(g.pedido.itens.length, 'item', 'itens')}, ${cl ? cl.nome : S.email.remetente.email}`; }
 async function depoisDeGuiaTratada(g, texto) {
   ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido);
   if (S.guias.length === 1) { finalizarAtendimento(texto); return; }
@@ -4814,8 +4824,8 @@ const acoes = {
   irVista(b) {
     const v = +b.dataset.v, g = guiaAtiva(), st = situacaoGuia(g);
     if (g.semGuia && g.status !== 'concluido' && v >= 2 && v !== 4) { acoes.desfazerSemGuia(); return; }
-    if (v === 3 && !st.pode) { toast('Resolva os bloqueios antes de seguir.', 'bad'); return; }
-    if (v === 4 && g.status !== 'concluido' && !podeFinal(g, st)) { toast('Conclua a conferência antes de finalizar.', 'bad'); return; }
+    if (v === 3 && !st.pode) { toast('Há bloqueios na etapa 2: corrija os dados apontados nos alertas ou responda à clínica sem gerar a guia.', 'bad'); return; }
+    if (v === 4 && g.status !== 'concluido' && !podeFinal(g, st)) { toast('Falta conferir a grade: cole os prints do sistema (ou faça a conferência sem prints) na etapa 3.', 'bad'); return; }
     if (v >= 3 && g.status !== 'concluido') gravarGuia(g, g.status);
     mudarVista(v);
   },
@@ -4831,7 +4841,7 @@ const acoes = {
     const prox = S.guias.findIndex(x => !guiaTerminal(x));
     if (prox >= 0) { S.ativa = prox; mudarVista(Math.max(2, S.guias[prox].vista || 2)); } else mudarVista(1);
   },
-  encerrar() { finalizarAtendimento(S.guias.length > 1 ? `${S.guias.filter(g => g.status === 'concluido').length} guia(s) concluída(s) — ${clinicaDe(S) ? clinicaDe(S).nome : S.email.remetente.email}` : resumoUltimo(S.guias[0])); },
+  encerrar() { finalizarAtendimento(S.guias.length > 1 ? `${pl(S.guias.filter(g => g.status === 'concluido').length, 'guia concluída', 'guias concluídas')} — ${clinicaDe(S) ? clinicaDe(S).nome : S.email.remetente.email}` : resumoUltimo(S.guias[0])); },
 
   /* ---- clínica do remetente ---- */
   async vincularClinica() {
@@ -4912,14 +4922,14 @@ const acoes = {
   /* ---- etapa 3: cópia de campos e itens ---- */
   async copiarCampo(b) {
     const g = guiaAtiva(), campo = b.dataset.campo, el = $('#' + b.dataset.ref), v = (el ? el.value : '').trim();
-    if (!v) { toast('O campo está vazio: não há nada para copiar.', 'bad'); return; }
-    if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!v) { toast('O campo está vazio: preencha-o antes de copiar.', 'bad'); return; }
+    if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados[campo] = v; persistir(); estadoCopiaBtn(b, true); toast('Copiado: ' + v);
   },
   async copiarItem(b) {
     const g = guiaAtiva(), it = g.pedido.itens.find(x => x.codigo === b.dataset.codigo); if (!it) return;
     const v = b.dataset.tipo === 'c' ? it.codigo : String(it.qtd);
-    if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados[b.dataset.tipo + ':' + it.codigo] = v; persistir(); estadoCopiaBtn(b, true); toast('Copiado: ' + v);
   },
   iniciarCega() { const g = guiaAtiva(); g.cega.iniciada = true; g.cega.tentativas = Math.max(1, g.cega.tentativas); persistir(); render(); $('#cegaN')?.focus(); },
@@ -4939,13 +4949,13 @@ const acoes = {
   setSit(b) { const g = guiaAtiva(), r = g.resultado; r.situacao = b.dataset.v; if (r.situacao !== 'parcial') r.naoAut = {}; if (r.situacao === 'nao') glosaDe(g).itens = {}; g.respEdit = null; persistir(); render(); },
   async copiarEmail(b) {
     const g = guiaAtiva(), v = $('#emailPrest').value.trim();
-    if (!emailValido(v)) { toast('Informe um e-mail de prestador válido para copiar.', 'bad'); return; }
-    if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!emailValido(v)) { toast('Informe um e-mail da clínica válido para copiar.', 'bad'); return; }
+    if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.email = v; persistir(); estadoCopiaBtn(b, true); toast('E-mail copiado: ' + v);
   },
   async copiarObs(b) {
     const g = guiaAtiva(), v = $('#txtObs').value;
-    if (!(await copiar(v))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.obs = v; persistir(); estadoCopiaBtn(b, true); toast('Observação copiada (texto simples).');
   },
   resetObs() { const g = guiaAtiva(); g.obsEdit = null; g.obsExtras = []; g.obsInc = []; persistir(); render(); },
@@ -4963,13 +4973,13 @@ const acoes = {
     const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
     const r = await copiarRico(htmlParaEmail(html), texto);
-    if (!r) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
   },
   async copiarRespSimples() {
     const g = guiaAtiva(), texto = htmlPlano(serializarEditor($('#edResp')));
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
-    if (!(await copiar(texto))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!(await copiar(texto))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast('Resposta copiada como texto simples.');
   },
   resetResp() { const g = guiaAtiva(); g.respEdit = null; g.respExtras = []; g.respInc = []; persistir(); render(); },
@@ -4994,7 +5004,7 @@ const acoes = {
     const html = serializarEditor($('#edModal')), texto = htmlPlano(html);
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
-    const r = await copiarRico(htmlParaEmail(html), texto); if (!r) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    const r = await copiarRico(htmlParaEmail(html), texto); if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} ${r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples (o navegador não permitiu formatação).'}`; toast(r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples.');
   },
@@ -5002,7 +5012,7 @@ const acoes = {
     const texto = htmlPlano(serializarEditor($('#edModal')));
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
-    if (!(await copiar(texto))) { toast('Não foi possível copiar. Tente novamente.', 'bad'); return; }
+    if (!(await copiar(texto))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} Copiado como texto simples.`; toast('Copiado como texto simples.');
   },
@@ -5064,7 +5074,7 @@ const acoes = {
   cfgSecao(b) { cfgSecao = b.dataset.s; render(); },
   async salvarCfg() {
     prepararSalvar(cfgEdit); cfgErros = validarCfg(cfgEdit);
-    if (cfgErros.length) { await render(); window.scrollTo(0, 0); toast(`${cfgErros.length} problema(s) encontrado(s). Nada foi salvo.`, 'bad'); return; }
+    if (cfgErros.length) { await render(); window.scrollTo(0, 0); toast(`${pl(cfgErros.length, 'problema encontrado', 'problemas encontrados')}. Nada foi salvo.`, 'bad'); return; }
     try {
       await mesclarOperadoresDaPasta(cfgEdit);
       await salvarConfig(cfgEdit); iniciarCfgEdit(); await render();
@@ -5081,7 +5091,7 @@ const acoes = {
     await Reg.carregar(Math.max(0, dias - HIST_DIAS) + 1);
     const regs = Reg.cache.filter(r => !r.tipo && r.dia >= ini && r.dia <= fim && r.status !== 'descartado' && r.status !== 'devolvido').sort((a, b) => (a.abertoEm < b.abertoEm ? -1 : 1));
     if (!regs.length) { toast('Nenhum registro no período informado.', 'bad'); return; }
-    baixar(nomeArquivo('Registros_' + diaBR(ini).replace(/\//g, '-') + '_a', fim, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8'); toast(`${regs.length} linha(s) exportada(s).`);
+    baixar(nomeArquivo('Registros_' + diaBR(ini).replace(/\//g, '-') + '_a', fim, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8'); toast(`${pl(regs.length, 'linha exportada', 'linhas exportadas')}.`);
   },
   async limparAntigos() {
     if (!confirm('Apagar registros com mais de 180 dias (pasta compartilhada e este computador)?')) return;
@@ -5141,7 +5151,7 @@ const acoes = {
   codImportarOk() {
     const cl = cfgEdit.clinicas[M.i], atualizar = $('#impAtualizar').checked; let add = 0, upd = 0;
     $('#impTxt').value.split('\n').forEach(l => { const m = l.match(/(?<!\d)(\d{8})(?!\d)\s*[-–—:;\t]?\s*(.*)$/); if (!m) return; const ex = cl._lista.find(x => x.c.trim() === m[1]); if (ex) { if (atualizar && m[2].trim() && ex.d !== m[2].trim()) { ex.d = m[2].trim(); upd++; } } else { cl._lista.push({ c: m[1], d: m[2].trim() }); add++; } });
-    cl._lista.sort((a, b) => a.c < b.c ? -1 : 1); fecharModal(true); if (add || upd) marcarSujo(); render(); toast(`${add} código(s) adicionado(s), ${upd} atualizado(s). Salve para gravar.`);
+    cl._lista.sort((a, b) => a.c < b.c ? -1 : 1); fecharModal(true); if (add || upd) marcarSujo(); render(); toast(`${pl(add, 'código adicionado', 'códigos adicionados')}, ${pl(upd, 'atualizado', 'atualizados')}. Salve para gravar.`);
   },
   async codSugerir(b) {
     const i = +b.dataset.i, cl = cfgEdit.clinicas[i]; await Reg.carregar(60);
@@ -5156,7 +5166,7 @@ const acoes = {
   codSugerirOk() {
     const cl = cfgEdit.clinicas[M.i]; let n = 0;
     $$('[data-sg]').forEach(ch => { if (ch.checked) { const [c, d] = M.cands[+ch.dataset.sg]; cl._lista.push({ c, d }); n++; } });
-    cl._lista.sort((a, b) => a.c < b.c ? -1 : 1); fecharModal(true); if (n) marcarSujo(); render(); toast(`${n} código(s) adicionado(s). Salve para gravar.`);
+    cl._lista.sort((a, b) => a.c < b.c ? -1 : 1); fecharModal(true); if (n) marcarSujo(); render(); toast(`${pl(n, 'código adicionado', 'códigos adicionados')}. Salve para gravar.`);
   },
   /* ---- modelos ---- */
   modeloSel(b) { cfgModeloSel[b.dataset.c] = b.dataset.k; render(); },
@@ -5446,28 +5456,28 @@ function htmlTestePrint(t) {
 }
 function htmlTesteEmail(t) {
   const e = t.email;
-  return `<div class="card"><div class="card-h"><h2>${ic('mail')} ${esc(t.nome)}</h2><span class="tag">${t.blocos.length} pedido(s) lido(s)</span>${t.clinica ? `<span class="tag">${ic('building', 'sm')}${esc(t.clinica)}</span>` : '<span class="tag warn">remetente fora do cadastro (sem regras)</span>'}<span class="esp"></span><button class="btn sm line" data-act="tstReler" data-id="${t.id}" title="Lê de novo com as regras atuais da clínica (inclusive as ainda não salvas)">${ic('refresh', 'sm')}Ler de novo</button><button class="btn sm line" data-act="tstRemover" data-tipo="e" data-id="${t.id}">${ic('trash', 'sm')}Remover teste</button></div>
+  return `<div class="card"><div class="card-h"><h2>${ic('mail')} ${esc(t.nome)}</h2><span class="tag">${pl(t.blocos.length, 'pedido lido', 'pedidos lidos')}</span>${t.clinica ? `<span class="tag">${ic('building', 'sm')}${esc(t.clinica)}</span>` : '<span class="tag warn">remetente fora do cadastro (sem regras)</span>'}<span class="esp"></span><button class="btn sm line" data-act="tstReler" data-id="${t.id}" title="Lê de novo com as regras atuais da clínica (inclusive as ainda não salvas)">${ic('refresh', 'sm')}Ler de novo</button><button class="btn sm line" data-act="tstRemover" data-tipo="e" data-id="${t.id}">${ic('trash', 'sm')}Remover teste</button></div>
     <details style="margin-bottom:10px"><summary class="muted">Ver o texto que o leitor recebeu</summary><pre class="original">${esc(e.textoPrincipal)}</pre></details>
     ${t.blocos.map(b => `<h3 style="margin:10px 0 6px">Pedido ${b.n}${t.blocos.length > 1 ? ` de ${t.blocos.length}` : ''}</h3>
       <div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Lido</th><th>Correto (corrija se estiver errado)</th><th></th></tr></thead><tbody>
       ${b.campos.map(c => htmlTesteCampo('e', t.id + ':' + b.n, c)).join('')}</tbody></table></div>
       ${b.regras && b.regras.length ? `<div class="al info" style="margin-top:6px"><span>${ic('info', 'sm')}</span><div class="tx"><b>Regras da clínica aplicadas:</b><br>${b.regras.map(esc).join('<br>')}</div></div>` : ''}
       ${b.soltos.length || b.invalidos.length ? `<p class="dica" style="margin-top:6px">Números que não viraram item: ${esc([...b.soltos, ...b.invalidos].join(', '))}</p>` : ''}`).join('')}
-    <label class="lbl" style="margin-top:10px">Observação (ex.: faltou um paciente inteiro, juntou dois pedidos)</label><textarea rows="2" data-teste="e:${t.id}:obs">${esc(t.obs)}</textarea></div>`;
+    <label class="lbl" style="margin-top:10px">Observação (ex.: faltou um beneficiário inteiro, juntou dois pedidos)</label><textarea rows="2" data-teste="e:${t.id}:obs">${esc(t.obs)}</textarea></div>`;
 }
 function cfgTestes() {
   const nP = TESTE.prints.length, nE = TESTE.emails.length;
   const erros = contarErrosTeste();
   return `<div class="card">${cabSecao('Testar leitura')}
     <p class="dica">Teste aqui os leitores de print e de e-mail sem abrir um atendimento. Na coluna <b>Correto</b>, corrija o que saiu errado. Depois baixe o registro e envie ao suporte: com vários registros juntos dá para ajustar os leitores. Nada daqui é salvo na pasta nem fica no navegador ao recarregar a página.</p>
-    <div class="aviso" style="margin-top:8px">${ic('shield')}<div>O registro pode conter dados de pacientes (nome, carteira, recortes da imagem, texto do e-mail). Envie só por canal interno e apague depois.</div></div>
+    <div class="aviso" style="margin-top:8px">${ic('shield')}<div>O registro pode conter dados de beneficiários (nome, carteira, recortes da imagem, texto do e-mail). Envie só por canal interno e apague depois.</div></div>
     <div class="form-grid" style="margin-top:12px">
       <label class="chk"><input type="checkbox" data-tst-op="recortes" ${TESTE.recortes ? 'checked' : ''}>Incluir recortes da imagem dos campos errados</label>
       <label class="chk"><input type="checkbox" data-tst-op="imagem" ${TESTE.imagem ? 'checked' : ''}>Incluir o print inteiro (ajuda muito quando a tela não é reconhecida)</label>
       <label class="chk"><input type="checkbox" data-tst-op="texto" ${TESTE.texto ? 'checked' : ''}>Incluir o texto do e-mail (necessário para ajustar o leitor de e-mail)</label>
       <label class="chk"><input type="checkbox" data-tst-op="anonimo" ${TESTE.anonimo ? 'checked' : ''}>Trocar nomes e carteiras do e-mail por letras e números fictícios</label>
     </div>
-    <div class="acoes"><span class="tag ${erros ? 'bad' : ''}">${nP} print(s) · ${nE} e-mail(s) · ${erros} campo(s) marcado(s) como errado(s)</span><span class="esp"></span>
+    <div class="acoes"><span class="tag ${erros ? 'bad' : ''}">${pl(nP, 'print', 'prints')} · ${pl(nE, 'e-mail', 'e-mails')} · ${pl(erros, 'campo marcado', 'campos marcados')} como errado(s)</span><span class="esp"></span>
       <button class="btn" data-act="tstCopiar" ${nP + nE ? '' : 'disabled'}>${ic('copy')}Copiar resumo</button>
       <button class="btn pri" data-act="tstBaixar" ${nP + nE ? '' : 'disabled'}>${ic('download')}Baixar registro (.json)</button>
       <button class="btn line" data-act="tstLimpar" ${nP + nE ? '' : 'disabled'}>${ic('x')}Limpar testes</button></div></div>
@@ -5545,7 +5555,7 @@ function resumoTeste() {
   });
   const an = TESTE.anonimo ? anonimizador() : (x => x);
   TESTE.emails.forEach(t => {
-    L.push(`\nE-MAIL ${t.nome} (${t.blocos.length} pedido(s))`); let algum = false;
+    L.push(`\nE-MAIL ${t.nome} (${pl(t.blocos.length, 'pedido', 'pedidos')})`); let algum = false;
     t.blocos.forEach(b => b.campos.filter(c => !certoT(c)).forEach(c => { algum = true; L.push(`  pedido ${b.n} · ${c.rot}: lido "${an(c.lido).replace(/\n/g, '; ')}" | correto "${an(c.correto).replace(/\n/g, '; ')}"`); }));
     if (t.obs) { algum = true; L.push(`  obs: ${an(t.obs)}`); }
     if (!algum) L.push('  tudo certo');
@@ -5660,7 +5670,7 @@ function planoImportClinicas(texto, base) {
 function htmlPrevImport(plano) {
   if (!plano.length) return '<p class="muted">Nenhuma clínica reconhecida no texto.</p>';
   const n = k => plano.filter(p => p.acao === k).length;
-  return `<p style="margin:10px 0 6px"><span class="tag ok">${n('nova')} nova(s)</span> <span class="tag info">${n('atualizar')} a atualizar</span> <span class="tag">${n('igual')} já cadastrada(s), sem mudança</span></p>
+  return `<p style="margin:10px 0 6px"><span class="tag ok">${pl(n('nova'), 'nova', 'novas')}</span> <span class="tag info">${n('atualizar')} a atualizar</span> <span class="tag">${n('igual') === 1 ? '1 já cadastrada' : n('igual') + ' já cadastradas'}, sem mudança</span></p>
   <div class="tabela-scroll" style="max-height:42vh"><table class="t"><thead><tr><th>Ação</th><th>Clínica</th><th>Cidade</th><th>E-mails</th></tr></thead><tbody>
   ${plano.map(p => `<tr><td>${p.acao === 'nova' ? '<span class="tag ok">Nova</span>' : p.acao === 'atualizar' ? '<span class="tag info">Atualizar</span>' : '<span class="tag">Sem mudança</span>'}</td>
     <td class="pri">${esc(p.nome)}${p.nomeAtual && p.nomeAtual !== p.nome ? `<br><span class="muted" style="font-weight:400">no cadastro: ${esc(p.nomeAtual)}</span>` : ''}</td>
@@ -5687,7 +5697,7 @@ Object.assign(acoes, {
       else if (p.acao === 'atualizar') { const c = cfgEdit.clinicas[p.alvo]; c.emails = unicos([...c.emails, ...p.novos]); if (p.cidadeNova) c.cidade = p.cidadeNova; atu++; }
     });
     fecharModal(true); if (nov || atu) marcarSujo(); render();
-    toast(`${nov} clínica(s) nova(s), ${atu} atualizada(s). Confira e clique em Salvar configurações.`);
+    toast(`${pl(nov, 'clínica nova', 'clínicas novas')}, ${pl(atu, 'atualizada', 'atualizadas')}. Confira e clique em Salvar configurações.`);
   }
 });
 
@@ -5772,17 +5782,17 @@ function htmlHistoricoGuia(r, a) {
       ${P.itens.map(l => `<tr><td>Item ${esc(l.codigo)}</td><td class="num">${l.qtdPedido ?? '—'}</td><td class="num"><b>${l.qtdSistema ?? '—'}</b>${l.status ? ` <span class="muted">${esc(ST_ROT[l.status] || l.status)}</span>` : ''}</td><td>${l.recorte ? `<img class="mini" src="${l.recorte}" alt="">` : ''}</td><td>${tagSit(l.resultado)}${l.nota && !l.ignorado ? `<div class="dica">${esc(l.nota)}</div>` : ''}${ign(l.ignorado)}</td></tr>`).join('')}
       </tbody></table></div>
       ${P.imagens && P.imagens.length ? `<h3 style="margin-top:12px">Prints enviados (${P.imagens.length})</h3><div class="prints-hist">${P.imagens.map(x => `<figure><figcaption>${esc(x.tipo === 'guia' ? 'Dados da Guia' : x.tipo === 'proc' ? 'Procedimentos' : 'Print')} · ${fmtHora(x.em)}</figcaption><a href="${x.img}" target="_blank" rel="noopener" title="Abrir em tamanho real"><img src="${x.img}" alt="Print enviado"></a></figure>`).join('')}</div>` : '<p class="dica">Os prints não foram guardados (opção desligada em Preferências).</p>'}`
-      : (r.conferencia && r.conferencia.prints ? `<p class="dica">${r.conferencia.prints.ok ? 'Conferido pelos prints' : 'Prints com divergência'} em ${fmtDH(r.conferencia.prints.em)}</p>${(r.conferencia.prints.divergencias || []).map(d => `<div class="dica">• ${esc(d)}</div>`).join('')}` : a && a.cega ? `<p class="dica">Conferência manual (cega): ${a.cega.ok ? 'concluída' : 'não concluída'}, ${a.cega.tentativas} tentativa(s).</p>` : '<p class="dica">Sem conferência pelos prints.</p>')}
-    ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length} correção(ões) e aceite(s))</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
+      : (r.conferencia && r.conferencia.prints ? `<p class="dica">${r.conferencia.prints.ok ? 'Conferido pelos prints' : 'Prints com divergência'} em ${fmtDH(r.conferencia.prints.em)}</p>${(r.conferencia.prints.divergencias || []).map(d => `<div class="dica">• ${esc(d)}</div>`).join('')}` : a && a.cega ? `<p class="dica">Conferência manual (cega): ${a.cega.ok ? 'concluída' : 'não concluída'}, ${pl(a.cega.tentativas, 'tentativa', 'tentativas')}.</p>` : '<p class="dica">Sem conferência pelos prints.</p>')}
+    ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${pl(a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length, 'correção', 'correções')} e aceite(s))</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
     ${a && a.copiados.length ? `<h3 style="margin-top:16px">Copiado para o sistema</h3><div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Valor copiado</th></tr></thead><tbody>${a.copiados.map(c => `<tr><td>${esc(c.campo)}</td><td class="num">${esc(c.valor)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <h3 style="margin-top:16px">Alertas</h3>
     ${(a ? a.alertas : [...(r.bloqueios || []).map(t => ({ modo: 'bloqueio', texto: t })), ...(r.alertas || []).map(x => ({ modo: x.m, texto: x.t, conferido: x.c }))]).map(x => `<div class="dica">• <b>${esc(TAG_MODO[x.modo] ? TAG_MODO[x.modo][2] : x.modo)}:</b> ${esc(x.texto)}${x.conferido ? ' <span class="tag ok">conferido</span>' : ''}</div>`).join('') || '<p class="dica">Nenhum alerta.</p>'}
     ${a && (a.resultado.obsAdicionais || a.resultado.motivo || a.resultado.semGuia) ? `<h3 style="margin-top:16px">Resposta</h3><dl class="email-meta">${linha('Sem guia', esc(a.resultado.semGuia))}${linha('Motivo', esc(a.resultado.motivo))}${linha('Observações adicionais', `<span style="white-space:pre-wrap">${esc(a.resultado.obsAdicionais)}</span>`)}</dl>` : ''}`;
 }
 async function abrirHistoricoGuia(id) {
-  const r = Reg.todos[id] || Reg.cache.find(x => x.id === id); if (!r) { toast('Registro não encontrado.', 'bad'); return; }
+  const r = Reg.todos[id] || Reg.cache.find(x => x.id === id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }
   const a = await Aud.ler(r);
-  abrirModal({ titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Paciente'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
+  abrirModal({ titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Beneficiário'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
     rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button>` });
 }
 /* ---------- Auditar (aba Ações): busca em todos os registros ---------- */
@@ -5790,14 +5800,14 @@ let AUD_BUSCA = { q: '', res: null, buscando: false };
 function htmlAuditar() {
   const R = AUD_BUSCA.res;
   return `<div class="card" id="cardAuditar"><div class="card-h"><h2>${ic('search')} Auditar</h2></div>
-    <p class="dica" style="margin:0 0 8px">Busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia (ou, com a caixa marcada e a busca vazia, lista todas as guias com correções). O nome completo só está nos registros feitos a partir desta versão (nos antigos, só as iniciais).</p>
-    <div class="linha-flex"><input type="search" id="audQ" value="${esc(AUD_BUSCA.q)}" placeholder="Ex.: Maria Helena, 800000701023900IE ou T10068052" data-enter="auditarBuscar" style="flex:1;min-width:220px;width:auto" aria-label="Buscar paciente, carteira ou guia">
+    <p class="dica" style="margin:0 0 8px">Busca em todos os dias pelo nome do beneficiário, pela carteira ou pelo número da guia (ou, com a caixa marcada e a busca vazia, lista todas as guias com correções). O nome completo só está nos registros feitos a partir desta versão (nos antigos, só as iniciais).</p>
+    <div class="linha-flex"><input type="search" id="audQ" value="${esc(AUD_BUSCA.q)}" placeholder="Ex.: Maria Helena, 800000701023900IE ou T10068052" data-enter="auditarBuscar" style="flex:1;min-width:220px;width:auto" aria-label="Buscar beneficiário, carteira ou guia">
       <button class="btn pri" data-act="auditarBuscar">${ic('search')}Buscar</button></div>
     <label class="chk" style="margin-top:8px"><input type="checkbox" id="audCorr" ${AUD_BUSCA.soCorr ? 'checked' : ''}><span>Só guias com correções, releituras ou divergências aceitas</span></label>
-    ${AUD_BUSCA.buscando ? '<p class="muted" style="margin-top:8px">Buscando nos registros…</p>' : R ? `<p class="dica" style="margin-top:8px">${R.length} resultado(s)${R.length > 200 ? ' (mostrando os 200 mais recentes)' : ''}.</p>
-    ${R.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Data</th><th>Paciente</th><th>Carteira</th><th>Guia</th><th>Clínica</th><th>Operador</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${R.slice(0, 200).map(r => `<tr><td class="num">${fmtDH(r.concluidoEm || r.abertoEm)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}${r.correcoes ? ` <span class="tag warn" title="Correções, releituras e aceites registrados">${r.correcoes} correção(ões)</span>` : ''}${r.ignorados ? ` <span class="tag obs">${r.ignorados} aceite(s)</span>` : ''}</td><td class="num">${esc(r.carteira || '—')}</td><td class="num"><b>${esc(r.guia || '—')}</b></td><td>${esc(r.clinica || r.remetente || '—')}</td><td>${esc(r.operador || '—')}</td><td>${tagStatus(r.status)} ${tagResultado(resultadoDe(r))}</td>
-        <td class="c"><button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}">${ic('eye', 'sm')}Histórico</button></td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
+    ${AUD_BUSCA.buscando ? '<p class="muted" style="margin-top:8px">Buscando nos registros…</p>' : R ? `<p class="dica" style="margin-top:8px">${pl(R.length, 'resultado', 'resultados')}${R.length > 200 ? ' (mostrando os 200 mais recentes)' : ''}.</p>
+    ${R.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Data</th><th>Beneficiário</th><th>Carteira</th><th>Guia</th><th>Clínica</th><th>Operador</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${R.slice(0, 200).map(r => `<tr><td class="num">${fmtDH(r.concluidoEm || r.abertoEm)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}${r.correcoes ? ` <span class="tag warn" title="Correções, releituras e aceites registrados">${pl(r.correcoes, 'correção', 'correções')}</span>` : ''}${r.ignorados ? ` <span class="tag obs">${pl(r.ignorados, 'aceite', 'aceites')}</span>` : ''}</td><td class="num">${esc(r.carteira || '—')}</td><td class="num"><b>${esc(r.guia || '—')}</b></td><td>${esc(r.clinica || r.remetente || '—')}</td><td>${esc(r.operador || '—')}</td><td>${tagStatus(r.status)} ${tagResultado(resultadoDe(r))}</td>
+        <td class="c"><button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}">${ic('eye', 'sm')}Ver histórico</button></td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
   </div>`;
 }
 function buscarRegistros(q) {
@@ -5934,7 +5944,7 @@ function abrirMotivoIgnorar(g, x) {
 function confirmarIgnorar(g, x, motivo) {
   g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {};
   const ign = { ...linhaIgnorada(x), ...(motivo ? { motivo } : {}) };
-  if (motivo && motivo.tipo === 'leitura') { ign.on = false; ign.leitura = true; }   // erro de leitura: não vai observação ao prestador
+  if (motivo && motivo.tipo === 'leitura') { ign.on = false; ign.leitura = true; }   // erro de leitura: não vai observação à clínica
   g.prints.ign[x.chave] = ign;
   evento(g, 'ignorado', `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"${motivo ? ' — ' + motivo.texto + (motivo.detalhe ? ': ' + motivo.detalhe : '') : ''}`, { chave: x.chave, motivo: motivo || null });
   if (motivo && motivo.tipo === 'leitura') {
@@ -5942,7 +5952,7 @@ function confirmarIgnorar(g, x, motivo) {
     Apr.registrar({ tipo: 'print', campo, lido: x.lido ?? x.qSis ?? '', correto: x.ped ?? x.qPed ?? '', sistema: (PRINTS_MEM.get(g.id) || {}).sistema || '', clinicaId: S.clinicaId, clinica: (clinicaDe(S) || {}).nome || '' });
   }
   aplicarPrints(g); persistir(); render();
-  toast(ign.leitura ? 'Marcado como erro de leitura do print. Sem observação para o prestador.' : ign.on !== false ? 'Divergência aceita: a observação para o prestador foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência aceita.');
+  toast(ign.leitura ? 'Marcado como erro de leitura do print. Sem observação para a clínica.' : ign.on !== false ? 'Divergência aceita: a observação para a clínica foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência aceita.');
 }
 Object.assign(acoes, {
   async ignorarPrint(b) {
@@ -5990,13 +6000,13 @@ Object.assign(acoes, {
     else if (e.campo === 'local') p.local = e.correto;
     else if (e.campo === 'emissao') p.emissao = lerEmissao(e.correto, S.email.data);
     p.aprendidos.splice(+b.dataset.i, 1);
-    evento(g, 'aprendido', `${e.campo}: "${e.lido}" → "${e.correto}" (correção já feita ${e.n} vez(es) nesta clínica).`);
+    evento(g, 'aprendido', `${e.campo}: "${e.lido}" → "${e.correto}" (correção já feita ${pl(e.n, 'vez', 'vezes')} nesta clínica).`);
     persistir(); render(); toast('Correção aplicada. Confira no e-mail.');
   }
 });
 
 /* ---------- Configurações › Aprendizado ---------- */
-const CAMPO_APR = { codigo: 'Código', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data do pedido', paciente: 'Nome do paciente', ident: 'Carteira', guia: 'Nº da guia', credNome: 'Credenciado', profissional: 'Médico (print)', registro: 'CRM (print)', dtSolic: 'Data (print)', item: 'Item' };
+const CAMPO_APR = { codigo: 'Código', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data do pedido', paciente: 'Nome do beneficiário', ident: 'Carteira', guia: 'Nº da guia', credNome: 'Credenciado', profissional: 'Médico (print)', registro: 'CRM (print)', dtSolic: 'Data (print)', item: 'Item' };
 function regraSugerida(e) {
   if (e.tipo !== 'email') return '';
   if (e.campo === 'codigo') return 'troca';
@@ -6080,7 +6090,7 @@ function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
   const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
   return `<div class="mini">
     <div class="mini-h"><div><b>${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''}</div></div><span class="tag ${nFeito >= nCopiar ? 'ok' : ''}">${nFeito}/${nCopiar} copiados</span></div>
-    ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s): resolva no conferidor antes de gerar a guia.</div>` : ''}
+    ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}: resolva no conferidor antes de gerar a guia.</div>` : ''}
     <div class="mini-sec">Para lançar no sistema (clique para copiar)</div>
     <div class="mini-lista">${MINI_CAMPOS.map(([k, r]) => linha(k, r, valorCopia(g, k).trim())).join('')}
       ${p.itens.map(it => `<div class="mini-item">${linha('c:' + it.codigo, 'Código', it.codigo)}${linha('q:' + it.codigo, 'Qtd.', it.qtd == null ? '' : String(it.qtd))}</div>`).join('') || '<p class="muted">Sem serviços.</p>'}</div>
