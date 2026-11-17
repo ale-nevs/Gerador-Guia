@@ -12,8 +12,8 @@ A página **não acessa o sistema da operadora** e **não gera guias**. A guia c
 
 | Lugar | O que fica lá | Contém dados de pacientes? |
 | --- | --- | --- |
-| GitHub e Vercel | `public/index.html`, `public/logo-promedica.png` e `vercel.json`, só o código da página | Não |
-| Pasta compartilhada do Windows | `config.json` (clínicas, modelos, alertas), `parametrizacoes.json` e a pasta `registros/` | Sim, o mínimo: carteira, códigos, guia, operador. Sem nome, CID ou médico |
+| GitHub e Vercel | a pasta `public/` (`index.html`, `css/app.css`, `js/*.js`, `ocr/`, `fonts/`, imagens e a extensão) e `vercel.json`, só o código da página | Não |
+| Pasta compartilhada do Windows | `config.json` (clínicas, modelos, alertas, PIN do supervisor em código), `parametrizacoes.json`, `registros/` (com o nome do beneficiário), `auditoria/` (e-mail, prints e histórico de cada guia), `aprendizado/`, `notas/`, `presenca/` e `relatos/` | Sim: veja a seção 9 |
 | Computador do operador | Nada instalado. O Chrome lembra a pasta, o operador e o tema | Só o pedido em andamento, apagado ao concluir |
 
 > **Nunca envie o `config.json`, e-mails ou registros para o GitHub.** Mantenha o repositório sem esses arquivos (o `.gitignore` já os bloqueia).
@@ -32,7 +32,7 @@ O código da página fica no repositório `ale-nevs/gerador-guia`, no GitHub, e 
 
 **Para publicar uma versão nova:** basta enviar a alteração para a branch de produção do repositório. A Vercel publica sozinha em cerca de 1 minuto. Os operadores atualizam com **Ctrl+F5**. A versão aparece no topo da página, ao lado da data.
 
-**Plano B, sem Vercel:** copie `public/index.html` e `public/logo-promedica.png` para a pasta compartilhada e abra o `index.html` com duplo clique no Chrome. Funciona igual. Se o Chrome não deixar escolher a pasta nesse modo, use a Vercel.
+**Plano B, sem Vercel:** copie a pasta `public/` inteira (o `index.html` usa os arquivos de `css/` e `js/` ao lado dele) para a pasta compartilhada e abra o `index.html` com duplo clique no Chrome. Funciona igual. Se o Chrome não deixar escolher a pasta nesse modo, use a Vercel.
 
 ## 3. Preparar a pasta compartilhada
 
@@ -86,13 +86,13 @@ Nada é enviado nem emitido automaticamente: toda resposta é revisada e copiada
 
 ---
 
-## 6. Aba Ações e Painel do dia
+## 6. Acompanhamento e Painel do dia
 
-A aba **Ações** mostra, em 3 colunas, onde está cada guia aberta hoje (paciente × clínica): **Lendo o pedido**, **Gerando guia** e **Anexando e-mail**. Ao abrir um e-mail, o sistema mostra a **última guia gerada** para a mesma carteira (de qualquer data) e, se for de outra clínica, o nome dela.
+A aba **Acompanhamento** mostra quem está com o Conferidor aberto agora (lido da pasta, atualizado a cada minuto), o **Auditar** e, em 3 colunas, onde está cada guia aberta hoje (paciente × clínica): **Lendo o pedido**, **Gerando guia** e **Anexando e-mail**. Ao abrir um e-mail, o sistema mostra a **última guia gerada** para a mesma carteira (de qualquer data) e, se for de outra clínica, o nome dela.
 
 ### Painel do dia
 
-Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que ainda precisa ser feito em cada guia (com botão para abrir), guias por clínica e a tabela do dia com filtros (status, resultado, clínica, parametrização e busca). **Exportar CSV** respeita os filtros aplicados. Há visualização por **dia** e por **mês**. Em cada guia concluída: **Corrigir guia** (carteira, serviços e quantidades), **Cancelar guia** e **Excluir guia**. Na coluna Observações, ao passar o mouse, aparecem as divergências da conferência, o motivo de guias sem gerar e as glosas retiradas. Continuam disponíveis, na visão por dia, a amostragem do apoio e a conciliação de e-mails e de guias.
+Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que ainda precisa ser feito em cada guia (com botão para abrir), guias por clínica e a tabela do dia com filtros (status, resultado, clínica, parametrização e busca). **Exportar CSV** respeita os filtros aplicados. Há visualização por **dia** e por **mês**. Em cada guia concluída: **Corrigir guia** (carteira, serviços e quantidades), **Cancelar guia** e **Excluir guia**. Na coluna Observações, ao passar o mouse, aparecem as divergências da conferência, o motivo de guias sem gerar e as glosas retiradas. Continuam disponíveis, na visão por dia, a amostragem do apoio (sorteia até 10 guias concluídas para conferência por amostragem) e a conciliação de e-mails e de guias. O cartão **Tempo e qualidade** mostra o tempo médio por operador e por clínica, a porcentagem de e-mails lidos sem correção por clínica (abaixo de 70%, vale criar regra de leitura) e as clínicas que mais geram correção.
 
 ---
 
@@ -102,14 +102,14 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 - Atenção: é uma trava de uso, não segurança forte. O código (hash) fica no `config.json` da pasta compartilhada, e quem tem acesso à pasta pode alterá-lo.
 - Ao salvar, o `config.json` da pasta é regravado, preservando operadores criados ou protegidos por colegas desde que a tela foi aberta. Outras máquinas releem o arquivo ao voltar para a janela.
 
-### Topo compacto e telas estreitas
-- O botão pequeno ao lado de Claro/Escuro oculta o menu de seções e o topo. Fica uma barra fina na cor do operador com o nome, uma luz da pasta (verde conectada, amarela reautorizar, vermelha sem pasta) e o botão para voltar. A escolha fica salva neste computador.
-- No canto esquerdo do topo compacto há uma bolinha por operador com atendimento em andamento (inclusive colegas, lidos da pasta compartilhada e atualizados a cada 20 s): anel na cor e com o animal do operador, 33% lendo o pedido, 66% gerando a guia, 100% anexando e respondendo. Ao passar o mouse aparecem o paciente e a clínica. Sem atendimento, uma bolinha cinza.
-- Botões secundários (copiar, atualizar, corrigir, excluir etc.) mostram só o ícone, com o nome na dica ao passar o mouse. Há um botão de copiar ao lado da carteira usada no sistema.
-- A página foi ajustada para funcionar até 320 px de largura, sem rolagem horizontal.
+### Visualização e densidade
+- No topo, o seletor **Visualização** tem três opções, lembradas por operador neste computador: **Completa** (menu e todos os detalhes), **Simples** (topo compacto e tela única para gerar a guia: bom para monitor pequeno) e **Flutuante** (abre o painel que fica por cima do sistema).
+- No topo compacto há uma bolinha por operador com atendimento em andamento (inclusive colegas, atualizados a cada 20 s): anel na cor e com o animal do operador, 33% lendo o pedido, 66% gerando a guia, 100% anexando e respondendo.
+- Em Configurações › Aparência, **Densidade compacta** reduz alturas e espaços (vale só para você, neste computador).
+- A página funciona até 320 px de largura, sem rolagem horizontal.
 
 ### Extensão do Chrome (botão "Abrir no conferidor")
-No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada". Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
+No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada" (ou **Atualizar extensão**, quando a instalada é mais antiga que a do site). Na versão 1.2.0 o botão mostra se o e-mail já está em atendimento ou já foi atendido, "Abrindo…" e "Aberto: NOME", fica cinza quando o e-mail é fechado (pede confirmação) e, com **Responder no webmail** (etapa 4), cola a resposta pronta no corpo da resposta do webmail; o envio continua sendo feito pelo operador. Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
 
 ### Conferência pelos prints (etapa 3)
 No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de Senhas" do sistema oficial, por OCR no próprio navegador (arquivos em `public/ocr/`, sem IA externa e sem enviar imagens).
@@ -137,7 +137,20 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 ### Histórico da guia e Auditar
 - **Histórico** (Painel do dia, ao lado de Corrigir/Cancelar/Excluir guia): abre o histórico da guia — prints enviados, o que foi lido em cada campo, o que conferiu, o que foi **ignorado** (e se a observação foi incluída), o que foi **copiado** para o sistema, o número da guia (lido do print ou digitado), alertas, pedido lido do e-mail e resposta.
 - O histórico é gravado ao concluir, cancelar, devolver ou descartar a guia, em `auditoria/AAAA-MM/<id>.json` na pasta compartilhada (sem a pasta, só no navegador deste computador). Os prints vão reduzidos (JPEG). Para não guardar prints, desmarque em Configurações › Preferências operacionais.
-- **Ações › Auditar:** busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia e abre o histórico. O nome completo do paciente passou a ficar no registro a partir desta versão; nos registros antigos só há as iniciais (a busca por carteira e guia funciona em todos).
+- **Acompanhamento › Auditar:** busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia e abre o histórico. O nome completo do paciente passou a ficar no registro a partir desta versão; nos registros antigos só há as iniciais (a busca por carteira e guia funciona em todos).
+
+### Novidades da versão 2.1 (organização e prevenção de erros)
+- **Barra fixa no rodapé** em cada etapa: Voltar, o primeiro bloqueio ou pendência (com **ver**, que leva aos alertas) e Seguir/Concluir.
+- **Etapas** com nome fixo e o estado num selo (Agora, Concluída, Pendente, N bloqueios). O **Conferi** dos avisos virou botão.
+- **Etapa 2:** o texto do e-mail fica fixo ao rolar e realça beneficiário, carteira, médico, CID e data nas cores dos campos (passar o mouse no campo acende o trecho). Cada campo tem um ícone de origem: e-mail, regra da clínica, aprendizado, digitado, parametrização ou cadastro. "Responder sem gerar guia" mostra as 3 respostas mais usadas e as outras num menu.
+- **Etapa 3:** a conferência pelos prints destaca a diferença letra a letra entre pedido e lido; o modal de motivo só libera **Aceitar divergência** depois de escolher (teclas 1 a 4).
+- **Etapa 4:** a situação da autorização vem **sugerida pelos prints** (confira e troque se preciso); sem situação, a resposta aparece em prévia com o modelo provável. **Copiar observação da guia** fica ao lado do nº da guia.
+- **Notas fixas:** da clínica (no cadastro) e do beneficiário (por carteira, botão **Nota do beneficiário** na etapa 2) aparecem em todo atendimento.
+- **Relatar problema** (cartão dos prints e Histórico): baixa um arquivo com a leitura dos prints, as imagens, as correções e o histórico da guia, e guarda uma cópia em `relatos/` na pasta. Contém dados do beneficiário: envie só por canal interno.
+- **Atendimento parado:** aviso quando o atendimento fica mais de X minutos na mesma etapa (Preferências; 0 desliga).
+- **PIN do supervisor** (Configurações › Perfil): protege alertas, modelos, observações automáticas, regras de leitura das clínicas, importação de configurações, **Virar regra** e a limpeza da auditoria. Liberado por 15 minutos.
+- **Histórico detalhado (Preferências):** mostra quanto a pasta `auditoria` ocupa e apaga as imagens dos prints mais antigas que 3, 6, 12 ou 24 meses, mantendo o texto. Os registros do Painel não são afetados.
+- **Segurança dos registros:** atendimento salvo com a pasta fora do ar fica guardado no computador, aparece num aviso fixo com contador e vai sozinho para a pasta quando ela volta (sem apagar o que já está lá). Duas abas do Conferidor no mesmo computador: a mais recente avisa e a outra fica pausada. Fechar a aba com atendimento aberto pede confirmação.
 
 ### Importar lista de clínicas
 Em Configurações › Clínicas, **Importar lista** recebe a tabela copiada da planilha (número, nome, cidade e e-mails, uma clínica por linha; o cabeçalho é ignorado). **Pré-visualizar** mostra o que será feito: clínica nova, clínica a atualizar ou sem mudança. Uma clínica já cadastrada (reconhecida pelo e-mail ou pelo nome, ex.: "CLÍNICA CRIAR" = "Criar Clínica de Integração") só ganha os e-mails que faltam e a cidade, se estiver vazia; nada é apagado. E-mail que já pertence a outra clínica é ignorado e aparece em vermelho. Depois de importar, confira e clique em **Salvar configurações**.
