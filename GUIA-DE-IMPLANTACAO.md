@@ -122,6 +122,18 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 - Sem prints: o botão "conferir a grade manualmente (conferência cega)" continua disponível.
 - O recurso precisa do site publicado (não funciona abrindo o arquivo direto) e baixa cerca de 14 MB de arquivos de leitura na primeira vez.
 
+### Captura da janela, modo simples e painel flutuante
+- **Conectar à janela do sistema** (etapa 3, ao lado de Colar print): o Chrome pergunta qual janela compartilhar; escolha a do sistema (PS Web ou Liberação de Senhas). Depois, abra no sistema a aba que quer conferir e clique em **Capturar a janela do sistema**: a imagem é lida como um print colado, sem Print Screen. A conexão vale até recarregar a página ou clicar em "Parar de compartilhar" no Chrome. A janela do sistema não pode estar minimizada (pode estar atrás de outras).
+- **Modo simples** (etapa 3): mostra só o essencial — os campos na ordem de lançamento, cada um copiável com um clique (fica verde quando copiado), a conferência pelos prints, os alertas e o botão de seguir. Bom para monitor pequeno. O botão volta ao modo completo.
+- **Painel flutuante**: abre uma janelinha que fica **por cima do sistema**, no canto da tela, com os mesmos campos para copiar, o contador de copiados, os botões Capturar/Colar print, o resumo da conferência e o nº da guia. Acompanha o atendimento em tempo real. Funciona no Chrome e no Edge atuais (em navegador antigo abre como janela comum).
+
+### Prevenção de erros e aprendizado
+- **Antes de aceitar uma divergência do print** (botão Ignorar), o app lê aquela parte de novo com mais preparos e posições. Se a releitura bater com o pedido, era erro de leitura: corrige sozinho e nada é ignorado.
+- Se continuar diferente, abre o **motivo**: obrigatório para nome do paciente e carteira, com opções prontas (erro de leitura conferido na tela, nome abreviado, carteira nova, autorizado a menor…) e detalhe. "Erro de leitura" não gera observação ao prestador.
+- **Alerta "Mesmo código e carteira já autorizados na semana"** (segunda a domingo, em outro e-mail), com Conferi.
+- **Linha do tempo da guia:** edições de campos, correção da leitura do e-mail, carteira usada, prints lidos/recusados, releituras, divergências aceitas (com motivo), alertas conferidos e o nº da guia. Vai para o histórico (botão Histórico) e o registro guarda o número de correções e aceites; em Ações › Auditar dá para listar só as guias com correções.
+- **Aprendizado** (Configurações › Aprendizado): cada correção fica registrada na pasta (`aprendizado/correcoes.json`). Quando o mesmo valor volta num e-mail da mesma clínica, aparece o alerta "Correção já feita antes nesta clínica" com o botão **Aplicar a mesma correção**. Correções de código e de quantidade ausente podem **virar regra da clínica** com um clique. Erros de leitura de print confirmados viram aviso de "leitura conhecida" e podem ser baixados (.json) para ajuste do leitor.
+
 ### Histórico da guia e Auditar
 - **Histórico** (Painel do dia, ao lado de Corrigir/Cancelar/Excluir guia): abre o histórico da guia — prints enviados, o que foi lido em cada campo, o que conferiu, o que foi **ignorado** (e se a observação foi incluída), o que foi **copiado** para o sistema, o número da guia (lido do print ou digitado), alertas, pedido lido do e-mail e resposta.
 - O histórico é gravado ao concluir, cancelar, devolver ou descartar a guia, em `auditoria/AAAA-MM/<id>.json` na pasta compartilhada (sem a pasta, só no navegador deste computador). Os prints vão reduzidos (JPEG). Para não guardar prints, desmarque em Configurações › Preferências operacionais.

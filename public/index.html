@@ -590,6 +590,29 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .linha-tempo .ev{display:grid;grid-template-columns:44px 170px 1fr;gap:8px;font-size:var(--fs-sm);align-items:baseline}
 .linha-tempo .ev.corr b{color:var(--warn-fg)}
 @media (max-width:640px){.linha-tempo .ev{grid-template-columns:44px 1fr}.linha-tempo .ev span:last-child{grid-column:1/-1}}
+.mini{display:grid;gap:8px;font-size:var(--fs-sm)}
+.mini-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.mini-h b{font-size:var(--fs-md)}
+.mini-sec{font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-top:4px}
+.mini-lista{display:grid;gap:4px}
+.mini-row{display:grid;grid-template-columns:118px 1fr auto;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:7px 10px;cursor:pointer;font:inherit}
+.mini-row:hover{border-color:var(--accent);background:var(--accent-bg)}
+.mini-row .r{color:var(--text-2);font-size:var(--fs-xs)}
+.mini-row .v{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-row.ok{border-color:var(--ok-br);background:var(--ok-bg)}
+.mini-row.ok .ic{color:var(--ok-solid)}
+.mini-row.vazio{opacity:.55;cursor:default}
+.mini-item{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mini-item .mini-row{grid-template-columns:52px 1fr auto}
+.mini-al{display:flex;gap:6px;align-items:center;padding:6px 10px;border-radius:var(--r-sm);background:var(--neu-bg);border:1px solid var(--neu-br);font-weight:600}
+.mini-al.ok{background:var(--ok-bg);border-color:var(--ok-br);color:var(--ok-fg)}
+.mini-al.warn{background:var(--warn-bg);border-color:var(--warn-br);color:var(--warn-fg)}
+.mini-al.bad{background:var(--bad-bg);border-color:var(--bad-br);color:var(--bad-fg)}
+.mini-div{font-size:var(--fs-xs);padding:2px 4px}
+.mini-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mini-msg{font-size:var(--fs-xs);color:var(--accent-fg);margin-top:4px}
+.mini-num{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+.mini-janela{padding:12px;background:var(--bg);min-height:100vh}
 </style>
 </head>
 <body>
@@ -2841,7 +2864,7 @@ function htmlPassos(g) {
 
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
-  renderTopo(); pintarSync();
+  renderTopo(); pintarSync(); queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
@@ -3034,10 +3057,16 @@ function campoCopia(g, { campo, rot, sub, curto, mid, ph, mono }) {
 function renderGuia(alvo, g) {
   const p = g.pedido, cl = clinicaDe(S), st = situacaoGuia(g), podeSeguir = podeFinal(g, st);
   const exec = valorCopia(g, 'executante');
+  const navGuia = `<div class="acoes acoes-rodape"><button class="btn" data-act="irVista" data-v="2">${ic('left')}Pedido e alertas</button><button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'} title="${podeSeguir ? '' : 'Conclua a conferência sem divergências'}">Seguir para finalizar${ic('right')}</button></div>`;
+  const botoesModo = `<button class="btn sm line" data-act="modoSimples" title="Mostra só o essencial para gerar a guia (bom para monitor pequeno)">${ic('layers', 'sm')}${LS.get('modoSimples', false) ? 'Modo completo' : 'Modo simples'}</button>${Mini.aberto() ? '<span class="tag ok">Painel flutuante aberto</span>' : `<button class="btn sm line" data-act="painelFlutuante" title="Abre uma janelinha que fica por cima do sistema, com os campos para copiar e a captura">${ic('right', 'sm')}Painel flutuante</button>`}`;
+  if (LS.get('modoSimples', false)) {   // tela única: campos para copiar, prints, alertas e seguir
+    alvo.innerHTML = `<div class="stack"><div class="card"><div class="card-h"><h2>Gerar a guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}</div>${htmlMini(g, { semPrints: true })}</div>${htmlCartaoPrints(g)}${htmlPainelAlertas(g, st)}${navGuia}</div>`;
+    return;
+  }
   alvo.innerHTML = `
   <div class="stack">
   <div class="card">
-    <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
+    <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
     <div class="cp-grupo"><span class="eyebrow">Prestador e solicitação</span>
       <div class="cp-linha"><div class="rot">1. Credenciado executante${!exec ? '<small>Não cadastrado: informe aqui</small>' : ''}</div><div class="cp-campos">${campoCopia(g, { campo: 'executante', rot: 'Credenciado executante', ph: 'Executante no sistema' })}</div></div>
       <div class="cp-linha"><div class="rot">2. Médico</div><div class="cp-campos">${campoCopia(g, { campo: 'medico_nome', rot: 'Nome do médico', sub: 'Nome' })}${campoCopia(g, { campo: 'medico_crm', rot: 'CRM do médico', sub: p.medico.conselho || 'CRM', curto: true, mono: true })}</div></div>
@@ -4551,6 +4580,7 @@ function htmlCartaoPrints(g) {
     <p class="dica" style="margin:0 0 10px">Copie os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b> da tela "Liberação de Senhas" e use <b>Ctrl+V</b> aqui (ou o botão <b>Colar</b>). Se a grade tiver mais itens do que cabem na tela, cole também um print rolado até o fim. A leitura é feita neste navegador; ${cfg.preferencias.guardarPrints !== false ? 'os prints ficam no histórico da guia (pasta compartilhada).' : 'as imagens não são guardadas.'} O número da guia vai sozinho para a etapa 4.</p>
     ${htmlSeletorSistema()}
     <div class="acoes" style="margin-top:0">
+      ${htmlBotoesCaptura()}
       <button class="btn pri" data-act="colarPrint" title="Cola o print que está na área de transferência (o mesmo que Ctrl+V)">${ic('clip')}Colar print</button>
       <label class="btn line" for="arqPrints" id="zonaPrints" title="Ou escolha/arraste os arquivos de imagem">${ic('upload')}Escolher arquivos</label>
       <input type="file" id="arqPrints" accept="image/*" multiple class="oculto">
@@ -5185,7 +5215,17 @@ document.addEventListener('change', async e => {
     g.itensEditados = true; persistir(); render(); return;
   }
   if (t.id === 'cartUsada') { const ant = g.carteiraUsada; g.carteiraUsada = normCart(t.value); if (ant !== g.carteiraUsada) evento(g, 'carteira', `Carteira usada no sistema: "${ant || '—'}" → "${g.carteiraUsada || '—'}"`); persistir(); render(); return; }
-  if (t.dataset.cpcampo) { g.itensEditados = true; persistir(); return; }
+  if (t.dataset.cpcampo) {
+    g.itensEditados = true;
+    const k = t.dataset.cpcampo, de = t.dataset.orig ?? '', para = t.value.trim();
+    if (de !== para) {
+      evento(g, 'edicao-campo', `${ROT_COPIA[k] || k}: "${de || '—'}" → "${para || '—'}"`);
+      const cl = clinicaDe(S), campo = { medico_nome: 'medico', medico_crm: 'crm', cid: 'cid', local: 'local', data: 'emissao' }[k];
+      if (cl && campo && de) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo, lido: de, correto: para });
+      t.dataset.orig = para;
+    }
+    persistir(); return;
+  }
   if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
   if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
   if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return; }
@@ -5902,6 +5942,138 @@ Object.assign(acoes, {
   async aprRemover(b) { if (!confirm('Esquecer esta correção? Ela deixa de ser sugerida.')) return; await Apr.remover(b.dataset.k); render(); },
   aprBaixar() { baixar(nomeArquivo('aprendizado', isoDia(new Date()), 'json'), JSON.stringify({ tipo: 'conferidor-aprendizado', versao: VERSAO, gerado: agora(), itens: Apr.lista }, null, 1), 'application/json'); }
 });
+/* ====================================================================
+   Captura da janela do sistema pelo navegador (sem Print Screen): o operador escolhe a janela uma vez;
+   cada "Capturar" pega a imagem atual dela e lê como um print colado.
+   ==================================================================== */
+const Captura = {
+  stream: null, video: null,
+  suportada: () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia),
+  ativa() { return !!(this.stream && this.stream.getVideoTracks().some(t => t.readyState === 'live')); },
+  async conectar(nav) {
+    const md = (nav || navigator).mediaDevices;
+    this.parar();
+    this.stream = await md.getDisplayMedia({ video: { displaySurface: 'window', cursor: 'never', frameRate: 5 }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include' });
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = this.stream; this.video = v;
+    await v.play(); await new Promise(ok => { if (v.videoWidth) ok(); else v.addEventListener('loadeddata', ok, { once: true }); });
+    this.stream.getVideoTracks()[0].addEventListener('ended', () => { this.stream = null; this.video = null; render(); });
+  },
+  async quadro() {
+    if (!this.ativa()) throw new Error('A janela do sistema não está conectada.');
+    const v = this.video;
+    await new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok()) : setTimeout(ok, 120)));
+    const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+    const url = c.toDataURL('image/png'), bin = atob(url.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new File([u8], `captura-${new Date().toTimeString().slice(0, 8).replace(/:/g, '')}.png`, { type: 'image/png' });
+  },
+  parar() { if (this.stream) this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.video = null; }
+};
+async function capturarJanela(nav) {
+  const g = guiaAtiva(); if (!g) return;
+  try {
+    if (!Captura.ativa()) { await Captura.conectar(nav); toast('Janela conectada. Deixe a aba certa (Dados da Guia ou Procedimentos) aberta no sistema e clique em Capturar.'); render(); return; }
+    const f = await Captura.quadro(); await processarPrints([f]);
+  } catch (e) { if (e && e.name === 'NotAllowedError') toast('Captura cancelada.', 'bad'); else toast('Não foi possível capturar a janela: ' + (e.message || e), 'bad'); render(); }
+}
+function htmlBotoesCaptura() {
+  if (!Captura.suportada()) return '';
+  return Captura.ativa()
+    ? `<button class="btn pri" data-act="capturarJanela" title="Captura a janela do sistema agora (deixe aberta a aba que quer conferir)">${ic('eye')}Capturar a janela do sistema</button><button class="btn sm line" data-act="trocarJanela" title="Escolher outra janela">${ic('refresh', 'sm')}Trocar janela</button>`
+    : `<button class="btn" data-act="capturarJanela" title="Escolha a janela do sistema uma vez; depois cada clique captura a tela atual, sem Print Screen">${ic('eye')}Conectar à janela do sistema</button>`;
+}
+
+/* ====================================================================
+   Modo simples (tela única) e painel flutuante no canto da tela (fica por cima do sistema)
+   ==================================================================== */
+const MINI_CAMPOS = [['executante', 'Credenciado executante'], ['carteira', 'Carteira'], ['benef', 'Beneficiário'], ['medico_nome', 'Médico'], ['medico_crm', 'CRM'], ['data', 'Data do pedido'], ['local', 'Local do pedido'], ['cid', 'CID']];
+let miniMsg = '';
+function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
+  if (!g || !S) return `<div class="mini"><p class="muted">Nenhum atendimento aberto no conferidor.</p></div>`;
+  const p = g.pedido, st = situacaoGuia(g), av = prontoPrints(g) ? avaliarPrints(g) : null, cl = clinicaDe(S);
+  const linha = (chave, rot, v) => { const ok = v !== '' && g.copiados[chave] === v; return `<button type="button" class="mini-row ${ok ? 'ok' : ''} ${v ? '' : 'vazio'}" data-mcopy="${esc(chave)}" ${v ? '' : 'disabled'} title="${v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(rot)}</span><span class="v num">${esc(v || '—')}</span>${ic(ok ? 'check' : 'copy', 'sm')}</button>`; };
+  const nCopiar = MINI_CAMPOS.filter(([k]) => valorCopia(g, k).trim()).length + p.itens.length * 2, nFeito = MINI_CAMPOS.filter(([k]) => { const v = valorCopia(g, k).trim(); return v && g.copiados[k] === v; }).length + p.itens.filter(it => g.copiados['c:' + it.codigo] === it.codigo).length + p.itens.filter(it => g.copiados['q:' + it.codigo] === String(it.qtd)).length;
+  const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
+  return `<div class="mini">
+    <div class="mini-h"><div><b>${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''}</div></div><span class="tag ${nFeito >= nCopiar ? 'ok' : ''}">${nFeito}/${nCopiar} copiados</span></div>
+    ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}${st.bloqueios.length} bloqueio(s): resolva no conferidor antes de gerar a guia.</div>` : ''}
+    <div class="mini-sec">Para lançar no sistema (clique para copiar)</div>
+    <div class="mini-lista">${MINI_CAMPOS.map(([k, r]) => linha(k, r, valorCopia(g, k).trim())).join('')}
+      ${p.itens.map(it => `<div class="mini-item">${linha('c:' + it.codigo, 'Código', it.codigo)}${linha('q:' + it.codigo, 'Qtd.', it.qtd == null ? '' : String(it.qtd))}</div>`).join('') || '<p class="muted">Sem serviços.</p>'}</div>
+    ${semPrints ? '' : `<div class="mini-sec">Conferência pelos prints</div>
+    <div class="mini-prints">
+      ${av ? `<div class="mini-al ${av.ok ? 'ok' : prob.length ? 'warn' : ''}">${ic(av.ok ? 'check' : 'alert', 'sm')}${av.ok ? 'Conferido pelos prints' + (av.ressalvas ? ' (com ressalva)' : '') : prob.length ? prob.length + ' ponto(s) para conferir' : av.avisos[0] || 'Faltam prints'}</div>
+        ${prob.slice(0, 4).map(x => `<div class="mini-div">${x.sit === 'bad' ? '✕' : '!'} ${esc(x.rot || 'Item ' + x.codigo)}: ${esc(String(x.lido ?? x.qSis ?? '—'))} <span class="muted">(pedido ${esc(String(x.ped ?? x.qPed ?? '—'))})</span></div>`).join('')}
+        ${av.avisos.filter(a => /Falta/.test(a)).map(a => `<div class="mini-div">• ${esc(a)}</div>`).join('')}` : '<p class="muted" style="margin:0 0 6px">Nenhum print lido ainda.</p>'}
+      <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('eye', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
+      ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
+      <div class="mini-num">Nº da guia: <b class="num">${esc(g.numero || '—')}</b>${g.numero ? ` <span class="muted">(${g.numeroOrigem === 'print' ? 'do print' : 'digitado'})</span>` : ''}</div>
+    </div>`}
+    <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button>` : `<button type="button" class="btn sm line" data-act="modoSimples">${ic('layers', 'sm')}Voltar ao modo completo</button>`}</div>
+  </div>`;
+}
+/* copia um valor do painel (no painel flutuante a área de transferência é a da janelinha) */
+async function miniCopiar(chave, win) {
+  const g = guiaAtiva(); if (!g) return;
+  let v = '';
+  if (chave.startsWith('c:') || chave.startsWith('q:')) { const it = g.pedido.itens.find(x => x.codigo === chave.slice(2)); if (!it) return; v = chave[0] === 'c' ? it.codigo : String(it.qtd ?? ''); }
+  else v = valorCopia(g, chave).trim();
+  if (!v) return;
+  let ok = false;
+  try { await (win || window).navigator.clipboard.writeText(v); ok = true; } catch (e) { if (!win) ok = await copiar(v); }
+  if (!ok) { miniMsg = 'Não consegui copiar: clique de novo.'; Mini.atualizar(); return; }
+  g.copiados[chave] = v; miniMsg = 'Copiado: ' + v; persistir(); render();
+}
+const Mini = {
+  win: null,
+  aberto() { return !!(this.win && !this.win.closed); },
+  async abrir() {
+    if (this.aberto()) { this.win.focus(); return; }
+    try {
+      if ('documentPictureInPicture' in window) this.win = await documentPictureInPicture.requestWindow({ width: 380, height: 700 });
+      else { this.win = window.open('', 'conferidorPainel', 'popup,width=400,height=720'); if (!this.win) { toast('O navegador bloqueou a janela do painel. Permita pop-ups para este site.', 'bad'); return; } }
+    } catch (e) { toast('Não foi possível abrir o painel flutuante: ' + e.message, 'bad'); return; }
+    const d = this.win.document; d.title = 'Conferidor — painel';
+    d.head.innerHTML = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    document.querySelectorAll('style').forEach(n => d.head.appendChild(n.cloneNode(true)));
+    d.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || 'light');
+    d.body.innerHTML = '<div id="miniApp" class="mini-janela"></div>';
+    d.addEventListener('click', e => this.clique(e));
+    d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (fs.length && S) { e.preventDefault(); miniMsg = 'Lendo o print…'; this.atualizar(); processarPrints(fs).then(() => { miniMsg = ''; this.atualizar(); }); } });
+    this.win.addEventListener('pagehide', () => { this.win = null; render(); });
+    this.atualizar(); render();
+  },
+  atualizar() { if (!this.aberto()) { this.win = null; return; } const el = this.win.document.getElementById('miniApp'); if (el) el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }); },
+  async clique(e) {
+    const c = e.target.closest('[data-mcopy]'); if (c) { await miniCopiar(c.dataset.mcopy, this.win); return; }
+    const b = e.target.closest('[data-mact]'); if (!b) return;
+    const a = b.dataset.mact;
+    if (a === 'abrir') { window.focus(); return; }
+    if (a === 'capturar') { miniMsg = Captura.ativa() ? 'Capturando…' : ''; this.atualizar(); await capturarJanela(this.win.navigator); miniMsg = ''; this.atualizar(); return; }
+    if (a === 'colar') {
+      try {
+        const itens = await this.win.navigator.clipboard.read(), fs = [];
+        for (const it of itens) for (const t of it.types) if (/^image\//.test(t)) fs.push(new File([await it.getType(t)], 'print-colado.png', { type: t }));
+        if (!fs.length) { miniMsg = 'Não há imagem copiada. Copie o print e clique de novo (ou Ctrl+V aqui).'; this.atualizar(); return; }
+        miniMsg = 'Lendo o print…'; this.atualizar(); await processarPrints(fs); miniMsg = '';
+      } catch (er) { miniMsg = 'Use Ctrl+V com o painel selecionado.'; }
+      this.atualizar();
+    }
+  }
+};
+Object.assign(acoes, {
+  capturarJanela() { return capturarJanela(); },
+  async trocarJanela() { Captura.parar(); await capturarJanela(); },
+  modoSimples() { LS.set('modoSimples', !LS.get('modoSimples', false)); render(); },
+  painelFlutuante() { return Mini.abrir(); }
+});
+document.addEventListener('focusin', e => { const t = e.target; if (t && t.dataset && t.dataset.cpcampo != null && t.dataset.orig == null) t.dataset.orig = t.value.trim(); });   // valor antes da edição (linha do tempo)
+/* no modo simples (janela principal) */
+document.addEventListener('click', e => {
+  const c = e.target.closest && e.target.closest('[data-mcopy]'); if (c) { miniCopiar(c.dataset.mcopy); return; }
+  const b = e.target.closest && e.target.closest('[data-mact]'); if (!b) return;
+  if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
+});
+
 async function init() {
   iniciarSoIcone();
   Tema.aplicar();
