@@ -503,6 +503,31 @@ table.t{border-collapse:collapse;width:100%}
 .modal-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface-2)}
 .modal-f .dica{margin:0;flex:1;min-width:180px}
 
+.modal-fundo.lateral{justify-content:flex-end;align-items:stretch;padding:0;background:rgba(8,15,30,.22);backdrop-filter:none}
+.modal.lateral{max-width:min(760px,94vw);max-height:none;height:100vh;border-radius:0;border-width:0 0 0 1px;box-shadow:-16px 0 40px rgba(0,0,0,.22);animation:entraLado .18s ease-out}
+@keyframes entraLado{from{transform:translateX(40px);opacity:.4}to{transform:none;opacity:1}}
+.modal-desc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 18px;background:var(--warn-bg);color:var(--warn-fg);border-top:1px solid var(--warn-br);font-size:var(--fs-sm);font-weight:600}
+.modal-desc .esp{flex:1}
+.btn.perigo{background:var(--bad-solid);border-color:var(--bad-solid);color:#fff}
+.btn.perigo:hover{filter:brightness(.92);background:var(--bad-solid)}
+kbd{display:inline-block;min-width:18px;text-align:center;font:600 11.5px/1.4 var(--font-sans);border:1px solid var(--border-strong);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface-2);color:var(--text-2)}
+mark.dif{background:var(--bad-bg);color:var(--bad-fg);outline:1px solid var(--bad-br);border-radius:2px;padding:0 1px;font-weight:800}
+.dif-box{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2)}
+.dif-box .num{font-size:var(--fs-lg);font-weight:650;letter-spacing:.03em;overflow-wrap:anywhere}
+/* ===== Esqueleto, combobox e dicas ===== */
+@keyframes brilho{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.esq-b{border-radius:6px;background:linear-gradient(90deg,var(--surface-3) 0,var(--surface-2) 50%,var(--surface-3) 100%);background-size:800px 100%;animation:brilho 1.2s linear infinite}
+.esq-linha{height:16px;margin:10px 0}.esq-linha:nth-child(3n){width:72%}.esq-linha:nth-child(3n+2){width:88%}
+.esq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px}.esq-kpi{height:72px}
+.combo{position:relative;min-width:240px;flex:1 1 260px;max-width:440px}
+.combo-in{width:100%}
+.combo-lista{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;max-height:280px;overflow:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);box-shadow:0 10px 30px rgba(15,23,42,.18);padding:4px}
+.combo-op{display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:6px;cursor:pointer;color:var(--text)}
+.combo-op b{font-size:var(--fs-sm);font-weight:600}.combo-op small{font-size:var(--fs-xs);color:var(--text-2)}
+.combo-op.ativo{background:var(--soft-2)}.combo-op.sel b::after{content:" ✓";color:var(--ok-solid)}
+.combo-vazio{padding:8px 10px;color:var(--text-2);font-size:var(--fs-sm)}
+.dica-flut{position:fixed;z-index:300;max-width:340px;padding:6px 10px;border-radius:6px;background:#1e293b;color:#f8fafc;font-size:var(--fs-xs);line-height:1.4;font-weight:500;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.25);white-space:pre-line}
+:root[data-theme=dark] .dica-flut{background:#e2e8f0;color:#0f172a}
 /* ===== Editor de texto rico e modelos ===== */
 .ed-barra{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-sm) var(--r-sm) 0 0;background:var(--surface-2)}
 .ed-barra .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
@@ -941,21 +966,42 @@ const escH = s => esc(s).replace(/\n/g, '<br>');
 
 /* ---------- Modal ---------- */
 let modalAtual = null;
-function abrirModal({ titulo, sub = '', icone = 'info', corpo, rodape = '', tamanho = '', aoFechar = null, risco = '' }) {
+function abrirModal({ titulo, sub = '', icone = 'info', corpo, rodape = '', tamanho = '', aoFechar = null, risco = '', lateral = false }) {
   fecharModal(true);
-  const fundo = document.createElement('div'); fundo.className = 'modal-fundo'; fundo.id = 'modalFundo';
-  fundo.innerHTML = `<div class="modal ${tamanho} ${risco ? 'risco-' + risco : ''}" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+  const fundo = document.createElement('div'); fundo.className = 'modal-fundo' + (lateral ? ' lateral' : ''); fundo.id = 'modalFundo';
+  fundo.innerHTML = `<div class="modal ${tamanho} ${risco ? 'risco-' + risco : ''} ${lateral ? 'lateral' : ''}" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
     <div class="modal-h"><span class="caixa">${ic(icone, 'lg')}</span><div><h2 id="modalTitulo">${esc(titulo)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
       <button class="btn ico" data-act="fecharModal" aria-label="Fechar" title="Fechar">${ic('x')}</button></div>
     <div class="modal-b" id="modalCorpo">${corpo}</div>${rodape ? `<div class="modal-f" id="modalRodape">${rodape}</div>` : ''}</div>`;
   fundo.addEventListener('mousedown', e => { if (e.target === fundo) fundo.dataset.fechar = '1'; else delete fundo.dataset.fechar; });
   fundo.addEventListener('click', e => { if (e.target === fundo && fundo.dataset.fechar) fecharModal(); });
   $('#modalRoot').appendChild(fundo);
-  modalAtual = { aoFechar };
+  modalAtual = { aoFechar, sujo: false };
+  fundo.addEventListener('input', ev => { if (modalAtual && ev.target.matches('textarea, input[type=text], [contenteditable]')) modalAtual.sujo = true; });
   const foco = $('[autofocus],input,textarea,select,.ed', fundo); if (foco) setTimeout(() => foco.focus(), 30);
 }
+/* Confirmação em modal (com o nome do item). Resolve true / texto do campo, ou null se a pessoa voltar. */
+function confirmar({ titulo, texto, ok = 'Confirmar', risco = 'bad', icone = 'alert', campo = null }) {
+  return new Promise(res => {
+    let feito = false;
+    abrirModal({ titulo, icone, risco, tamanho: 'p', corpo: `<p style="margin:0 0 10px">${texto}</p>${campo ? `<label class="lbl" for="cfCampo">${esc(campo.rot)}</label><textarea id="cfCampo" rows="2" placeholder="${esc(campo.ph || '')}"></textarea>` : ''}`,
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal" id="cfVoltar">Voltar</button><button class="btn ${risco === 'bad' ? 'perigo' : 'pri'}" id="cfOk">${ok}</button>`,
+      aoFechar: () => { if (!feito) res(null); } });
+    $('#cfOk').addEventListener('click', () => { feito = true; const v = campo ? $('#cfCampo').value.trim() : true; fecharModal(true); res(v); });
+    if (!campo) setTimeout(() => { const b = $('#cfVoltar'); if (b) b.focus(); }, 40);
+  });
+}
+/* "JANY GLEYDE DA SILVA" → "JANY G. D. S." */
+const nomeCurto = n => { const p = String(n || '').trim().split(/\s+/).filter(Boolean); return p.length ? p[0] + (p.length > 1 ? ' ' + p.slice(1).map(w => w[0] + '.').join(' ') : '') : ''; };
 function fecharModal(silencioso) {
   const f = $('#modalFundo'); if (!f) return;
+  if (!silencioso && modalAtual && modalAtual.sujo && !modalAtual.descartar) {   // texto digitado: pergunta antes de descartar
+    const m = f.querySelector('.modal'); let bar = m.querySelector('.modal-desc');
+    if (!bar) { bar = document.createElement('div'); bar.className = 'modal-desc'; bar.setAttribute('role', 'alert');
+      bar.innerHTML = `${ic('alert', 'sm')}<span class="esp">Há texto digitado que será perdido.</span><button class="btn sm" data-act="modalContinuar">Continuar editando</button><button class="btn sm perigo" data-act="modalDescartar">Descartar</button>`;
+      m.appendChild(bar); }
+    bar.querySelector('[data-act=modalContinuar]').focus(); return;
+  }
   const cb = modalAtual && modalAtual.aoFechar; f.remove(); modalAtual = null; M = null;
   if (cb && !silencioso) cb();
 }
@@ -2957,7 +3003,7 @@ document.addEventListener('paste', e => {
 /* ---------- Alertas (painel abaixo do conteúdo) ---------- */
 function htmlUmAlerta(a, g) {
   let extra = '';
-  if (a.vincular) extra += `<select id="selClinica" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Só para este e-mail</button>`;
+  if (a.vincular) extra += `<select id="selClinica" class="sel-busca" aria-label="Clínica do remetente"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(cl => `<option data-busca="${esc(buscaClinica(cl))}" value="${cl.id}" ${cl.id === S.clinicaSugerida ? 'selected' : ''}>${esc(cl.nome)}</option>`).join('')}</select><button class="btn sm" data-act="vincularClinica">${ic('check', 'sm')}Vincular e salvar e-mail no cadastro</button><button class="btn sm line" data-act="clinicaSoAgora">Só para este e-mail</button>`;
   if (a.acaoCarteira) extra += `<button class="btn sm" data-act="respSemGuia" data-modelo="carteira_nao_localizada">${ic('mail', 'sm')}Não localizei: responder</button><button class="btn sm" data-act="respSemGuia" data-modelo="nome_carteira">${ic('mail', 'sm')}Nome e carteira não conferem: responder</button>`;
   if (a.aprendidoI != null) extra += `<button class="btn sm" data-act="aplicarAprendido" data-i="${a.aprendidoI}">${ic('check', 'sm')}Aplicar a mesma correção</button>`;
   if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
@@ -3544,7 +3590,7 @@ function htmlModalParam() {
   const m = M, cl = cfg.clinicas.find(c => c.id === m.clinicaId);
   return `<div class="stack">
     <div class="linha-flex">${cl ? htmlClinica(cl) : ''}<span class="tag"><span class="muted">Carteira</span> <b class="num">${esc(m.carteira || '—')}</b></span>${m.id ? '<span class="tag ac">Parametrização existente</span>' : '<span class="tag info">Nova parametrização</span>'}</div>
-    ${m.livre ? `<div class="form-grid"><div><label class="lbl" for="pmClinica">Clínica</label><select id="pmClinica" data-pm="clinicaId"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${c.id}" ${c.id === m.clinicaId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div><div><label class="lbl" for="pmCart">Carteira (17 caracteres)</label><input type="text" id="pmCart" data-pm="carteira" class="num" value="${esc(m.carteira)}" maxlength="20"></div></div>` : ''}
+    ${m.livre ? `<div class="form-grid"><div><label class="lbl" for="pmClinica">Clínica</label><select id="pmClinica" class="sel-busca" data-pm="clinicaId"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${c.id}" ${c.id === m.clinicaId ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div><div><label class="lbl" for="pmCart">Carteira (17 caracteres)</label><input type="text" id="pmCart" data-pm="carteira" class="num" value="${esc(m.carteira)}" maxlength="20"></div></div>` : ''}
     <div class="aviso-simples">${ic('info')}<div>A parametrização é uma referência para os <b>próximos atendimentos desta clínica e carteira</b>. É independente de “Corrigir leitura”: alterar aqui não muda os itens deste e-mail, e o contrário também.</div></div>
     <div class="form-grid">
       <div><label class="lbl" for="pmMedico">Nome do médico</label><input type="text" id="pmMedico" data-pm="medico" value="${esc(m.medico)}"></div>
@@ -3562,7 +3608,7 @@ function htmlModalParam() {
 function abrirModalParam(g, prm, livre) {
   M = novoParamModal(g, prm); M.livre = !!livre;
   if (!M.textoEditado) M.texto = textoParametrizacao(M);
-  abrirModal({ titulo: M.id ? 'Parametrização' : 'Nova parametrização', sub: 'Referência para os próximos atendimentos', icone: 'layers', tamanho: 'g', corpo: htmlModalParam(),
+  abrirModal({ lateral: true, titulo: M.id ? 'Parametrização' : 'Nova parametrização', sub: 'Referência para os próximos atendimentos', icone: 'layers', tamanho: 'g', corpo: htmlModalParam(),
     rodape: `${M.id ? `<button class="btn dng" data-act="pmExcluir">${ic('trash')}Excluir parametrização</button>` : ''}<span class="esp" style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="pmSalvar">${ic('save')}Salvar parametrização</button>` });
 }
 
@@ -3571,7 +3617,7 @@ function abrirModalCadCodigo(codigo) {
   const g = guiaAtiva(), it = g.pedido.itens.find(x => x.codigo === codigo);
   M = { tipo: 'codcad', codigo };
   abrirModal({ titulo: 'Cadastrar código', sub: codigo, icone: 'tag', tamanho: 'p',
-    corpo: `<div class="form-grid"><div style="grid-column:1/-1"><label class="lbl" for="ccClinica">Clínica</label><select id="ccClinica"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${esc(c.id)}" ${S.clinicaId === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
+    corpo: `<div class="form-grid"><div style="grid-column:1/-1"><label class="lbl" for="ccClinica">Clínica</label><select id="ccClinica" class="sel-busca"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${esc(c.id)}" ${S.clinicaId === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></div>
       <div style="grid-column:1/-1"><label class="lbl" for="ccDesc">Descrição da terapia</label><input type="text" id="ccDesc" value="${esc((it && it.desc) || '')}" autofocus></div></div>`,
     rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cadCodigoOk">${ic('check')}Cadastrar código</button>` });
 }
@@ -3642,8 +3688,10 @@ function csvRegistros(regs) {
   });
   return '﻿' + [cab.join(';'), ...linhas].join('\r\n');
 }
+/* Esqueleto de carregamento (no lugar de "Carregando…") */
+const htmlEsqueleto = (linhas = 6, cartoes = 0) => `<div class="esq" aria-busy="true" aria-label="Carregando">${cartoes ? `<div class="esq-kpis">${'<div class="esq-b esq-kpi"></div>'.repeat(cartoes)}</div>` : ''}<div class="card">${'<div class="esq-b esq-linha"></div>'.repeat(linhas)}</div></div>`;
 async function renderPainel(app) {
-  app.innerHTML = '<p class="muted">Carregando registros…</p>';
+  app.innerHTML = htmlEsqueleto(8, 3);
   const mes = painelModo === 'mes', sem = painelModo === 'semana', longo = mes || sem;
   if (longo) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
   await Param.carregar();
@@ -3769,7 +3817,7 @@ function conciliarGuias() {
    Aba Ações: onde está cada guia (lendo o pedido, gerando guia, anexando e-mail)
    ==================================================================== */
 async function renderQuadro(app) {
-  app.innerHTML = '<p class="muted">Carregando…</p>';
+  app.innerHTML = htmlEsqueleto(5);
   await Reg.carregar();
   const hoje = isoDia(new Date());
   const mapa = new Map();
@@ -4745,7 +4793,7 @@ function htmlCartaoPrints(g) {
     ${av.avisos.map(a => `<div class="aviso" style="margin:8px 0">${ic('info')}<div>${esc(a)}</div></div>`).join('')}
     ${av.ressalvas ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div><b>${pl(av.ressalvas, 'divergência ignorada', 'divergências ignoradas')}.</b> Marque, em cada uma, se quer incluir a observação para a clínica (vai para as <b>observações adicionais</b>, etapa 4). Detalhe o motivo lá; isso não bloqueia a finalização.</div></div>` : ''}
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Campo</th><th>Pedido</th><th>Lido no print</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
-      ${av.checks.map(c => `<tr class="r-${c.ign ? 'ign' : c.st}"><td>${esc(c.rot)}</td><td class="num">${esc(c.ped)}</td><td class="num"><b>${esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`).join('')}
+      ${av.checks.map(c => { const dif = (c.st === 'bad' || c.st === 'warn') && c.ped && c.lido && c.ped !== '—' ? marcasDiferenca(c.ped, c.lido) : null; return `<tr class="r-${c.ign ? 'ign' : c.st}"><td>${esc(c.rot)}</td><td class="num">${dif ? dif[0] : esc(c.ped)}</td><td class="num"><b>${dif ? dif[1] : esc(c.lido || '—')}</b></td><td>${c.crop ? `<img class="mini" src="${c.crop}" alt="">` : ''}</td><td>${tg(c)}${c.nota && !c.ign ? `<div class="dica">${esc(c.nota)}</div>` : ''}</td></tr>`; }).join('')}
     </tbody></table></div>
     <h3>Itens: pedido × sistema (${av.nPedido} no pedido, ${av.nSistema} nos prints)</h3>
     <div class="tabela-scroll"><table class="t prints-t"><thead><tr><th>Código</th><th>Qtd. pedido</th><th>Qtd. no sistema</th><th>Imagem</th><th>Resultado</th></tr></thead><tbody>
@@ -4898,6 +4946,8 @@ const acoes = {
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
   fecharModal() { fecharModal(); },
+  modalContinuar() { const b = $('.modal-desc'); if (b) b.remove(); const c = $('#modalFundo textarea, #modalFundo input[type=text]'); if (c) c.focus(); },
+  modalDescartar() { if (modalAtual) modalAtual.descartar = true; fecharModal(); },
   escolherEml() { $('#arquivoEml').click(); },
   async usarColado() {
     const t = $('#coladoTxt').value; if (!t.trim()) { toast('Cole o texto do e-mail.', 'bad'); return; }
@@ -4921,7 +4971,8 @@ const acoes = {
     mudarVista(v);
   },
   async descartar() {
-    if (!confirm('Descartar este e-mail? Use para mensagens que não são pedidos (evoluções, avisos, arquivo errado). As guias já concluídas são mantidas.')) return;
+    const de = clinicaDe(S) ? clinicaDe(S).nome : (S.email.remetente.email || 'remetente');
+    if (!(await confirmar({ titulo: 'Descartar e-mail', texto: `Descartar o e-mail de <b>${esc(de)}</b> (“${esc(curtoTxt(S.email.assunto || 'sem assunto', 70))}”)? Use para mensagens que não são pedidos (evoluções, avisos, arquivo errado). As guias já concluídas são mantidas.`, ok: 'Descartar e-mail', icone: 'trash' }))) return;
     for (const g of S.guias) if (g.status !== 'concluido') await gravarGuia(g, 'descartado');
     finalizarAtendimento('Descartado — ' + S.email.assunto);
   },
@@ -5005,7 +5056,7 @@ const acoes = {
     render(); toast('Parametrização salva' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.'));
   },
   async pmExcluir() {
-    const id = M.id; if (!confirm('Excluir esta parametrização? Os próximos atendimentos deixam de usá-la.')) return;
+    const id = M.id, cl = cfg.clinicas.find(c => c.id === M.clinicaId); if (!confirm(`Excluir a parametrização de ${cl ? cl.nome : 'esta clínica'}, carteira ${M.carteira || '—'}? Os próximos atendimentos deixam de usá-la.`)) return;
     await Param.remover(id); if (S) S.guias.forEach(g => { if (g.param && g.param.id === id) g.param = null; });
     fecharModal(true); persistir(); render(); toast('Parametrização excluída.');
   },
@@ -5144,14 +5195,16 @@ const acoes = {
   },
   async cancelarGuia(b) {
     const r = regPorId(b.dataset.id); if (!r) return;
-    const motivo = prompt(`Cancelar a guia ${r.guia || ''}? Informe o motivo (opcional) e confirme:`, '');
+    const quem = nomeCurto(r.paciente) || r.pacienteIni || '';
+    const motivo = await confirmar({ titulo: 'Cancelar guia', texto: `Cancelar a guia <b>${esc(r.guia || 'sem número')}</b>${quem ? ` de <b>${esc(quem)}</b>` : ''}? O registro fica marcado como cancelado.`, ok: 'Cancelar guia', campo: { rot: 'Motivo (opcional)', ph: 'Ex.: guia gerada em duplicidade' } });
     if (motivo === null) return;
     const novo = clonar(r); novo.status = 'cancelado'; novo.canceladoEm = agora(); novo.canceladoPor = operador(); novo.canceladoMotivo = motivo.trim(); novo.atualizadoEm = agora();
     await Reg.salvar(novo); Reg.mesclarHist([novo]); render(); toast('Guia cancelada.');
   },
   async excluirGuia(b) {
     const r = regPorId(b.dataset.id); if (!r) return;
-    if (!confirm(`Excluir definitivamente o registro${r.guia ? ' da guia ' + r.guia : ''}? Esta ação não pode ser desfeita.`)) return;
+    const quem = nomeCurto(r.paciente) || r.pacienteIni || '';
+    if (!(await confirmar({ titulo: 'Excluir guia', texto: `Excluir a guia <b>${esc(r.guia || 'sem número')}</b>${quem ? ` de <b>${esc(quem)}</b>` : ''}? O registro some do Painel e do Auditar. Esta ação não pode ser desfeita.`, ok: 'Excluir guia', icone: 'trash' }))) return;
     await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
   async regSync() { const n = await Reg.sincronizar(); await Reg.carregar(); render(); toast(Reg.nPendentes() ? 'Ainda não consegui gravar na pasta. Confira a conexão e tente de novo.' : n ? `${n} ${n === 1 ? 'atendimento enviado' : 'atendimentos enviados'} para a pasta.` : 'Nada pendente.', Reg.nPendentes() ? 'bad' : ''); },
@@ -5279,7 +5332,7 @@ const acoes = {
 function abrirParamLivre() {
   M = { tipo: 'param', id: null, guiaId: null, livre: true, clinicaId: '', carteira: '', medico: '', data: '', terapias: [{ id: uid(), codigo: '', descricao: '', qtd: '' }], texto: '', textoEditado: false };
   M.texto = textoParametrizacao(M);
-  abrirModal({ titulo: 'Nova parametrização', sub: 'Referência para os próximos atendimentos', icone: 'layers', tamanho: 'g', corpo: htmlModalParam(), rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="pmSalvar">${ic('save')}Salvar parametrização</button>` });
+  abrirModal({ lateral: true, titulo: 'Nova parametrização', sub: 'Referência para os próximos atendimentos', icone: 'layers', tamanho: 'g', corpo: htmlModalParam(), rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="pmSalvar">${ic('save')}Salvar parametrização</button>` });
 }
 
 /* ====================================================================
@@ -5471,10 +5524,77 @@ function soIcone(raiz) {
     b.classList.add('so'); if (!b.title) b.title = t; if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', t);
   });
 }
+/* Escolha de clínica com busca: o <select> continua no lugar (escondido) e recebe a escolha */
+const buscaClinica = cl => [cl.nome, cl.cidade, ...(cl.emails || [])].filter(Boolean).join(' ');
+function realcarSelects(raiz) {
+  raiz.querySelectorAll('select.sel-busca:not([data-realce])').forEach(sel => {
+    sel.dataset.realce = '1';
+    const ops = [...sel.options].filter(o => o.value).map(o => {
+      const cl = cfg.clinicas.find(c => c.id === o.value);
+      return { v: o.value, t: o.textContent, s: cl ? [cl.cidade, (cl.emails || [])[0]].filter(Boolean).join(' · ') : '', b: norm((o.dataset.busca || '') + ' ' + o.textContent) };
+    });
+    const caixa = document.createElement('div'); caixa.className = 'combo';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'combo-in'; inp.autocomplete = 'off';
+    inp.placeholder = 'Digite o nome, a cidade ou o e-mail da clínica…'; inp.id = (sel.id || 'sel') + 'Busca';
+    inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-expanded', 'false'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-label', sel.getAttribute('aria-label') || 'Clínica');
+    const lista = document.createElement('div'); lista.className = 'combo-lista'; lista.setAttribute('role', 'listbox'); lista.hidden = true;
+    const lbl = sel.id && raiz.querySelector(`label[for="${sel.id}"]`); if (lbl) lbl.htmlFor = inp.id;
+    sel.parentNode.insertBefore(caixa, sel); caixa.append(inp, lista, sel); sel.hidden = true; sel.tabIndex = -1;
+    const atual = () => ops.find(o => o.v === sel.value);
+    inp.value = atual() ? atual().t : '';
+    let vis = [], ativo = 0;
+    const pintar = () => {
+      const q = norm(inp.value).split(/\s+/).filter(Boolean), sel0 = atual();
+      vis = (!q.length || (sel0 && inp.value === sel0.t) ? ops : ops.filter(o => q.every(w => o.b.includes(w)))).slice(0, 60);
+      ativo = Math.min(ativo, Math.max(0, vis.length - 1));
+      lista.innerHTML = vis.length ? vis.map((o, i) => `<div class="combo-op ${i === ativo ? 'ativo' : ''} ${o.v === sel.value ? 'sel' : ''}" role="option" data-v="${esc(o.v)}" aria-selected="${o.v === sel.value}"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</div>`).join('') : '<div class="combo-vazio">Nenhuma clínica encontrada.</div>';
+      lista.hidden = false; inp.setAttribute('aria-expanded', 'true');
+      const a = lista.querySelector('.ativo'); if (a) a.scrollIntoView({ block: 'nearest' });
+    };
+    const fechar = () => { lista.hidden = true; inp.setAttribute('aria-expanded', 'false'); const a = atual(); if (!a || inp.value !== a.t) inp.value = a ? a.t : ''; };
+    const escolher = v => { sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); const a = atual(); inp.value = a ? a.t : ''; lista.hidden = true; inp.setAttribute('aria-expanded', 'false'); };
+    inp.addEventListener('focus', () => { inp.select(); ativo = Math.max(0, ops.findIndex(o => o.v === sel.value)); pintar(); });
+    inp.addEventListener('input', () => { ativo = 0; pintar(); });
+    inp.addEventListener('blur', () => setTimeout(fechar, 160));
+    inp.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); if (lista.hidden) pintar(); else { ativo = Math.min(vis.length - 1, ativo + 1); pintar(); } }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); ativo = Math.max(0, ativo - 1); pintar(); }
+      else if (ev.key === 'Enter') { if (!lista.hidden && vis[ativo]) { ev.preventDefault(); ev.stopPropagation(); escolher(vis[ativo].v); } }
+      else if (ev.key === 'Escape' && !lista.hidden) { ev.preventDefault(); ev.stopPropagation(); fechar(); }
+    });
+    lista.addEventListener('mousedown', ev => { const o = ev.target.closest('.combo-op'); if (o) { ev.preventDefault(); escolher(o.dataset.v); } });
+  });
+}
+/* Dicas de mouse: o title vira uma dica no estilo do sistema (o texto continua acessível) */
+const Dica = {
+  el: null, alvo: null, t: null,
+  iniciar() {
+    document.addEventListener('mouseover', e => { const a = e.target.closest && e.target.closest('[title],[data-dica]'); if (!a || a === this.alvo || a.closest('svg') && !a.matches('svg')) return; this.preparar(a); }, true);
+    document.addEventListener('mouseout', e => { if (this.alvo && !(e.relatedTarget && this.alvo.contains(e.relatedTarget))) this.esconder(); }, true);
+    ['mousedown', 'keydown', 'scroll', 'wheel'].forEach(t => document.addEventListener(t, () => this.esconder(), true));
+    document.addEventListener('focusin', e => { const a = e.target.closest && e.target.closest('[title],[data-dica]'); if (a && a.matches(':focus-visible')) { this.preparar(a); } });
+    document.addEventListener('focusout', () => this.esconder());
+  },
+  preparar(a) {
+    this.esconder();
+    if (a.hasAttribute('title')) { const t = a.getAttribute('title'); a.removeAttribute('title'); if (!t) return; a.dataset.dica = t; if (!a.getAttribute('aria-label') && !a.textContent.trim()) a.setAttribute('aria-label', t); }
+    if (!a.dataset.dica) return;
+    this.alvo = a; this.t = setTimeout(() => this.mostrar(a), 380);
+  },
+  mostrar(a) {
+    if (!document.body.contains(a)) return;
+    const el = document.createElement('div'); el.className = 'dica-flut'; el.setAttribute('role', 'tooltip'); el.textContent = a.dataset.dica; document.body.appendChild(el); this.el = el;
+    const r = a.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    let x = r.left + r.width / 2 - w / 2, y = r.bottom + 8; x = Math.max(8, Math.min(x, innerWidth - w - 8));
+    if (y + h > innerHeight - 8) { y = r.top - h - 8; el.classList.add('acima'); }
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  },
+  esconder() { clearTimeout(this.t); this.alvo = null; if (this.el) { this.el.remove(); this.el = null; } }
+};
 function iniciarSoIcone() {
   const alvos = ['#app', '#modalRoot'].map(s => document.querySelector(s)).filter(Boolean);
-  const mo = new MutationObserver(() => alvos.forEach(soIcone));
-  alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); soIcone(a); });
+  const mo = new MutationObserver(() => alvos.forEach(a => { soIcone(a); realcarSelects(a); }));
+  alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); soIcone(a); realcarSelects(a); });
 }
 
 /* ====================================================================
@@ -5880,7 +6000,7 @@ function htmlHistoricoGuia(r, a) {
       </tbody></table></div>
       ${P.imagens && P.imagens.length ? `<h3 style="margin-top:12px">Prints enviados (${P.imagens.length})</h3><div class="prints-hist">${P.imagens.map(x => `<figure><figcaption>${esc(x.tipo === 'guia' ? 'Dados da Guia' : x.tipo === 'proc' ? 'Procedimentos' : 'Print')} · ${fmtHora(x.em)}</figcaption><a href="${x.img}" target="_blank" rel="noopener" title="Abrir em tamanho real"><img src="${x.img}" alt="Print enviado"></a></figure>`).join('')}</div>` : '<p class="dica">Os prints não foram guardados (opção desligada em Preferências).</p>'}`
       : (r.conferencia && r.conferencia.prints ? `<p class="dica">${r.conferencia.prints.ok ? 'Conferido pelos prints' : 'Prints com divergência'} em ${fmtDH(r.conferencia.prints.em)}</p>${(r.conferencia.prints.divergencias || []).map(d => `<div class="dica">• ${esc(d)}</div>`).join('')}` : a && a.cega ? `<p class="dica">Conferência manual (cega): ${a.cega.ok ? 'concluída' : 'não concluída'}, ${pl(a.cega.tentativas, 'tentativa', 'tentativas')}.</p>` : '<p class="dica">Sem conferência pelos prints.</p>')}
-    ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${pl(a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length, 'correção', 'correções')} e aceite(s))</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
+    ${a && a.eventos && a.eventos.length ? `<h3 style="margin-top:16px">Linha do tempo (${pl(a.eventos.filter(e => EV_CORRECAO.includes(e.tipo)).length, 'correção', 'correções')} e aceites)</h3><div class="linha-tempo">${a.eventos.map(e => `<div class="ev ${EV_CORRECAO.includes(e.tipo) ? 'corr' : ''}"><span class="num">${fmtHora(e.em)}</span><b>${esc(EV_ROT[e.tipo] || e.tipo)}</b><span>${esc(e.texto)}${e.op ? ` <span class="muted">· ${esc(e.op)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
     ${a && a.copiados.length ? `<h3 style="margin-top:16px">Copiado para o sistema</h3><div class="tabela-scroll"><table class="t"><thead><tr><th>Campo</th><th>Valor copiado</th></tr></thead><tbody>${a.copiados.map(c => `<tr><td>${esc(c.campo)}</td><td class="num">${esc(c.valor)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <h3 style="margin-top:16px">Alertas</h3>
     ${(a ? a.alertas : [...(r.bloqueios || []).map(t => ({ modo: 'bloqueio', texto: t })), ...(r.alertas || []).map(x => ({ modo: x.m, texto: x.t, conferido: x.c }))]).map(x => `<div class="dica">• <b>${esc(TAG_MODO[x.modo] ? TAG_MODO[x.modo][2] : x.modo)}:</b> ${esc(x.texto)}${x.conferido ? ' <span class="tag ok">conferido</span>' : ''}</div>`).join('') || '<p class="dica">Nenhum alerta.</p>'}
@@ -5889,7 +6009,7 @@ function htmlHistoricoGuia(r, a) {
 async function abrirHistoricoGuia(id) {
   const r = Reg.todos[id] || Reg.cache.find(x => x.id === id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }
   const a = await Aud.ler(r);
-  abrirModal({ titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Beneficiário'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
+  abrirModal({ lateral: true, titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Beneficiário'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
     rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button>` });
 }
 /* ---------- Auditar (aba Ações): busca em todos os registros ---------- */
@@ -5901,7 +6021,7 @@ function htmlAuditar() {
     <div class="linha-flex"><input type="search" id="audQ" value="${esc(AUD_BUSCA.q)}" placeholder="Ex.: Maria Helena, 800000701023900IE ou T10068052" data-enter="auditarBuscar" style="flex:1;min-width:220px;width:auto" aria-label="Buscar beneficiário, carteira ou guia">
       <button class="btn pri" data-act="auditarBuscar">${ic('search')}Buscar</button></div>
     <label class="chk" style="margin-top:8px"><input type="checkbox" id="audCorr" ${AUD_BUSCA.soCorr ? 'checked' : ''}><span>Só guias com correções, releituras ou divergências aceitas</span></label>
-    ${AUD_BUSCA.buscando ? '<p class="muted" style="margin-top:8px">Buscando nos registros…</p>' : R ? `<p class="dica" style="margin-top:8px">${pl(R.length, 'resultado', 'resultados')}${R.length > 200 ? ' (mostrando os 200 mais recentes)' : ''}.</p>
+    ${AUD_BUSCA.buscando ? `<div style="margin-top:10px">${'<div class="esq-b esq-linha"></div>'.repeat(5)}</div>` : R ? `<p class="dica" style="margin-top:8px">${pl(R.length, 'resultado', 'resultados')}${R.length > 200 ? ' (mostrando os 200 mais recentes)' : ''}.</p>
     ${R.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Data</th><th>Beneficiário</th><th>Carteira</th><th>Guia</th><th>Clínica</th><th>Operador</th><th>Situação</th><th></th></tr></thead><tbody>
       ${R.slice(0, 200).map(r => `<tr><td class="num">${fmtDH(r.concluidoEm || r.abertoEm)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}${r.correcoes ? ` <span class="tag warn" title="Correções, releituras e aceites registrados">${pl(r.correcoes, 'correção', 'correções')}</span>` : ''}${r.ignorados ? ` <span class="tag obs">${pl(r.ignorados, 'aceite', 'aceites')}</span>` : ''}</td><td class="num">${esc(r.carteira || '—')}</td><td class="num"><b>${esc(r.guia || '—')}</b></td><td>${esc(r.clinica || r.remetente || '—')}</td><td>${esc(r.operador || '—')}</td><td>${tagStatus(r.status)} ${tagResultado(resultadoDe(r))}</td>
         <td class="c"><button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}">${ic('eye', 'sm')}Ver histórico</button></td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
@@ -6029,14 +6149,38 @@ const MOTIVOS_IGN = {
   outro: [['outro', 'Outro motivo (descreva)']]
 };
 const exigeMotivo = chave => chave === 'c:paciente' || chave === 'c:ident';
+/* Diferença letra a letra: marca o que muda entre o pedido e o lido (ex.: 41310000353730[2]EQ × …0[1]EQ) */
+function marcasDiferenca(a, b) {
+  a = String(a); b = String(b); const n = a.length, m = b.length;
+  if (n * m > 40000) return [esc(a), esc(b)];
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ka = new Array(n).fill(false), kb = new Array(m).fill(false);
+  for (let i = 0, j = 0; i < n && j < m;) { if (a[i] === b[j]) { ka[i] = kb[j] = true; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+  const html = (s, k) => { let o = '', dif = false; for (let i = 0; i < s.length; i++) { if (!k[i] && !dif) { o += '<mark class="dif">'; dif = true; } if (k[i] && dif) { o += '</mark>'; dif = false; } o += esc(s[i]); } return o + (dif ? '</mark>' : ''); };
+  return [html(a, ka), html(b, kb)];
+}
+function htmlDiferenca(ped, lido) {
+  const [a, b] = marcasDiferenca(ped, lido);
+  return `<div class="dif-box"><div><span class="lbl">Pedido</span><span class="num">${a}</span></div><div><span class="lbl">Lido no sistema</span><span class="num">${b}</span></div></div>`;
+}
 function abrirMotivoIgnorar(g, x) {
   const k = x.chave.startsWith('i:') ? 'item' : x.chave.slice(2), ops = [...MOTIVOS_IGN.comum, ...(MOTIVOS_IGN[k] || []), ...MOTIVOS_IGN.outro], obrig = exigeMotivo(x.chave);
   M = { tipo: 'motivoIgn', chave: x.chave };
   abrirModal({ risco: 'warn', titulo: 'Aceitar divergência', sub: `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"`, icone: 'shield', tamanho: 'p',
     corpo: `<p class="dica" style="margin:0 0 10px">O print já foi lido de novo e continua diferente. ${obrig ? '<b>Para nome e carteira o motivo é obrigatório.</b>' : 'Diga o motivo: ele fica no histórico da guia.'}</p>
-      <div class="stack" role="radiogroup">${ops.map(([v, t], i) => `<label class="chk"><input type="radio" name="motIgn" value="${v}" ${i === 0 && !obrig ? '' : ''}><span>${esc(t)}</span></label>`).join('')}</div>
+      ${(x.ped ?? x.qPed) != null && (x.lido ?? x.qSis) != null ? htmlDiferenca(String(x.ped ?? x.qPed), String(x.lido ?? x.qSis)) : ''}
+      <div class="stack" role="radiogroup">${ops.map(([v, t], i) => `<label class="chk"><input type="radio" name="motIgn" value="${v}"><span><kbd>${i + 1}</kbd> <span class="mot-t">${esc(t)}</span></span></label>`).join('')}</div>
       <label class="lbl" for="motIgnTxt" style="margin-top:10px">Detalhe ${obrig ? '(obrigatório em "Outro")' : '(opcional)'}</label><textarea id="motIgnTxt" rows="2" placeholder="Ex.: no sistema está JANY G. DA SILVA"></textarea>`,
-    rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="motivoIgnOk">${ic('check')}Aceitar divergência</button>` });
+    rodape: `<span class="dica">Escolha o motivo (ou tecle 1 a ${ops.length}).</span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="motivoIgnOk" id="motIgnOk" disabled>${ic('check')}Aceitar divergência</button>` });
+  const fundo = $('#modalFundo'), ok = $('#motIgnOk');
+  fundo.addEventListener('change', ev => { if (ev.target.name === 'motIgn') ok.disabled = false; });
+  fundo.addEventListener('keydown', ev => {
+    if (ev.target.matches('textarea') || ev.ctrlKey || ev.altKey) return;
+    const n = parseInt(ev.key, 10), r = $$('input[name=motIgn]', fundo);
+    if (n >= 1 && n <= r.length) { ev.preventDefault(); r[n - 1].checked = true; r[n - 1].focus(); ok.disabled = false; if (r[n - 1].value === 'outro') $('#motIgnTxt').focus(); }
+  });
+  setTimeout(() => { const r = $('input[name=motIgn]', fundo); if (r) r.focus(); }, 40);
 }
 function confirmarIgnorar(g, x, motivo) {
   g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {};
@@ -6070,7 +6214,7 @@ Object.assign(acoes, {
     const sel = $('input[name="motIgn"]:checked'), det = ($('#motIgnTxt') || {}).value.trim();
     if (!sel) { toast('Escolha o motivo.', 'bad'); return; }
     if (sel.value === 'outro' && det.length < 4) { toast('Descreva o motivo.', 'bad'); $('#motIgnTxt').focus(); return; }
-    const texto = sel.closest('label').textContent.trim();
+    const texto = (sel.closest('label').querySelector('.mot-t') || sel.closest('label')).textContent.trim();
     fecharModal(true);
     confirmarIgnorar(g, x, { tipo: sel.value, texto, detalhe: det });
   },
@@ -6131,7 +6275,7 @@ Object.assign(acoes, {
     else cl.leitura.qtdPadrao = Number(e.correto);
     marcarSujo(); render(); toast(`Regra adicionada em ${cl.nome}. Clique em Salvar configurações.`);
   },
-  async aprRemover(b) { if (!confirm('Esquecer esta correção? Ela deixa de ser sugerida.')) return; await Apr.remover(b.dataset.k); render(); },
+  async aprRemover(b) { const x = Apr.lista.find(y => Apr.chave(y) === b.dataset.k); if (!(await confirmar({ titulo: 'Esquecer correção', texto: x ? `Esquecer a correção <b>“${esc(x.lido)}” → “${esc(x.correto)}”</b>${x.clinica ? ' de ' + esc(x.clinica) : ''}? Ela deixa de ser sugerida.` : 'Esquecer esta correção?', ok: 'Esquecer correção', risco: 'warn' }))) return; await Apr.remover(b.dataset.k); render(); },
   aprBaixar() { baixar(nomeArquivo('aprendizado', isoDia(new Date()), 'json'), JSON.stringify({ tipo: 'conferidor-aprendizado', versao: VERSAO, gerado: agora(), itens: Apr.lista }, null, 1), 'application/json'); }
 });
 /* ====================================================================
@@ -6302,6 +6446,7 @@ window.addEventListener('beforeunload', e => { if (S && !Abas.pausada) { e.preve
 
 async function init() {
   Abas.iniciar();
+  Dica.iniciar();
   iniciarSoIcone();
   Tema.aplicar();
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { }
