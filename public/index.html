@@ -95,6 +95,10 @@ a{color:var(--accent)}
 .ic.sm{width:14px;height:14px}.ic.lg{width:20px;height:20px}.ic.xl{width:28px;height:28px}
 @keyframes giro{to{transform:rotate(360deg)}}
 
+.aba-pausada{position:fixed;inset:0;z-index:200;background:var(--overlay);display:flex;align-items:center;justify-content:center;padding:16px}
+.aba-pausada-c{background:var(--surface);color:var(--text);border-radius:var(--r-lg);padding:28px;max-width:460px;text-align:center;display:grid;gap:12px;justify-items:center;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.aba-pausada-c .ic{color:var(--warn-solid)}
+.aba-pausada-c h2{font-size:var(--fs-xl)}
 /* ===== Topo ===== */
 header.topo{background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow);position:sticky;top:0;z-index:30}
 .topo-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;padding-top:10px;padding-bottom:10px}
@@ -1642,6 +1646,12 @@ const Pasta = {
     this.ok = (await this.handle.requestPermission({ mode: 'readwrite' })) === 'granted';
   },
   async dir(partes, criar) { let d = this.handle; for (const p of partes) d = await d.getDirectoryHandle(p, { create: !!criar }); return d; },
+  /* undefined = arquivo não existe; erro de leitura lança (para não sobrescrever um arquivo que só não foi lido) */
+  async lerSeguro(partes, nome) {
+    let d; try { d = await this.dir(partes, false); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
+    let fh; try { fh = await d.getFileHandle(nome); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
+    return JSON.parse(await (await fh.getFile()).text());
+  },
   async ler(partes, nome) { try { const d = await this.dir(partes, false); const f = await (await d.getFileHandle(nome)).getFile(); return JSON.parse(await f.text()); } catch (e) { return null; } },
   async gravar(partes, nome, obj) {
     try {
@@ -2239,41 +2249,89 @@ const Param = {
   porId(id) { return this.lista.find(x => x.id === id) || null; }
 };
 
-/* Registros: um por guia. Sem nome do beneficiário, CID ou médico. */
+/* Registros: um por guia (com o nome do paciente; CID e médico ficam na auditoria). */
+const carimboReg = r => r.atualizadoEm || r.registradoEm || '';
+/* Junta duas versões do mesmo arquivo de registros pelo id: nada é descartado, vale a versão mais recente de cada
+   registro, e o que foi excluído (lista "excluidos") não volta. */
+function juntarDocsReg(a, b) {
+  if (!a && !b) return null;
+  const base = a || b, exc = new Set([...((a && a.excluidos) || []), ...((b && b.excluidos) || [])]), mapa = new Map();
+  [...((a && a.registros) || []), ...((b && b.registros) || [])].forEach(r => {
+    if (!r || exc.has(r.id)) return; const x = mapa.get(r.id); if (!x || carimboReg(r) >= carimboReg(x)) mapa.set(r.id, r);
+  });
+  return { ...base, registros: [...mapa.values()], excluidos: [...exc] };
+}
+const assinaturaReg = d => d ? JSON.stringify([(d.registros || []).map(r => r.id + '@' + carimboReg(r)).sort(), [...(d.excluidos || [])].sort()]) : '';
 const Reg = {
   cache: [],
   arquivo(dia, op) { return { partes: ['registros', dia.slice(0, 7)], nome: `${dia}_${slug(op)}.json` }; },
   async salvar(reg) {
     const { partes, nome } = this.arquivo(reg.dia, reg.operador || 'sem-operador');
     const chave = `reg.${reg.dia}.${slug(reg.operador || 'sem-operador')}`;
-    let doc = LS.get(chave, null);
-    if (Pasta.ok) { const lido = await Pasta.ler(partes, nome); if (lido) doc = lido; }
+    let doc = LS.get(chave, null), erro = null;
+    if (Pasta.ok) { try { const lido = await Pasta.lerSeguro(partes, nome); if (lido) doc = juntarDocsReg(lido, doc); } catch (e) { erro = e; } }
     if (!doc) doc = { operador: reg.operador, dia: reg.dia, registros: [] };
+    doc.registros = doc.registros || [];
+    if (doc.excluidos) doc.excluidos = doc.excluidos.filter(x => x !== reg.id);
     const i = doc.registros.findIndex(r => r.id === reg.id);
     if (i >= 0) doc.registros[i] = reg; else doc.registros.push(reg);
     LS.set(chave, doc);
-    let erro = null;
-    if (Pasta.ok) { try { await Pasta.gravar(partes, nome, doc); } catch (e) { erro = e; } }
+    if (Pasta.ok && !erro) { try { await Pasta.gravar(partes, nome, doc); } catch (e) { erro = e; } }
+    if (!Pasta.ok || erro) this.pendente(chave, reg.id); else this.pendente(chave, null);
     const j = this.cache.findIndex(r => r.id === reg.id);
     if (j >= 0) this.cache[j] = reg; else this.cache.push(reg);
-    if (erro) toast('Não consegui gravar na pasta compartilhada. O registro ficou só neste computador.', 'bad');
+    if (erro) toast('Não consegui gravar na pasta compartilhada. O registro está guardado neste computador e será enviado depois.', 'bad');
+    pintarSync();
+  },
+  /* Atendimentos gravados só neste computador (pasta fora ou falha), por arquivo: { chave: [ids] } */
+  pendentes() { const p = LS.get('regPendentes', {}); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; },
+  nPendentes() { return Object.values(this.pendentes()).reduce((s, l) => s + (l || []).length, 0); },
+  pendente(chave, id) {
+    const p = this.pendentes();
+    if (id == null) delete p[chave]; else p[chave] = [...new Set([...(p[chave] || []), id])];
+    LS.set('regPendentes', p);
+  },
+  /* Envia à pasta o que está só neste computador, juntando com o que já está lá (nada é sobrescrito). */
+  async sincronizar(chaves) {
+    if (!Pasta.ok) return 0;
+    const p = this.pendentes(); let n = 0;
+    for (const k of (chaves || Object.keys(p))) {
+      const local = LS.get(k, null); if (!local) { delete p[k]; continue; }
+      const dia = k.slice(4, 14), partes = ['registros', dia.slice(0, 7)], nome = `${dia}_${k.slice(15)}.json`;
+      try {
+        const lido = await Pasta.lerSeguro(partes, nome), junto = juntarDocsReg(lido, local);
+        if (!lido || assinaturaReg(junto) !== assinaturaReg(lido)) await Pasta.gravar(partes, nome, junto);
+        LS.set(k, junto); if (p[k]) n += p[k].length; delete p[k];
+      } catch (e) { }
+    }
+    LS.set('regPendentes', p); pintarSync(); return n;
+  },
+  /* Uma vez por dia: confere os arquivos dos últimos 60 dias deste computador (recupera o que ficou só aqui). */
+  async conferirLocais() {
+    if (!Pasta.ok || LS.get('regConferidoEm', '') === isoDia(new Date())) return;
+    const lim = isoDia(addDias(new Date(), -60));
+    await this.sincronizar(LS.chaves('reg.').filter(k => k.slice(4, 14) >= lim));
+    LS.set('regConferidoEm', isoDia(new Date()));
   },
   async carregar(diasExtra) {
     const dias = HIST_DIAS + (diasExtra || 0);
     const limite = isoDia(addDias(new Date(), -dias));
     const docs = [];
+    if (Pasta.ok && this.nPendentes()) await this.sincronizar();
     if (Pasta.ok) {
       const meses = new Set(); for (let d = 0; d <= dias; d += 10) meses.add(isoDia(addDias(new Date(), -d)).slice(0, 7)); meses.add(limite.slice(0, 7));
       for (const m of meses) for (const [n, h] of await Pasta.listar(['registros', m])) {
         if (!n.endsWith('.json') || n.slice(0, 10) < limite) continue;
         try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
       }
+      for (const k of Object.keys(this.pendentes())) if (k.slice(4, 14) >= limite) { const d = LS.get(k, null); if (d) docs.push(d); }
     } else {
       for (const k of LS.chaves('reg.')) if (k.slice(4, 14) >= limite) { const d = LS.get(k, null); if (d) docs.push(d); }
     }
+    const excl = new Set(docs.flatMap(d => d.excluidos || []));
     // o mesmo registro pode estar no arquivo de mais de um operador (quando outro continuou o atendimento): vale o mais recente
     const mapa = new Map();
-    docs.flatMap(d => d.registros || []).forEach(r => { const a = mapa.get(r.id); if (!a || (r.atualizadoEm || r.registradoEm || '') >= (a.atualizadoEm || a.registradoEm || '')) mapa.set(r.id, r); });
+    docs.flatMap(d => d.registros || []).forEach(r => { if (excl.has(r.id)) return; const a = mapa.get(r.id); if (!a || carimboReg(r) >= carimboReg(a)) mapa.set(r.id, r); });
     this.cache = [...mapa.values()];
   },
   doDia(dia) { return this.cache.filter(r => r.dia === dia); },
@@ -2299,8 +2357,8 @@ const Reg = {
     }
     for (const k of LS.chaves('reg.')) { const d = LS.get(k, null); if (d) docs.push(d); }
     this.hist = {}; this.todos = {};
-    const mapa = new Map();
-    docs.flatMap(d => d.registros || []).forEach(r => { const a = mapa.get(r.id); if (!a || (r.atualizadoEm || '') >= (a.atualizadoEm || '')) mapa.set(r.id, r); });
+    const mapa = new Map(), excl = new Set(docs.flatMap(d => d.excluidos || []));
+    docs.flatMap(d => d.registros || []).forEach(r => { if (excl.has(r.id)) return; const a = mapa.get(r.id); if (!a || (r.atualizadoEm || '') >= (a.atualizadoEm || '')) mapa.set(r.id, r); });
     this.mesclarHist([...mapa.values()]);
     await this.carregar(); this.mesclarHist(this.cache); this.histPronto = true;
   },
@@ -2308,8 +2366,10 @@ const Reg = {
   doMes(ym) { const m = new Map(Object.values(this.todos).filter(r => r.dia && r.dia.startsWith(ym)).map(r => [r.id, r])); this.cache.filter(r => !r.tipo && r.dia && r.dia.startsWith(ym)).forEach(r => m.set(r.id, r)); return [...m.values()]; },
   async excluir(id) {
     const r = this.cache.find(x => x.id === id) || this.todos[id]; if (!r) return false;
-    for (const k of LS.chaves('reg.' + r.dia)) { const d = LS.get(k, null); if (d && (d.registros || []).some(x => x.id === id)) { d.registros = d.registros.filter(x => x.id !== id); LS.set(k, d); } }
-    if (Pasta.ok) { const partes = ['registros', r.dia.slice(0, 7)]; for (const [n] of await Pasta.listar(partes)) { if (!n.startsWith(r.dia) || !n.endsWith('.json')) continue; const doc = await Pasta.ler(partes, n); if (doc && (doc.registros || []).some(x => x.id === id)) { doc.registros = doc.registros.filter(x => x.id !== id); await Pasta.gravar(partes, n, doc); } } }
+    const marcar = d => { d.registros = (d.registros || []).filter(x => x.id !== id); d.excluidos = [...new Set([...(d.excluidos || []), id])]; return d; };
+    for (const k of LS.chaves('reg.' + r.dia)) { const d = LS.get(k, null); if (d && (d.registros || []).some(x => x.id === id)) LS.set(k, marcar(d)); }
+    const pend = this.pendentes(); Object.keys(pend).forEach(k => { pend[k] = pend[k].filter(x => x !== id); if (!pend[k].length) delete pend[k]; }); LS.set('regPendentes', pend);
+    if (Pasta.ok) { const partes = ['registros', r.dia.slice(0, 7)]; for (const [n] of await Pasta.listar(partes)) { if (!n.startsWith(r.dia) || !n.endsWith('.json')) continue; const doc = await Pasta.ler(partes, n); if (doc && (doc.registros || []).some(x => x.id === id)) await Pasta.gravar(partes, n, marcar(doc)); } }
     this.cache = this.cache.filter(x => x.id !== id); delete this.todos[id];
     Object.values(this.hist).forEach(l => { const i = l.findIndex(x => x.id === id); if (i >= 0) l.splice(i, 1); });
     return true;
@@ -2330,7 +2390,7 @@ const guiaAtiva = () => (S ? S.guias[S.ativa] : null);
 // Último médico lido por remetente, só neste computador: serve de sugestão quando um pedido da mesma clínica vem sem médico
 const chaveMedico = () => (S && S.email && S.email.remetente && S.email.remetente.email) ? 'medico.' + S.email.remetente.email.toLowerCase() : '';
 function lembrarMedico() { const k = chaveMedico(); if (!k) return; const g = S.guias.find(x => x.pedido.medico && x.pedido.medico.nome); if (g) LS.set(k, g.pedido.medico.bruto); }
-function persistir() { if (S) { LS.set('atual', S); lembrarMedico(); } else LS.del('atual'); }
+function persistir() { if (Abas.pausada) return; if (S) { LS.set('atual', S); lembrarMedico(); } else LS.del('atual'); }
 function clinicaDe(s) { return s && s.clinicaId ? cfg.clinicas.find(c => c.id === s.clinicaId) || null : null; }
 const PALAVRAS_VAZIAS = new Set(['clinica', 'clinicas', 'de', 'da', 'do', 'das', 'dos', 'e', 'autorizacao', 'convenio', 'contato', 'espaco', 're', 'res', 'enc', 'fw', 'fwd', 'pedido', 'guia', 'guias', 'terapia', 'terapias', 'integrada', 'multidisciplinar']);
 const tokens = s => semAcento(s).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !PALAVRAS_VAZIAS.has(w));
@@ -2699,8 +2759,11 @@ function pintarSync() {
   else if (!Pasta.handle) { msg = 'Pasta compartilhada não conectada. Nada está sincronizando: colegas não veem este atendimento, o aviso de e-mail já atendido não funciona e os registros ficam só neste computador.'; acao = 'Conectar pasta'; }
   else if (!Pasta.ok) { msg = 'A pasta compartilhada precisa ser reautorizada (um clique por dia). Enquanto isso nada está sincronizando com os colegas.'; acao = 'Reautorizar pasta'; }
   else if (Pasta.erro) { msg = 'A última gravação na pasta compartilhada falhou (' + Pasta.erro + '). Este atendimento pode não ter sincronizado: confira a pasta e reautorize se preciso.'; acao = 'Reautorizar pasta'; }
+  const np = Reg.nPendentes(), txtP = np ? `${np} ${np === 1 ? 'atendimento registrado' : 'atendimentos registrados'} só neste computador, aguardando envio para a pasta.` : '';
+  if (np && Pasta.ok && !Pasta.erro) msg = txtP + ' Eles não se perdem: são enviados assim que a gravação funcionar.';
+  else if (np) msg += ' ' + txtP;
   el.hidden = !msg;
-  el.innerHTML = msg ? `${ic('folderx')}<span class="esp">${esc(msg)}</span>${acao ? `<button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${acao}</button>` : ''}` : '';
+  el.innerHTML = msg ? `${ic('folderx')}<span class="esp">${esc(msg)}</span>${np && Pasta.ok ? `<button class="btn sm" data-act="regSync">${ic('refresh', 'sm')}Enviar agora</button>` : ''}${acao ? `<button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${acao}</button>` : ''}` : '';
 }
 
 /* ---------- Topo e abas ---------- */
@@ -4621,7 +4684,7 @@ window.addEventListener('message', ev => {
   const d = ev.data;
   if (ev.source !== window || ev.origin !== location.origin || !d) return;
   if (d.__conferidorExt === 'instalada') { render(); return; }
-  if (d.__conferidorExt === 'webmail' && d.msg) abrirDoWebmail(d.msg);
+  if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg); }
 });
 async function iniciar(email) {
   await Reg.carregarTudo(); await Param.carregar();
@@ -4684,6 +4747,7 @@ const acoes = {
     try {
       if (Pasta.handle && !Pasta.ok) await Pasta.reautorizar(); else await Pasta.conectar();
       await carregarConfig(); await Param.carregar(); await Reg.carregar(); await Apr.carregar(); cfgEdit = null; cfgDirty = false; render();
+      Reg.conferirLocais().catch(() => { });
       toast(Pasta.ok ? 'Pasta conectada.' : 'Permissão não concedida.', Pasta.ok ? '' : 'bad');
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar a pasta: ' + e.message, 'bad'); }
   },
@@ -4969,6 +5033,7 @@ const acoes = {
     if (!confirm(`Excluir definitivamente o registro${r.guia ? ' da guia ' + r.guia : ''}? Esta ação não pode ser desfeita.`)) return;
     await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
+  async regSync() { const n = await Reg.sincronizar(); await Reg.carregar(); render(); toast(Reg.nPendentes() ? 'Ainda não consegui gravar na pasta. Confira a conexão e tente de novo.' : n ? `${n} ${n === 1 ? 'atendimento enviado' : 'atendimentos enviados'} para a pasta.` : 'Nada pendente.', Reg.nPendentes() ? 'bad' : ''); },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
     const emb = a => a.map(x => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map(x => x[1]);
@@ -5270,7 +5335,7 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // Botões secundários viram só ícone (o texto vai para dica e leitor de tela)
-const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Sortear amostra|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
+const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
 function soIcone(raiz) {
   raiz.querySelectorAll('.btn:not(.so):not(.pri)').forEach(b => {
     if (!b.querySelector('svg.ic')) return;
@@ -6074,7 +6139,42 @@ document.addEventListener('click', e => {
   if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
 });
 
+/* ---------- Uma aba por vez: duas abas abertas gravariam o atendimento no mesmo lugar do navegador ---------- */
+const Abas = {
+  id: Math.random().toString(36).slice(2), canal: null, pausada: false, outra: false, esperando: false,
+  iniciar() {
+    if (!('BroadcastChannel' in window)) return;
+    this.canal = new BroadcastChannel('conferidor-abas');
+    this.canal.onmessage = ev => {
+      const m = ev.data || {}; if (m.de === this.id) return;
+      if (m.t === 'ola' && !this.pausada) this.canal.postMessage({ t: 'aqui', de: this.id });
+      if (m.t === 'aqui' && this.esperando) this.outra = true;
+      if (m.t === 'assumir' && !this.pausada) this.pausar(false);
+    };
+    this.esperando = true; this.canal.postMessage({ t: 'ola', de: this.id });
+    setTimeout(() => { this.esperando = false; if (this.outra) this.pausar(true); }, 400);
+  },
+  pausar(nova) {
+    this.pausada = true; if (M) fecharModal(true);
+    let el = document.getElementById('abaPausada');
+    if (!el) { el = document.createElement('div'); el.id = 'abaPausada'; el.className = 'aba-pausada'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
+    el.innerHTML = `<div class="aba-pausada-c">${ic('alert', 'xl')}<h2>${nova ? 'O Conferidor já está aberto em outra aba' : 'Esta aba foi pausada'}</h2>
+      <p>${nova ? 'Duas abas abertas misturam os atendimentos, porque gravam no mesmo lugar do navegador. Feche esta aba e use a outra, ou use esta (a outra fica pausada).' : 'O Conferidor foi aberto em outra aba. Esta ficou pausada para não misturar os atendimentos.'}</p>
+      <button class="btn pri" id="abaUsar">${ic('check')}Usar esta aba</button></div>`;
+    el.querySelector('#abaUsar').addEventListener('click', () => this.assumir());
+  },
+  assumir() {
+    if (this.canal) this.canal.postMessage({ t: 'assumir', de: this.id });
+    this.pausada = false; this.outra = false;
+    const el = document.getElementById('abaPausada'); if (el) el.remove();
+    S = LS.get('atual', null); if (S && S.v !== 2) S = null;
+    render();
+  }
+};
+window.addEventListener('beforeunload', e => { if (S && !Abas.pausada) { e.preventDefault(); e.returnValue = ''; } });
+
 async function init() {
+  Abas.iniciar();
   iniciarSoIcone();
   Tema.aplicar();
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { }
@@ -6085,6 +6185,7 @@ async function init() {
   await carregarConfig();
   await Param.carregar();
   await Reg.carregar();
+  Reg.conferirLocais().catch(() => { });
   await Apr.carregar();
   S = LS.get('atual', null);
   if (S && S.v !== 2) S = null;
