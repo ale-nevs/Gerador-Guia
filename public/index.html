@@ -218,6 +218,50 @@ main > * + *{margin-top:10px}
 @media (min-width:760px){.passo .passo-selo{display:inline-flex}}
 .passo.atual.atencao .bola{background:var(--warn-bg);border-color:var(--warn-solid);color:var(--warn-fg)}
 
+/* ===== Como fazer / aguardando e-mail ===== */
+.como{margin:0 0 10px}.como .dica{margin:0 0 4px;font-size:var(--fs-sm)}
+.como details > summary{font-size:var(--fs-xs);color:var(--accent);font-weight:650;width:max-content}
+.como-d{font-size:var(--fs-sm);color:var(--text-2);padding:6px 0 0}.como-d ol{margin:0;padding-left:20px}.como-d p{margin:4px 0 0}
+.vazio .como{max-width:620px;margin:0 auto 14px}
+.vazio.aguardando{padding:22px 20px}.vazio.aguardando .ico{width:44px;height:44px;margin-bottom:8px}
+/* ===== Seletor de visualização ===== */
+.seg-vis{align-items:stretch}
+.seg-vis .seg-rot{display:inline-flex;align-items:center;padding:0 10px;font-size:var(--fs-xs);font-weight:650;color:var(--text-2);background:var(--surface-2);border-right:1px solid var(--border-strong)}
+.seg-vis button{padding:5px 11px;min-height:calc(var(--h-ctl) - 2px)}
+.seg-vis button.on{background:var(--primary);color:var(--on-primary)}
+body.topo-mini .seg-vis button{padding:3px 8px;min-height:26px}
+@media (max-width:1499px){.seg-vis .seg-rot{display:none}.chip.tema .txt-fino{display:none}}
+@media (max-width:1100px){.seg-vis .txt-fino{display:none}}
+/* ===== Densidade compacta ===== */
+body.densa{--h-ctl:28px;--h-sm:24px}
+body.densa .card{padding:8px 12px}
+body.densa main > * + *{margin-top:6px}
+body.densa .card + .card{margin-top:6px}
+body.densa .cp-grupo{padding:4px 10px}
+body.densa .cp-linha{padding:2px 0}
+body.densa .cp-grupo + .cp-grupo{margin-top:6px}
+body.densa .t th,body.densa .t td{padding:2px 6px}
+body.densa .passos{padding:4px}
+body.densa .passo{padding:4px 10px}
+body.densa .card-h{margin-bottom:4px}
+body.densa input[type=text],body.densa select{padding:3px 8px}
+body.densa .barra-acao{padding:6px 12px}
+body.densa nav.abas{padding:5px 8px;margin-top:6px}
+body.densa .topo-in{padding-top:5px;padding-bottom:5px}
+body.densa .al{padding:5px 9px}
+/* ===== Barra de ação fixa no rodapé ===== */
+.barra-acao{position:sticky;bottom:0;z-index:15;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:0 -6px 20px rgba(15,23,42,.10)}
+:root[data-theme=dark] .barra-acao{box-shadow:0 -6px 20px rgba(0,0,0,.45)}
+.barra-st{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-sm)}
+.barra-msg{color:var(--text-2);min-width:0}
+.acoes-sec{margin-bottom:-4px}
+@keyframes piscar{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--warn-solid)}}
+.piscar{animation:piscar 1.2s ease 2}
+.btn.conferi-btn{background:var(--surface);border-color:var(--warn-br);color:var(--warn-fg)}
+.btn.conferi-btn:hover{background:var(--warn-bg)}
+.btn.conferi-btn.on{background:var(--ok-bg);border-color:var(--ok-br);color:var(--ok-fg)}
+/* E-mail fixo ao rolar a coluna da direita (etapa 2) */
+@media (min-width:1001px){.col-fixa{position:sticky;top:76px;align-self:start;max-height:calc(100vh - 160px);overflow:auto;border-radius:var(--r-lg)}body.topo-mini .col-fixa{top:44px;max-height:calc(100vh - 120px)}.col-fixa pre.original{max-height:none}}
 /* ===== Cartões ===== */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;box-shadow:var(--shadow)}
 .card + .card{margin-top:10px}
@@ -2792,6 +2836,20 @@ function pintarSync() {
   el.innerHTML = msg ? `${ic('folderx')}<span class="esp">${esc(msg)}</span>${np && Pasta.ok ? `<button class="btn sm" data-act="regSync">${ic('refresh', 'sm')}Enviar agora</button>` : ''}${acao ? `<button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${acao}</button>` : ''}` : '';
 }
 
+/* ---------- Visualização (Completa · Simples · Flutuante) e densidade, lembradas por operador neste computador ---------- */
+const Vis = {
+  chave: k => k + '.' + (LS.get('operadorId', '') || 'x'),
+  get() { const v = LS.get(this.chave('vis'), null); if (v) return v; return LS.get('modoSimples', false) || LS.get('topoMini', false) ? 'simples' : 'completa'; },
+  set(v) { LS.set(this.chave('vis'), v); },
+  simples() { return this.get() === 'simples'; },
+  densa() { return LS.get(this.chave('densidade'), 'confortavel') === 'compacta'; }
+};
+function htmlSeletorVis(compacto) {
+  const v = Vis.get() === 'flutuante' && !Mini.aberto() ? 'completa' : Vis.get();
+  const b = (k, i, t, d) => `<button type="button" role="radio" aria-checked="${v === k}" class="${v === k ? 'on' : ''}" data-act="visualizacao" data-v="${k}" title="${d}" aria-label="${t}">${ic(i, 'sm')}${compacto ? '' : `<span class="txt-fino">${t}</span>`}</button>`;
+  return `<div class="seg seg-vis" role="radiogroup" aria-label="Visualização">${compacto ? '' : '<span class="seg-rot">Visualização</span>'}${b('completa', 'monitor', 'Completa', 'Menu, topo e todos os detalhes')}${b('simples', 'rows', 'Simples', 'Tela única: topo compacto e só o essencial para gerar a guia (monitor pequeno)')}${b('flutuante', 'pip', 'Flutuante', 'Abre uma janelinha que fica por cima do sistema, com os campos para copiar e a captura')}</div>`;
+}
+
 /* ---------- Topo e abas ---------- */
 /* ---------- Progresso dos operadores (topo compacto) ---------- */
 const ROT_ETAPA = { 33: 'lendo o pedido', 66: 'gerando a guia', 100: 'anexando e respondendo' };
@@ -2815,7 +2873,7 @@ function pintarProgresso() {
   el.innerHTML = L.length ? L.map(x => `<span class="prog" role="img" style="--p:${x.p};${x.o ? estiloOp(x.o) : ''}" title="${esc(x.tip)}" aria-label="${esc(x.tip)}"><span class="pe">${x.o ? glifo(x.o.icone) : ic('user', 'sm')}</span></span>`).join('')
     : `<span class="prog" role="img" style="--p:0" title="Nenhum atendimento em andamento" aria-label="Nenhum atendimento em andamento"><span class="pe">${ic('user', 'sm')}</span></span>`;
 }
-setInterval(async () => { if (document.hidden || !LS.get('topoMini', false)) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
+setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
@@ -2825,8 +2883,9 @@ function renderTopo() {
       : Pasta.handle ? { c: 'alerta', i: 'folder', t: 'Reautorizar pasta', d: 'A pasta lembrada precisa de autorização (um clique por dia).' }
         : { c: 'alerta', i: 'folderx', t: 'Pasta não conectada', d: 'Sem a pasta, os registros ficam só neste computador e não há visão conjunta entre operadores.' };
   const escuro = Tema.efetivo() === 'dark';
-  const mini = !!LS.get('topoMini', false), cab = document.querySelector('header.topo');
+  const mini = Vis.simples(), cab = document.querySelector('header.topo');
   document.body.classList.toggle('topo-mini', mini);
+  document.body.classList.toggle('densa', Vis.densa());
   cab.style.cssText = mini && op ? estiloOp(op) : '';
   const nivel = !Pasta.suportado ? 'bad' : Pasta.ok ? 'ok' : Pasta.handle ? 'warn' : 'bad';
   if (mini) pintarProgresso();
@@ -2834,7 +2893,7 @@ function renderTopo() {
     $('#topoAcoes').innerHTML = `
     <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip mini-btn" data-act="pasta" title="${esc(pasta.t + ': ' + pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span></button>
-    <button class="chip mini-btn" data-act="topoMini" title="Mostrar menu e topo completo" aria-label="Mostrar menu e topo completo">${ic('chevdown', 'sm')}</button>`;
+    ${htmlSeletorVis(true)}`;
     $('#abas').innerHTML = '';
     document.title = 'Conferidor de Guias · Promédica';
     return;
@@ -2845,7 +2904,7 @@ function renderTopo() {
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
     ${extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
-    <button class="chip mini-btn" data-act="topoMini" title="Ocultar menu e topo (modo compacto)" aria-label="Ocultar menu e topo">${ic('chevup', 'sm')}</button>`;
+    ${htmlSeletorVis(false)}`;
   $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
     .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
   $('#verRodape').textContent = 'v' + VERSAO;
@@ -2903,7 +2962,7 @@ function htmlUmAlerta(a, g) {
   if (a.aprendidoI != null) extra += `<button class="btn sm" data-act="aplicarAprendido" data-i="${a.aprendidoI}">${ic('check', 'sm')}Aplicar a mesma correção</button>`;
   if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
   const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
-  if (pedeConferi(a)) extra += `<label class="chk conferi"><input type="checkbox" data-conf="${esc(a.key)}" ${conferido ? 'checked' : ''}>Conferi</label>`;
+  if (pedeConferi(a)) extra += `<button type="button" class="btn sm conferi-btn ${conferido ? 'on' : ''}" data-act="conferiAlerta" data-conf="${esc(a.key)}" aria-pressed="${conferido ? 'true' : 'false'}">${ic('check', 'sm')}${conferido ? 'Conferido' : 'Conferi'}</button>`;
   if (a.modo === 'obs') extra += `<span class="muted" style="font-size:var(--fs-xs)">Texto em “Incluir observação” (observações adicionais da resposta).</span>`;
   const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
   return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico, 'sm')}</span><div class="tx"><b class="al-t">${a.modo === 'bloqueio' ? 'Bloqueio:' : a.modo === 'obs' ? 'Aviso com observação:' : a.nivel === 'info' ? 'Informativo:' : 'Atenção:'}</b> ${esc(a.texto)}</div>${extra ? `<div class="acoes-al">${extra}</div>` : ''}</div>`;
@@ -2924,6 +2983,29 @@ function htmlPainelAlertas(g, st) {
       ${st.obs.length ? `<span class="tag obs">${ic('message', 'sm')}${st.obs.length} com observação</span>` : ''}
       ${tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Conferido</span>`) : ''}</div>
     <div class="al-corpo"><div class="alertas" id="alertas">${htmlAlertas(g, st)}</div></div></section>`;
+}
+
+/* ---------- Instrução curta + "Como fazer" (aberto nos primeiros 5 dias de uso neste computador) ---------- */
+function comoFazerAberto(chave) {
+  const p = LS.get('como.' + chave, null); if (p != null) return p;
+  let ini = LS.get('primeiroUso', ''); if (!ini) { ini = isoDia(new Date()); LS.set('primeiroUso', ini); }
+  return (Date.now() - new Date(ini + 'T12:00')) / 864e5 < 5;
+}
+const htmlComoFazer = (chave, frase, detalhe) => `<div class="como"><p class="dica">${frase}</p><details data-como="${chave}" ${comoFazerAberto(chave) ? 'open' : ''}><summary>Como fazer</summary><div class="como-d">${detalhe}</div></details></div>`;
+document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.como) LS.set('como.' + d.dataset.como, d.open); }, true);
+
+/* ---------- Barra de ação fixa no rodapé: ← Voltar | estado (ver) | Seguir → ---------- */
+const curtoTxt = (t, n = 110) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+function statusBarra(g, st, pend) {
+  const ver = `<button class="btn link" data-act="verAlertas">ver</button>`;
+  if (st.bloqueios.length) return `<span class="tag bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}</span><span class="barra-msg" title="${esc(st.bloqueios.map(b => b.texto).join('\n'))}">${esc(curtoTxt(st.bloqueios[0].texto))}</span>${ver}`;
+  if (pend && pend.length) return `<span class="tag warn">${ic('alert', 'sm')}${pl(pend.length, 'pendência', 'pendências')}</span><span class="barra-msg" title="${esc(pend.join('\n'))}">${esc(curtoTxt(pend[0]))}</span>`;
+  const conf = atencaoPendente(g, st).length;
+  if (conf) return `<span class="tag warn">${ic('alert', 'sm')}${conf} a conferir</span><span class="barra-msg">Marque “Conferi” nos avisos depois de conferir.</span>${ver}`;
+  return `<span class="tag ok">${ic('check', 'sm')}Tudo certo para seguir</span>`;
+}
+function htmlBarraAcao({ voltar = '', seguir = '', status = '' }) {
+  return `<div class="barra-acao" role="region" aria-label="Ações da etapa">${voltar}<div class="barra-st">${status}</div>${seguir}</div>`;
 }
 
 /* ---------- Barra de guias e etapas ---------- */
@@ -2973,12 +3055,17 @@ function renderEntrada(app) {
   ${semOp ? `<div class="aviso">${ic('user')}<div>Escolha seu nome em <b>Operador</b>, no topo, antes de começar.</div></div>` : ''}
   ${!Pasta.ok ? `<div class="aviso">${ic('folderx')}<div>${Pasta.handle ? 'A pasta compartilhada precisa ser reautorizada (um clique por dia).' : 'A pasta compartilhada não está conectada: os registros ficam só neste computador e não há visão conjunta entre operadores.'}</div><span class="acoes"><button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${Pasta.handle ? 'Reautorizar pasta' : 'Conectar pasta'}</button></span></div>` : ''}
   ${ultimoConcluido ? `<div class="ultimo">${ic('check')}<div>Último registrado: <b>${esc(ultimoConcluido.texto)}</b> às ${fmtHora(ultimoConcluido.em)}.</div></div>` : ''}
-  <div class="vazio" id="zona">
+  ${extInstalada() ? `<div class="vazio aguardando" id="zona">
+    <div class="ico">${ic('mail', 'xl')}</div>
+    <h2>Aguardando e-mail do webmail…</h2>
+    <p>Abra o e-mail no webmail e clique em <b>Abrir no conferidor</b>, o botão no canto da tela. Ele chega aqui sozinho.</p>
+    <button class="btn line sm" data-act="escolherEml">${ic('upload', 'sm')}Ou envie o arquivo .eml</button>
+  </div>` : `<div class="vazio" id="zona">
     <div class="ico">${ic('upload', 'xl')}</div>
     <h2>Nenhum pedido carregado</h2>
-    <p>Arraste aqui o .eml do e-mail que você vai atender ou escolha o arquivo. Um e-mail pode ter de 1 a ${MAX_BENEFICIARIOS} beneficiários; cada um gera uma guia independente. No SmarterMail: abra o e-mail › menu ⋮ › baixar/salvar como .eml.</p>
+    ${htmlComoFazer('upload', 'Arraste aqui o .eml do e-mail que você vai atender ou escolha o arquivo.', `<p>No SmarterMail: abra o e-mail › menu ⋮ › baixar/salvar como .eml. Um e-mail pode ter de 1 a ${MAX_BENEFICIARIOS} beneficiários; cada um gera uma guia. Com a extensão do Chrome (ícone de download no topo), o e-mail vem com um clique, sem baixar arquivo.</p>`)}
     <button class="btn pri" data-act="escolherEml">${ic('upload')}Fazer upload do e-mail (.eml)</button>
-  </div>
+  </div>`}
   <div class="card">
     <details>
       <summary>Sem o arquivo? Colar o texto do e-mail</summary>
@@ -3089,7 +3176,7 @@ function renderPedido(alvo, g) {
   const cartInvalida = g.carteiraUsada && !cartValida(g.carteiraUsada);
   alvo.innerHTML = `
   <div class="grid2">
-    <div>${htmlEmailCard()}</div>
+    <div class="col-fixa">${htmlEmailCard()}</div>
     <div class="stack">
       <div class="card">
         <div class="card-h"><h2>Dados do pedido${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
@@ -3116,14 +3203,13 @@ function renderPedido(alvo, g) {
     </div>
   </div>
   ${htmlPainelAlertas(g, st)}
-  <div class="acoes" style="margin-top:0">
-    <button class="btn" data-act="irVista" data-v="1">${ic('left')}E-mail</button>
-    <button class="btn pri" data-act="irVista" data-v="3" ${st.pode ? '' : 'disabled'} title="${st.pode ? '' : 'Resolva os bloqueios ou responda à clínica'}">Seguir para a guia${ic('right')}</button>
-    <span class="esp"></span>
-    ${S.guias.length > 1 ? `<button class="btn ghost" data-act="ignorarGuia">${ic('x')}Ignorar esta solicitação</button>` : ''}
-    <button class="btn dng" data-act="descartar">${ic('trash')}Descartar e-mail</button>
+  <div class="acoes acoes-sec" style="margin-top:0"><span class="esp"></span>
+    ${S.guias.length > 1 ? `<button class="btn sm ghost" data-act="ignorarGuia">${ic('x', 'sm')}Ignorar esta solicitação</button>` : ''}
+    <button class="btn sm dng" data-act="descartar">${ic('trash', 'sm')}Descartar e-mail</button>
   </div>
-  ${!st.pode ? `<p class="dica">${ic('ban', 'sm')} Há bloqueio: corrija os dados, ou responda à clínica cobrando a informação.</p>` : ''}`;
+  ${htmlBarraAcao({ voltar: `<button class="btn" data-act="irVista" data-v="1">${ic('left')}Voltar ao e-mail</button>`,
+    status: st.bloqueios.length ? statusBarra(g, st) + `<span class="barra-msg muted">Corrija os dados ou responda à clínica.</span>` : statusBarra(g, st),
+    seguir: `<button class="btn pri" data-act="irVista" data-v="3" ${st.pode ? '' : 'disabled'}>Seguir para a guia${ic('right')}</button>` })}`;
 }
 
 /* ====================================================================
@@ -3147,9 +3233,9 @@ function campoCopia(g, { campo, rot, sub, curto, mid, ph, mono }) {
 function renderGuia(alvo, g) {
   const p = g.pedido, cl = clinicaDe(S), st = situacaoGuia(g), podeSeguir = podeFinal(g, st);
   const exec = valorCopia(g, 'executante');
-  const navGuia = `<div class="acoes acoes-rodape"><button class="btn" data-act="irVista" data-v="2">${ic('left')}Pedido e alertas</button><button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'} title="${podeSeguir ? '' : 'Conclua a conferência sem divergências'}">Seguir para finalizar${ic('right')}</button></div>`;
-  const botoesModo = `<button class="btn sm line" data-act="modoSimples" title="Mostra só o essencial para gerar a guia (bom para monitor pequeno)">${ic('layers', 'sm')}${LS.get('modoSimples', false) ? 'Modo completo' : 'Modo simples'}</button>${Mini.aberto() ? '<span class="tag ok">Painel flutuante aberto</span>' : `<button class="btn sm line" data-act="painelFlutuante" title="Abre uma janelinha que fica por cima do sistema, com os campos para copiar e a captura">${ic('right', 'sm')}Painel flutuante</button>`}`;
-  if (LS.get('modoSimples', false)) {   // tela única: campos para copiar, prints, alertas e seguir
+  const navGuia = htmlBarraAcao({ voltar: `<button class="btn" data-act="irVista" data-v="2">${ic('left')}Voltar ao pedido</button>`, status: statusBarra(g, st, podeSeguir || st.bloqueios.length ? [] : ['Falta conferir a grade: cole os prints do sistema ou faça a conferência sem prints.']), seguir: `<button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'}>Seguir para finalizar${ic('right')}</button>` });
+  const botoesModo = Mini.aberto() ? `<span class="tag ok">${ic('pip', 'sm')}Painel flutuante aberto</span>` : '';
+  if (Vis.simples()) {   // tela única: campos para copiar, prints, alertas e seguir
     alvo.innerHTML = `<div class="stack"><div class="card"><div class="card-h"><h2>Gerar a guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}</div>${htmlMini(g, { semPrints: true })}</div>${htmlCartaoPrints(g)}${htmlPainelAlertas(g, st)}${navGuia}</div>`;
     return;
   }
@@ -3193,12 +3279,9 @@ function renderGuia(alvo, g) {
     </div>
   </div>` : ''}
   ${htmlPainelAlertas(g, st)}
-  <div class="acoes" style="margin-top:0">
-    <button class="btn" data-act="irVista" data-v="2">${ic('left')}Pedido e alertas</button>
-    <button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'} title="${podeSeguir ? '' : 'Conclua a conferência sem divergências'}">Seguir para finalizar${ic('right')}</button>
-    <span class="esp"></span>
-  </div>
-  ${!podeSeguir ? `<p class="dica">${cegaExigida() ? 'Para seguir: conclua a conferência da grade sem divergências.' : 'Resolva os bloqueios para seguir.'}</p>` : ''}
+  ${htmlBarraAcao({ voltar: `<button class="btn" data-act="irVista" data-v="2">${ic('left')}Voltar ao pedido</button>`,
+    status: statusBarra(g, st, podeSeguir || st.bloqueios.length ? [] : ['Falta conferir a grade: cole os prints do sistema ou faça a conferência sem prints.']),
+    seguir: `<button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'}>Seguir para finalizar${ic('right')}</button>` })}
   </div>`;
 }
 function ambiguos(g) {
@@ -3364,12 +3447,9 @@ function renderFinal(alvo, g) {
     </div>` : ''}
   </div>
   ${htmlPainelAlertas(g, st)}
-  <div class="acoes" style="margin-top:0">
-    <button class="btn" data-act="irVista" data-v="3">${ic('left')}Guia e conferência</button>
-    <span class="esp"></span>
-    <button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>
-  </div>
-  ${pend.length ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+  ${pend.length > 1 ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+  ${htmlBarraAcao({ voltar: `<button class="btn" data-act="irVista" data-v="3">${ic('left')}Voltar à guia</button>`, status: statusBarra(g, st, pend),
+    seguir: `<button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>` })}`;
 }
 function renderFinalSemGuia(alvo, g) {
   const multi = usaConsolidada(), showResp = mostraResposta(g), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
@@ -3390,9 +3470,9 @@ function renderFinalSemGuia(alvo, g) {
     <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
       ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div></div>` : ''}
   </div>
-  <div class="acoes" style="margin-top:12px"><button class="btn" data-act="desfazerSemGuia">${ic('left')}Pedido e alertas</button><span class="esp"></span>
-    <button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button></div>
-  ${pend.length ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+  ${pend.length > 1 ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+  ${htmlBarraAcao({ voltar: `<button class="btn" data-act="desfazerSemGuia">${ic('left')}Voltar ao pedido</button>`, status: statusBarra(g, { bloqueios: [], A: [] }, pend),
+    seguir: `<button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>` })}`;
 }
 function renderConcluida(alvo, g) {
   const r = g.resultado, resp = respostaDaGuia(g, false), a = autorizadosDe(g), n = negadosDe(g);
@@ -3823,10 +3903,14 @@ const cabSecao = (t, d) => `<div class="card-h"><h2>${t}</h2></div>`;
 
 /* ---------- 1. Aparência ---------- */
 function cfgAparencia() {
-  const p = Tema.pref();
+  const p = Tema.pref(), dz = Vis.densa() ? 'compacta' : 'confortavel';
+  const den = (v, i, t) => `<button type="button" class="sit ${dz === v ? 'on autorizada' : ''}" role="radio" aria-checked="${dz === v}" data-act="densidade" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b></span></button>`;
   const op = (v, i, t, d) => `<button type="button" class="sit ${p === v ? 'on autorizada' : ''}" role="radio" aria-checked="${p === v}" data-act="setTema" data-v="${v}">${ic(i, 'lg')}<span><b>${t}</b></span></button>`;
   return `<div class="card">${cabSecao('Aparência', 'Vale para este computador e é lembrada ao reabrir o sistema. Também pode ser alternada pelo botão no topo da página.')}
     <div class="sit-opcoes" role="radiogroup" aria-label="Tema">${op('auto', 'settings', 'Automático', 'Acompanha o tema do Windows.')}${op('claro', 'sun', 'Modo claro', 'Fundo claro, ideal para ambientes iluminados.')}${op('escuro', 'moon', 'Modo escuro', 'Fundo escuro, reduz o brilho da tela.')}</div>
+    <h3>Densidade (só para você, neste computador)</h3>
+    <p class="dica">A compacta reduz alturas e espaços para a etapa 3 caber num monitor pequeno (768 px de altura).</p>
+    <div class="sit-opcoes" role="radiogroup" aria-label="Densidade">${den('confortavel', 'rows', 'Confortável')}${den('compacta', 'monitor', 'Compacta')}</div>
 </div>`;
 }
 
@@ -4670,7 +4754,7 @@ function htmlCartaoPrints(g) {
     <div class="acoes"><button class="btn line" data-act="limparPrints">${ic('trash', 'sm')}Limpar prints</button></div>` : '';
   return `<div class="card" id="cartaoPrints">
     <div class="card-h"><h2>Conferência pelos prints do sistema</h2>${tag}<span class="esp"></span><span id="printsEstado"></span></div>
-    <p class="dica" style="margin:0 0 10px">Copie os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b> da tela "Liberação de Senhas" e use <b>Ctrl+V</b> aqui (ou o botão <b>Colar</b>). Se a grade tiver mais itens do que cabem na tela, cole também um print rolado até o fim. A leitura é feita neste navegador; ${cfg.preferencias.guardarPrints !== false ? 'os prints ficam no histórico da guia (pasta compartilhada).' : 'as imagens não são guardadas.'} O número da guia vai sozinho para a etapa 4.</p>
+    ${htmlComoFazer('prints', 'Capture ou cole os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b>.', `<ol><li>No sistema, abra a guia na tela "Liberação de Senhas", aba <b>Dados da Guia</b>.</li><li>Clique em <b>Capturar a janela do sistema</b> (ou tire o print e use <b>Ctrl+V</b> aqui).</li><li>Abra a aba <b>Procedimentos</b> e capture de novo. Se a grade não couber na tela, role até o fim e capture mais uma vez.</li></ol><p>A leitura é feita neste navegador; ${cfg.preferencias.guardarPrints !== false ? 'os prints ficam no histórico da guia (pasta compartilhada).' : 'as imagens não são guardadas.'} O número da guia vai sozinho para a etapa 4.</p>`)}
     ${htmlSeletorSistema()}
     <div class="acoes" style="margin-top:0">
       ${htmlBotoesCaptura()}
@@ -4803,7 +4887,14 @@ const acoes = {
   },
   limparPrints() { const g = guiaAtiva(); PRINTS_MEM.delete(g.id); g.prints = null; sincronizarObsPrints(g); if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; } persistir(); render(); },
   obsAutoRestaurar() { if (!confirm('Restaurar os textos e as marcações padrão das observações automáticas?')) return; cfgEdit.obsAuto = obsAutoPadrao(); marcarSujo(); render(); },
-  topoMini() { LS.set('topoMini', !LS.get('topoMini', false)); render(); },
+  topoMini() { Vis.set(Vis.simples() ? 'completa' : 'simples'); render(); },
+  async visualizacao(b) {
+    const v = b.dataset.v;
+    if (v === 'flutuante') { Vis.set('flutuante'); await Mini.abrir(); if (!Mini.aberto()) Vis.set('completa'); render(); return; }
+    Vis.set(v); if (Mini.aberto()) { try { Mini.win.close(); } catch (er) { } Mini.win = null; }
+    render(); window.scrollTo(0, 0);
+  },
+  densidade(b) { LS.set(Vis.chave('densidade'), b.dataset.v); render(); },
   alternarTema() { Tema.alternar(); render(); },
   setTema(b) { Tema.definir(b.dataset.v); render(); },
   fecharModal() { fecharModal(); },
@@ -5064,6 +5155,12 @@ const acoes = {
     await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
   async regSync() { const n = await Reg.sincronizar(); await Reg.carregar(); render(); toast(Reg.nPendentes() ? 'Ainda não consegui gravar na pasta. Confira a conexão e tente de novo.' : n ? `${n} ${n === 1 ? 'atendimento enviado' : 'atendimentos enviados'} para a pasta.` : 'Nada pendente.', Reg.nPendentes() ? 'bad' : ''); },
+  conferiAlerta(b) {
+    const g = guiaAtiva(); if (!g) return; const k = b.dataset.conf, on = !(g.conf && g.conf[k]);
+    g.conf = g.conf || {}; g.conf[k] = on; const al = situacaoGuia(g).A.find(a => a.key === k);
+    evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
+  },
+  verAlertas() { const el = $('.painel-al'); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
     const emb = a => a.map(x => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map(x => x[1]);
@@ -6134,7 +6231,7 @@ const Mini = {
     d.body.innerHTML = '<div id="miniApp" class="mini-janela"></div>';
     d.addEventListener('click', e => this.clique(e));
     d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (fs.length && S) { e.preventDefault(); miniMsg = 'Lendo o print…'; this.atualizar(); processarPrints(fs).then(() => { miniMsg = ''; this.atualizar(); }); } });
-    this.win.addEventListener('pagehide', () => { this.win = null; render(); });
+    this.win.addEventListener('pagehide', () => { this.win = null; if (Vis.get() === 'flutuante') Vis.set('completa'); render(); });
     this.atualizar(); render();
   },
   atualizar() { if (!this.aberto()) { this.win = null; return; } const el = this.win.document.getElementById('miniApp'); if (el) el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }); },
@@ -6158,8 +6255,8 @@ const Mini = {
 Object.assign(acoes, {
   capturarJanela() { return capturarJanela(); },
   async trocarJanela() { Captura.parar(); await capturarJanela(); },
-  modoSimples() { LS.set('modoSimples', !LS.get('modoSimples', false)); render(); },
-  painelFlutuante() { return Mini.abrir(); }
+  modoSimples() { Vis.set(Vis.simples() ? 'completa' : 'simples'); render(); },
+  async painelFlutuante() { Vis.set('flutuante'); await Mini.abrir(); if (!Mini.aberto()) Vis.set('completa'); render(); }
 });
 document.addEventListener('focusin', e => { const t = e.target; if (t && t.dataset && t.dataset.cpcampo != null && t.dataset.orig == null) t.dataset.orig = t.value.trim(); });   // valor antes da edição (linha do tempo)
 /* no modo simples (janela principal) */
