@@ -312,7 +312,7 @@ function renderTela(app) {
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
   const alvoId = 'etapa';
-  app.innerHTML = htmlAvisoParado() + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g) + htmlNotasFixas(g)) + `<div id="${alvoId}"></div>`;
+  app.innerHTML = htmlAvisoParado() + htmlAvisoReaberta(g) + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g) + htmlNotasFixas(g)) + `<div id="${alvoId}"></div>`;
   const alvo = $('#' + alvoId);
   if (S.vista === 1) renderVisao(alvo); else if (g.status === 'concluido' && S.vista === 4) renderConcluida(alvo, g);
   else if (S.vista === 2) renderPedido(alvo, g); else if (S.vista === 3) renderGuia(alvo, g); else renderFinal(alvo, g);
@@ -944,7 +944,7 @@ let painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' };
 let conc = null;    // resultado da conciliação
 let amostra = null;
 const resultadoDe = r => r.status === 'cancelado' ? '' : ((r.resultado && r.resultado.situacao) || (r.status === 'concluido' ? 'autorizada' : ''));
-const regPorId = id => Reg.cache.find(x => x.id === id) || Reg.todos[id] || null;
+const regPorId = id => [Reg.cache.find(x => x.id === id), Reg.todos[id]].filter(Boolean).sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1))[0] || null;   // a versão mais recente (o histórico completo pode estar desatualizado)
 function descDiv(d) { let m; if ((m = /^omitido:(.+)$/.exec(d))) return `Omitido na grade: ${m[1]}`; if ((m = /^qtd:(\d+)=(\d+)$/.exec(d))) return `Quantidade divergente em ${m[1]} (informado ${m[2]})`; if ((m = /^duplicado:(.+)$/.exec(d))) return `Duplicado na grade: ${m[1]}`; if ((m = /^indevida:(.+)$/.exec(d))) return `Inclusão indevida (final ${m[1]})`; return String(d).replace(/<[^>]+>/g, ''); }
 const descreverDivergencias = divs => divs.map((d, i) => `Tentativa ${i + 1}: ` + (Array.isArray(d) ? d : [d]).map(descDiv).join('; ')).join('\n');
 function obsCelula(r) {
@@ -955,6 +955,7 @@ function obsCelula(r) {
   if (rs.situacao === 'sem_guia') T.push(`<span class="tag obs" title="${esc('Sem guia gerada: ' + nomeModelo(rs.modelo) + ((r.bloqueios || []).length ? '\n' + r.bloqueios.join('\n') : ''))}">${ic('mail', 'sm')}Sem guia: ${esc(nomeModelo(rs.modelo))}</span>`);
   if ((rs.glosas || []).length) T.push(`<span class="tag warn" title="${esc(rs.glosas.map(x => `${x.c}: glosa ${x.g || '—'}\nMotivo da retirada: ${x.m || '—'}`).join('\n\n'))}">${ic('check', 'sm')}Glosa retirada</span>`);
   if (r.status === 'cancelado') T.push(`<span class="tag bad" title="${esc(r.canceladoMotivo ? 'Motivo: ' + r.canceladoMotivo : 'Guia cancelada')}">${ic('ban', 'sm')}Cancelada</span>`);
+  if (r.reaberta) T.push(`<span class="tag info" title="${esc('Reaberta em ' + fmtDH(r.reaberta.em) + ' por ' + (r.reaberta.por || '—') + (r.reaberta.antes && r.reaberta.antes.guia ? '\nAntes: nº ' + r.reaberta.antes.guia + (r.reaberta.antes.situacao ? ' (' + (SIT_ROTULO[r.reaberta.antes.situacao] || r.reaberta.antes.situacao) + ')' : '') : ''))}">${ic('edit', 'sm')}Reaberta</span>`);
   if (r.corrigida) T.push(`<span class="tag info" title="${esc('Corrigida em ' + fmtDH(r.corrigida.em) + ' por ' + (r.corrigida.por || '—') + '\nAntes: carteira ' + (r.corrigida.antes.carteira || '—') + '; itens ' + (r.corrigida.antes.itens || []).join(', '))}">${ic('edit', 'sm')}Corrigida</span>`);
   return T.join(' ');
 }
@@ -963,15 +964,20 @@ function proximoPasso(r) {
   const e = r.etapa || 2;
   return e <= 2 ? 'Resolver alertas e confirmar os dados do pedido' : e === 3 ? 'Lançar no sistema e conferir a grade' : 'Informar número e resultado da guia';
 }
+const SEM_CLINICA = '__sem';
 function filtrarRegs(regs) {
-  const f = painelFiltro, q = norm(f.q);
+  const f = painelFiltro, termos = norm(f.q).split(' ').filter(Boolean), compacto = String(f.q || '').replace(/[^0-9a-z]/gi, '').toLowerCase();
   return regs.filter(r => {
     if (f.status && r.status !== f.status) return false;
     if (f.res && resultadoDe(r) !== f.res) return false;
-    if (f.clinica && (r.clinicaId || '') !== f.clinica) return false;
+    if (f.clinica === SEM_CLINICA ? !!r.clinicaId : f.clinica && (r.clinicaId || '') !== f.clinica) return false;
     if (f.param === 'sim' && !r.parametrizado) return false;
     if (f.param === 'nao' && r.parametrizado) return false;
-    if (q && !norm([r.carteira, r.guia, r.assunto, r.clinica, r.remetente, (r.itens || []).map(i => i.c).join(' ')].join(' ')).includes(q)) return false;
+    if (termos.length) {
+      const txt = norm([r.paciente, r.pacienteIni, r.carteira, r.guia, r.assunto, r.clinica, r.remetente, r.operador, r.listaNome, (r.itens || []).map(i => [i.c, i.dc, i.d].filter(Boolean).join(' ')).join(' ')].filter(Boolean).join(' '));
+      const doc = String((r.carteira || '') + ' ' + (r.guia || '')).replace(/[^0-9a-z ]/gi, '').toLowerCase().replace(/ /g, '|');
+      if (!termos.every(t => txt.includes(t)) && !(compacto.length >= 4 && doc.split('|').some(d => d.includes(compacto)))) return false;
+    }
     return true;
   });
 }
@@ -1008,8 +1014,8 @@ function htmlTempoQualidade(concl) {
     <p class="dica" style="margin:8px 0 0">“E-mail lido sem correção”: guias em que ninguém precisou corrigir à mão nome, médico, CID, data, local ou serviços (conta só os atendimentos registrados a partir desta versão). Abaixo de 70%, vale criar uma regra de leitura para a clínica.</p></div>`;
 }
 async function renderPainel(app) {
-  const gen = Redesenho.gen;
-  app.innerHTML = htmlEsqueleto(8, 3);
+  const gen = Redesenho.gen, mesma = !!$('#painelTopo'), y = scrollY;   // redesenho da mesma tela: fica o conteúdo até os dados chegarem e a rolagem volta ao lugar
+  if (!mesma) app.innerHTML = htmlEsqueleto(8, 3);
   const mes = painelModo === 'mes', sem = painelModo === 'semana', longo = mes || sem;
   if (longo) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
   await Param.carregar();
@@ -1026,15 +1032,16 @@ async function renderPainel(app) {
   const tempo = concl.length ? (concl.reduce((s, r) => s + (r.duracaoSeg || 0), 0) / concl.length / 60).toFixed(1).replace('.', ',') + ' min' : '—';
   const porClinica = {}; ativos.forEach(r => { const k = r.clinicaId || r.clinica || 'sem'; (porClinica[k] = porClinica[k] || { nome: r.clinica || 'Clínica não identificada', id: r.clinicaId, n: 0 }).n++; });
   const maxC = Math.max(1, ...Object.values(porClinica).map(x => x.n));
-  const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean));
+  const clinicasDia = unicos(regs.map(r => r.clinicaId).filter(Boolean)), semClinica = regs.some(r => !r.clinicaId);
+  if (painelFiltro.clinica && painelFiltro.clinica !== SEM_CLINICA && !clinicasDia.includes(painelFiltro.clinica)) clinicasDia.push(painelFiltro.clinica);   // filtro escolhido em outro período continua visível no seletor
   const per = mes ? 'mês' : sem ? 'semana' : 'dia';
   app.innerHTML = `
-  <div class="card"><div class="linha-flex">
+  <div class="card" id="painelTopo"><div class="linha-flex">
     <div class="seg" role="radiogroup" aria-label="Visualização"><button type="button" role="radio" aria-checked="${!longo}" class="${!longo ? 'on igual' : ''}" data-act="painelModo" data-v="dia">${ic('calendar', 'sm')} Dia</button><button type="button" role="radio" aria-checked="${sem}" class="${sem ? 'on igual' : ''}" data-act="painelModo" data-v="semana">${ic('calweek', 'sm')} Semana</button><button type="button" role="radio" aria-checked="${mes}" class="${mes ? 'on igual' : ''}" data-act="painelModo" data-v="mes">${ic('calmonth', 'sm')} Mês</button></div>
     ${sem ? `<div><label class="lbl" for="painelSemana">Semana</label><input type="week" id="painelSemana" value="${painelSemana}" style="width:auto"></div>` : mes ? `<div><label class="lbl" for="painelMes">Mês</label><input type="month" id="painelMes" value="${painelMes}" style="width:auto"></div>` : `<div><label class="lbl" for="painelDia">Dia</label><input type="date" id="painelDia" value="${painelDia}" style="width:auto"></div>`}
     <button class="btn" data-act="atualizarPainel" style="align-self:flex-end">${ic('refresh')}Atualizar</button>
     <span style="flex:1"></span>
-    <button class="btn line" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (${lista.length})</button></div></div>
+    <button class="btn line" id="btnCsv" data-act="exportarCsv" style="align-self:flex-end" ${lista.length ? '' : 'disabled'} title="Exporta as linhas exibidas na tabela (respeita os filtros)">${ic('download')}Exportar CSV (<span id="nCsv">${lista.length}</span>)</button></div></div>
   <div class="kpis">${[
     ['info', emails, 'E-mails com atendimento', true], ['', ativos.length, 'Guias no ' + per, true],
     ['ok', n(r => resultadoDe(r) === 'autorizada'), 'Autorizadas'], ['warn', n(r => resultadoDe(r) === 'parcial'), 'Parcialmente autorizadas'], ['bad', n(r => resultadoDe(r) === 'nao'), 'Não autorizadas'],
@@ -1046,26 +1053,17 @@ async function renderPainel(app) {
     ${Object.values(porClinica).sort((a, b) => b.n - a.n).map(x => { const cl = cfg.clinicas.find(c => c.id === x.id); return `<div class="barra-clinica idc ${cl ? corClinica(cl) : ''}"><div>${htmlClinica(cl, x.nome)}</div><div class="trilho"><i style="width:${Math.round(x.n / maxC * 100)}%"></i></div><b class="num">${x.n}</b></div>`; }).join('') || '<p class="muted">Sem registros neste período.</p>'}</div>
   ${htmlTempoQualidade(concl)}
   <div class="card">
-    <div class="card-h"><h2>Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})</h2></div>
+    <div class="card-h"><h2 id="guiasPainelTit">${tituloGuiasPainel(per, lista, regs)}</h2></div>
     <div class="filtros" style="margin-bottom:12px">
-      <div><label class="lbl" for="fQ">Buscar</label><div class="busca">${ic('search', 'sm')}<input type="search" id="fQ" data-fp="q" value="${esc(painelFiltro.q)}" placeholder="Carteira, guia, clínica, código…"></div></div>
-      <div><label class="lbl" for="fS">Status</label><select id="fS" data-fp="status"><option value="">Todos</option>${['em_andamento', 'concluido'].map(s => `<option value="${s}" ${painelFiltro.status === s ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select></div>
+      <div><label class="lbl" for="fQ">Buscar</label><div class="busca">${ic('search', 'sm')}<input type="search" id="fQ" data-fp="q" value="${esc(painelFiltro.q)}" placeholder="Beneficiário, carteira, guia, clínica, código…" autocomplete="off"></div></div>
+      <div><label class="lbl" for="fS">Status</label><select id="fS" data-fp="status"><option value="">Todos</option>${['em_andamento', 'concluido', 'cancelado'].map(s => `<option value="${s}" ${painelFiltro.status === s ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select></div>
       <div><label class="lbl" for="fR">Resultado</label><select id="fR" data-fp="res"><option value="">Todos</option>${Object.entries(SIT_ROTULO).map(([k, v]) => `<option value="${k}" ${painelFiltro.res === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-      <div><label class="lbl" for="fC">Clínica</label><select id="fC" data-fp="clinica"><option value="">Todas</option>${clinicasDia.map(id => { const c = cfg.clinicas.find(x => x.id === id); return `<option value="${esc(id)}" ${painelFiltro.clinica === id ? 'selected' : ''}>${esc(c ? c.nome : id)}</option>`; }).join('')}</select></div>
+      <div><label class="lbl" for="fC">Clínica</label><select id="fC" data-fp="clinica"><option value="">Todas</option>${clinicasDia.map(id => { const c = cfg.clinicas.find(x => x.id === id); return `<option value="${esc(id)}" ${painelFiltro.clinica === id ? 'selected' : ''}>${esc(c ? c.nome : id)}</option>`; }).join('')}${semClinica || painelFiltro.clinica === SEM_CLINICA ? `<option value="${SEM_CLINICA}" ${painelFiltro.clinica === SEM_CLINICA ? 'selected' : ''}>Clínica não identificada</option>` : ''}</select></div>
       <div><label class="lbl" for="fP">Parametrização</label><select id="fP" data-fp="param"><option value="">Todas</option><option value="sim" ${painelFiltro.param === 'sim' ? 'selected' : ''}>Parametrizadas</option><option value="nao" ${painelFiltro.param === 'nao' ? 'selected' : ''}>Não parametrizadas</option></select></div>
-      <div><button class="btn ghost" data-act="limparFiltros" ${Object.values(painelFiltro).some(Boolean) ? '' : 'disabled'}>${ic('x', 'sm')}Limpar filtros</button></div>
+      <div><button class="btn ghost" id="btnLimparFiltros" data-act="limparFiltros" ${Object.values(painelFiltro).some(Boolean) ? '' : 'disabled'}>${ic('x', 'sm')}Limpar filtros</button></div>
     </div>
-    <div class="tabela-scroll"><table class="t"><thead><tr><th>${longo ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
-    ${lista.map(r => {
-      const tot = r.totalGuias || 1, canc = r.status === 'cancelado';
-      return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${longo ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}${r.operador ? `<div style="margin-top:4px" title="Quem gerou">${htmlOperador(r.operador, r.operadorId)}</div>` : ''}</td>
-      <td class="c">${tot > 1 ? `<span class="sq idc idc-${(r.idxGuia || 0) % 10}" title="Guia ${(r.idxGuia || 0) + 1} de ${tot}">${(r.idxGuia || 0) + 1}/${tot}</span>` : '—'}</td>
-      <td class="num">${esc(r.carteira || '')}</td><td class="num">${(r.itens || []).map(i => `${i.c} × ${i.q ?? '?'}${i.aut === false ? ' <span class="tag bad">' + ic('x', 'sm') + 'negado</span>' : ''}`).join('<br>')}</td><td class="num"><b>${esc(r.guia || '')}</b></td>
-      <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
-      <td>${tagResultado(resultadoDe(r))}</td>
-      <td>${obsCelula(r)}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${r.id}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
-    }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`}
+    <div class="tabela-scroll"><table class="t" id="tabGuiasPainel"><thead><tr><th>${longo ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
+    ${htmlLinhasGuiasPainel(lista, regs, longo)}
     </tbody></table></div>
   </div>
   ${longo ? '' : `<div class="card">
@@ -1091,6 +1089,30 @@ async function renderPainel(app) {
     </div>
     <div id="resConc">${conc || ''}</div>
   </div>`}`;
+  if (mesma) window.scrollTo(0, y);
+}
+const tituloGuiasPainel = (per, lista, regs) => `Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})`;
+function htmlLinhasGuiasPainel(lista, regs, longo) {
+  return lista.map(r => {
+      const tot = r.totalGuias || 1, canc = r.status === 'cancelado';
+      return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${longo ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}${r.operador ? `<div style="margin-top:4px" title="Quem gerou">${htmlOperador(r.operador, r.operadorId)}</div>` : ''}</td>
+      <td class="c">${tot > 1 ? `<span class="sq idc idc-${(r.idxGuia || 0) % 10}" title="Guia ${(r.idxGuia || 0) + 1} de ${tot}">${(r.idxGuia || 0) + 1}/${tot}</span>` : '—'}</td>
+      <td class="num">${esc(r.carteira || '')}</td><td class="num">${(r.itens || []).map(i => `${i.c} × ${i.q ?? '?'}${i.aut === false ? ' <span class="tag bad">' + ic('x', 'sm') + 'negado</span>' : ''}`).join('<br>')}</td><td class="num"><b>${esc(r.guia || '')}</b></td>
+      <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
+      <td>${tagResultado(resultadoDe(r))}</td>
+      <td>${obsCelula(r)}</td>
+      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${podeReabrir(r) ? `<button class="btn sm line" data-act="reabrirRegistro" data-id="${esc(r.id)}" title="Abre a guia de novo na etapa 4 para corrigir número, situação, observação ou resposta (o registro só muda ao concluir)">${ic('edit', 'sm')}Reabrir</button>` : ''}${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${esc(r.id)}" title="Troca só a carteira e os serviços, sem reabrir">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${esc(r.id)}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${esc(r.id)}">Excluir guia</button></div></td></tr>`;
+    }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`;
+}
+/* filtros e busca: repinta só a tabela com os registros já carregados (sem reler a pasta, sem tirar o foco da busca, sem mexer na rolagem) */
+function repintarGuiasPainel() {
+  const tab = $('#tabGuiasPainel'); if (aba !== 'painel' || !tab) { render(); return; }
+  const longo = painelModo !== 'dia', per = painelModo === 'mes' ? 'mês' : painelModo === 'semana' ? 'semana' : 'dia';
+  const regs = regsDoPeriodo().filter(r => !r.tipo && r.status !== 'descartado' && r.status !== 'devolvido').sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1)), lista = filtrarRegs(regs);
+  tab.tBodies[0].innerHTML = htmlLinhasGuiasPainel(lista, regs, longo);
+  $('#guiasPainelTit').textContent = tituloGuiasPainel(per, lista, regs);
+  const csv = $('#btnCsv'); if (csv) { csv.disabled = !lista.length; $('#nCsv').textContent = lista.length; }
+  const lf = $('#btnLimparFiltros'); if (lf) lf.disabled = !Object.values(painelFiltro).some(Boolean);
 }
 async function conciliarEmails(files) {
   const emails = [];
