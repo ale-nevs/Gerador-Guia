@@ -725,20 +725,33 @@ const Captura = {
   },
   async quadro() {
     if (!this.ativa()) throw new Error('A janela do sistema não está conectada.');
-    const v = this.video;
-    await new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok()) : setTimeout(ok, 120)));
-    const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+    const c = document.createElement('canvas'), track = this.stream.getVideoTracks()[0];
+    let bmp = null;   // com a aba do Conferidor em segundo plano (painel flutuante), o Chrome pausa o vídeo: a imagem vem direto da captura
+    if (window.ImageCapture) { try { bmp = await Promise.race([new ImageCapture(track).grabFrame(), new Promise((_, rej) => setTimeout(() => rej(new Error('tempo')), 3000))]); } catch (e) { bmp = null; } }
+    if (bmp) { c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); if (bmp.close) bmp.close(); }
+    else {
+      const v = this.video;
+      await Promise.race([new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok()) : ok())), new Promise(ok => setTimeout(ok, 700))]);
+      if (!v.videoWidth) throw new Error('a captura não mandou imagem. A janela do sistema está minimizada?');
+      c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+    }
     const url = c.toDataURL('image/png'), bin = atob(url.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     return new File([u8], `captura-${new Date().toTimeString().slice(0, 8).replace(/:/g, '')}.png`, { type: 'image/png' });
   },
   parar() { if (this.stream) this.stream.getTracks().forEach(t => t.stop()); this.stream = null; this.video = null; }
 };
-async function capturarJanela(nav) {
-  const g = guiaAtiva(); if (!g) return;
+async function capturarJanela(nav, aviso) {
+  const g = guiaAtiva(); if (!g) { if (aviso) aviso('Nenhum atendimento aberto para receber o print.'); return; }
+  const avisar = (t, ruim) => { toast(t, ruim ? 'bad' : ''); if (aviso) aviso(t); };
   try {
-    if (!Captura.ativa()) { await Captura.conectar(nav); toast('Janela conectada. Deixe a aba certa (Dados da Guia ou Procedimentos) aberta no sistema e clique em Capturar.'); render(); return; }
-    const f = await Captura.quadro(); await processarPrints([f]);
-  } catch (e) { if (e && e.name === 'NotAllowedError') toast('Captura cancelada.', 'bad'); else toast('Não foi possível capturar a janela: ' + (e.message || e), 'bad'); render(); }
+    if (!Captura.ativa()) { await Captura.conectar(nav); avisar('Janela conectada. Deixe a aba certa (Dados da Guia ou Procedimentos) aberta no sistema e clique em Capturar.'); render(); return; }
+    if (aviso) aviso('Capturando a janela do sistema…');
+    const f = await Captura.quadro(); await processarPrints([f], aviso);
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') avisar(nav && nav !== navigator ? 'O Chrome não deixou conectar por aqui. Conecte pela tela do conferidor (etapa 3, Conectar à janela do sistema); depois a captura funciona neste painel.' : 'Captura cancelada.', true);
+    else avisar('Não foi possível capturar a janela: ' + (e.message || e), true);
+    render();
+  }
 }
 function htmlBotoesCaptura() {
   if (!Captura.suportada()) return '';

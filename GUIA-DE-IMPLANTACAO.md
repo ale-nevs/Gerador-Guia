@@ -155,6 +155,11 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Topo, quadro ao vivo e painel flutuante (versão 2.2.1)
+- **Sistema: Novo | Antigo** fica no topo, entre o botão do tema (só o ícone da lua/sol) e a Visualização. Vale para colar, capturar e testar prints; o cartão dos prints só mostra qual está escolhido.
+- **Guias em andamento hoje (Acompanhamento):** cada computador avisa a cada 30 s (e logo depois de cada mudança de etapa) o beneficiário, a clínica e a etapa que está atendendo. A guia de quem está trabalhando aparece sempre como **ao vivo**, com há quanto tempo está na etapa; antes, quem ficava mais de 10 min na mesma etapa sumia do quadro. Guia que ninguém tem aberta aparece como **parada há N min** e some depois do tempo das Preferências. O cartão de presença diz onde cada um está (ex.: "JANY G. × MRA · Guia e conferência há 4 min").
+- **Painel flutuante:** a captura pega a imagem direto da janela do sistema, mesmo com a aba do Conferidor atrás de outras janelas (antes ela travava porque o Chrome pausa o vídeo de abas em segundo plano). O andamento e os erros da leitura aparecem no próprio painel, junto com a conferência campo a campo (✓, !, ✕). Ctrl+V no painel também lê o print. Se o Chrome não deixar conectar a janela pelo painel, conecte uma vez pela etapa 3 do conferidor; depois a captura funciona pelo painel.
+
 ### Ajustes de uso (versão 2.2)
 - **Botões com texto:** antes, vários botões secundários (Corrigir guia, Excluir guia, Adicionar…, Remover…) mostravam só o ícone. Agora todos têm texto; só os de copiar seguem só com ícone (com dica).
 - **Cliques que não “pegavam”:** ao editar um campo e clicar logo num botão, a tela era redesenhada no meio do clique e o clique se perdia; ao sair de um campo com Tab, o foco sumia. Agora o redesenho espera o clique terminar e o foco ir para o próximo campo, e devolve o foco, o cursor e a rolagem das listas.

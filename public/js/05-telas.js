@@ -51,13 +51,20 @@ function htmlSeletorVis(compacto) {
 /* ---------- Topo e abas ---------- */
 /* ---------- Progresso dos operadores (topo compacto) ---------- */
 const ROT_ETAPA = { 33: 'lendo o pedido', 66: 'gerando a guia', 100: 'anexando e respondendo' };
-function listaProgresso() {
-  const lim = cfg.preferencias.acoesMinutos || 60, idade = r => (Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000;
+/* guias abertas agora: o que cada computador diz que está atendendo (presença, a cada 30 s) + registros em andamento do dia.
+   Guia ao vivo nunca some; guia parada (ninguém com ela aberta) some depois de X min sem movimento (Preferências). */
+function guiasEmAndamento() {
+  const hoje = isoDia(new Date()), lim = cfg.preferencias.acoesMinutos, idade = r => (Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000;
   const mapa = new Map();
-  Reg.doDia(isoDia(new Date())).filter(r => !r.tipo && r.status === 'em_andamento' && idade(r) <= lim).forEach(r => mapa.set(r.id, r));
-  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => mapa.set(g.id, montarRegistro(g, 'em_andamento')));
+  Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento').forEach(r => { mapa.set(r.id, { ...r, aoVivo: false, parado: Math.round(idade(r)) }); });
+  (Presenca.lista || []).forEach(d => (d.guias || []).forEach(x => { const r = mapa.get(x.id) || {};
+    mapa.set(x.id, { ...r, id: x.id, paciente: x.paciente || r.paciente, carteira: x.carteira || r.carteira, clinica: x.clinica || r.clinica, clinicaId: x.clinicaId || r.clinicaId, vista: x.vista, idxGuia: x.idx, totalGuias: x.total, itens: r.itens || Array(x.itens || 0).fill({}), operador: d.operador, operadorId: d.operadorId, aoVivo: true, ativa: x.ativa, desde: x.desde, sinal: d.em, visivel: d.visivel }); }));
+  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => { const r = montarRegistro(g, 'em_andamento'); mapa.set(g.id, { ...r, vista: g === guiaAtiva() ? S.vista : (g.vista || g.etapa || 2), aoVivo: true, ativa: g === guiaAtiva(), desde: g === guiaAtiva() ? S.vistaDesde : null, visivel: !document.hidden }); });
+  return [...mapa.values()].filter(r => r.aoVivo || !lim || r.parado <= lim).sort((a, b) => (b.aoVivo - a.aoVivo) || ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
+}
+function listaProgresso() {
   const porOp = new Map();
-  [...mapa.values()].sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1)).forEach(r => { const k = r.operadorId || r.operador || '?'; if (!porOp.has(k)) porOp.set(k, r); });
+  guiasEmAndamento().sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1)).forEach(r => { const k = r.operadorId || r.operador || '?'; if (!porOp.has(k)) porOp.set(k, r); });
   return [...porOp.values()].map(r => {
     const o = cfg.operadores.find(x => x.id === r.operadorId) || cfg.operadores.find(x => x.nome === r.operador) || null;
     const v = r.vista || r.etapa || 2, p = v <= 2 ? 33 : v >= 4 ? 100 : 66;
@@ -93,7 +100,7 @@ function renderTopo() {
     $('#topoAcoes').innerHTML = `
     <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip mini-btn" data-act="pasta" title="${esc(pasta.t + ': ' + pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span></button>
-    ${htmlSeletorVis(true)}`;
+    ${htmlSistemaTopo(true)}${htmlSeletorVis(true)}`;
     $('#abas').innerHTML = '';
     document.title = 'Conferidor de Guias · Promédica';
     return;
@@ -103,7 +110,8 @@ function renderTopo() {
       <option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip pasta ${pasta.c}" data-act="pasta" title="${esc(pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span><span class="txt-fino">${esc(pasta.t)}</span></button>
     ${extDesatualizada() ? `<button class="chip pasta alerta" data-act="baixarExtensao" title="A extensão instalada (v${esc(extInstalada())}) é mais antiga que a do site (v${EXT_VERSAO}). Baixe a nova e recarregue em chrome://extensions." aria-label="Atualizar extensão">${ic('download', 'sm')}<span class="txt-fino">Atualizar extensão</span></button>` : extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
-    <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
+    <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}">${ic(escuro ? 'sun' : 'moon', 'sm')}</button>
+    ${htmlSistemaTopo(false)}
     ${htmlSeletorVis(false)}`;
   const temLista = Lista.listas.length || cfg.clinicas.some(c => c.lista || /erasmo/i.test(c.nome)), pendL = Lista.pendentesMeus();
   $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ...(temLista ? [['lista', 'rows', Lista.nomeCurto()]] : []), ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
@@ -276,6 +284,7 @@ function render() {
   const app = $('#app'), antes = guardarEstadoTela(app);
   try { renderTopo(); pintarSync(); } catch (e) { console.error(e); window.__erros && window.__erros.push('Topo: ' + (e.stack || e.message)); }
   document.body.dataset.pronto = '1';
+  if (typeof Presenca !== 'undefined' && Presenca.agendar) Presenca.agendar();
   queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
   try {
     const r = renderTela(app);
@@ -1128,25 +1137,22 @@ function conciliarGuias() {
 async function renderQuadro(app) {
   app.innerHTML = htmlEsqueleto(5);
   await Reg.carregar();
-  const hoje = isoDia(new Date());
-  const mapa = new Map();
-  const lim = cfg.preferencias.acoesMinutos, idade = r => (Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000;
-  Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento' && (!lim || idade(r) <= lim)).forEach(r => mapa.set(r.id, r));
-  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => mapa.set(g.id, montarRegistro(g, 'em_andamento')));   // o que está aberto aqui vale mais que o arquivo
-  const lista = [...mapa.values()].sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
+  const lim = cfg.preferencias.acoesMinutos, hoje = isoDia(new Date());
+  await Presenca.bater(); await Presenca.ler();
+  const lista = guiasEmAndamento();
   const cols = [
     [2, 'Lendo o pedido', 'search', 'Pedido e alertas (etapas 1 e 2)'],
     [3, 'Gerando guia', 'filecheck', 'Guia e conferência (etapa 3)'],
     [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
-  await Presenca.bater(); await Presenca.ler();
   app.innerHTML = htmlPresenca() + htmlAuditar() + `<div class="card"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
-    <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está.${lim ? ` Some da lista após ${lim} min sem movimento.` : ''}</p></div>
+    <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está. <b>Ao vivo</b>: alguém está com ela aberta agora (atualiza a cada 30 s). ${lim ? `Guia parada (ninguém com ela aberta) some depois de ${lim} min sem movimento.` : ''}</p></div>
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
-    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
-      return `<div class="card-q"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
-      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl((r.itens || []).length, 'item', 'itens')} · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
-      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
+    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = r.desde ? Math.max(0, Math.round((Date.now() - new Date(r.desde)) / 60000)) : null;
+      const estado = r.aoVivo ? `<span class="tag ok">${ic('activity', 'sm')}ao vivo</span>${r.ativa ? '' : ' <span class="tag">aberta, em outra guia do e-mail</span>'}${r.visivel === false ? ' <span class="tag">em outra janela</span>' : ''}` : `<span class="tag warn">${ic('pause', 'sm')}parada há ${pl(r.parado, 'min', 'min')}</span>`;
+      return `<div class="card-q ${r.aoVivo ? '' : 'parada'}"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
+      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl((r.itens || []).length, 'item', 'itens')}${min != null ? ` · nesta etapa há ${min < 1 ? 'menos de 1 min' : min + ' min'}` : ''}</div>
+      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}${estado}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }

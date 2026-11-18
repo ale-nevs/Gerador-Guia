@@ -772,3 +772,12 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .mini-al{gap:8px}
 .mini-sem{margin-top:8px;padding:10px;border:1px solid var(--warn-br);background:var(--warn-bg);border-radius:var(--r-sm);display:grid;gap:6px}
 .mini-sem label{font-weight:650;font-size:var(--fs-sm);color:var(--warn-fg)}
+.mini-conf{display:grid;gap:2px;margin:6px 0}
+.mc{display:grid;grid-template-columns:16px minmax(90px,auto) 1fr;gap:6px;align-items:baseline;font-size:var(--fs-xs);padding:3px 6px;border-radius:5px}
+.mc .mc-i{font-weight:800;text-align:center}.mc .mc-r{color:var(--text-2)}.mc .mc-v{font-weight:650;overflow-wrap:anywhere}
+.mc.ok .mc-i{color:var(--ok-solid)}.mc.bad{background:var(--bad-bg)}.mc.bad .mc-i{color:var(--bad-solid)}.mc.warn{background:var(--warn-bg)}.mc.warn .mc-i{color:var(--warn-solid)}.mc.ign .mc-i,.mc.info .mc-i{color:var(--text-3)}
+.seg-sis-topo button{min-width:56px;justify-content:center}
+.card-q.parada{opacity:.75;border-style:dashed}
+.pres-op small b{color:var(--text)}
+@media (max-width:1499px){.chip.pasta .txt-fino{display:none}.chip.pasta{padding:0 10px}}
+.seg-sis-topo .seg-rot{display:inline-flex!important}
