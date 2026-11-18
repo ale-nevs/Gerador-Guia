@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="conferidor-guias" content="1">
+<meta name="description" content="Conferidor de Guias · Núcleo Gestão de Terapias — Promédica">
 <meta name="color-scheme" content="light dark">
 <title>Conferidor de Guias · Promédica</title>
 <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -23,11 +24,12 @@
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<header class="topo">
+<a class="pular-conteudo" href="#app">Pular para o conteúdo principal</a>
+<header class="topo" id="topoHeader">
   <div class="wrap topo-in">
     <div class="marca">
       <img class="logo" src="logo-promedica.png" alt="Promédica">
-      <span class="div"></span>
+      <span class="div" aria-hidden="true"></span>
       <div>
         <h1>Conferidor de Guias</h1>
         <p class="sub">Núcleo Gestão de Terapias</p>
@@ -37,15 +39,16 @@
     <div class="topo-acoes" id="topoAcoes"></div>
   </div>
 </header>
-<div class="wrap">
+<div class="wrap nav-wrap" id="navWrap">
   <nav class="abas" id="abas" aria-label="Seções"></nav>
 </div>
 <div class="wrap print-wrap"><div class="print-head"><img src="logo-promedica.png" alt="Promédica"><b>Conferidor de Guias · <span>Núcleo Gestão de Terapias</span></b><small id="printData"></small></div></div>
 <div id="barraSync" class="barra-sync" hidden role="alert"></div>
-<main id="app"></main>
-<footer class="rodape">
+<div id="barraPausados" class="wrap" hidden></div>
+<main id="app" tabindex="-1"></main>
+<footer class="rodape" id="rodapePrincipal">
   <span>© <span id="anoRodape"></span> Promédica · Conferidor de Guias<span class="ver" id="verRodape" title="Versão do sistema"></span></span>
-  <span>Criado por <b>Alexandre Neves</b></span>
+  <span class="rodape-dir"><button type="button" class="link-sutil" data-act="abrirAtalhos" title="Ver atalhos de teclado (?)">Atalhos <kbd>?</kbd></button><span class="sep-ponto" aria-hidden="true">·</span><span>Criado por <b>Alexandre Neves</b></span></span>
 </footer>
 <div id="modalRoot"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

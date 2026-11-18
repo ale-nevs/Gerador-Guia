@@ -155,13 +155,23 @@ function emailDeWebmail(m) {
   texto = limparTexto(texto);
   const corte = cortarHistorico(texto);
   const remetente = endereco(m.fromEmail ? `${m.fromNome || ''} <${m.fromEmail}>` : (m.fromNome || ''));
+  let responderPara = null;
+  if (m.responderPara) {
+    const rp = typeof m.responderPara === 'object'
+      ? endereco(m.responderPara.email ? `${m.responderPara.nome || ''} <${m.responderPara.email}>` : (m.responderPara.nome || ''))
+      : endereco(String(m.responderPara));
+    if (rp && rp.email) responderPara = rp;
+  } else if (m.replyToEmail || m.replyTo) {
+    const rp = endereco(m.replyToEmail ? `${m.replyToNome || ''} <${m.replyToEmail}>` : String(m.replyTo));
+    if (rp && rp.email) responderPara = rp;
+  }
   const cand = [m.data, ...(m.datas || [])].filter(Boolean);
   let d = null; for (const c of cand) { const x = new Date(c); if (!isNaN(x)) { d = x; break; } }
   if (!d && m.dataTexto) { const t = m.dataTexto.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); if (t) d = new Date(+t[3], +t[2] - 1, +t[1], +t[4], +t[5]); }
   const assunto = m.assunto || '';
   const messageId = m.messageId || ('sm-' + hashTexto((m.folder || '') + '|' + (m.uid || '') + '|' + remetente.email + assunto + texto.slice(0, 300)));
   return {
-    messageId, data: (d || new Date()).toISOString(), remetente, responderPara: null, assunto,
+    messageId, data: (d || new Date()).toISOString(), remetente, responderPara, assunto,
     textoCompleto: texto, textoPrincipal: corte.principal, restante: corte.restante, cortado: corte.cortado,
     anexos: (m.anexos || []).map(String), origem: 'webmail'
   };

@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Conferidor de Guias · Promédica",
   "short_name": "Conferidor",
-  "description": "Botão flutuante \"Abrir no conferidor\" no webmail da Promédica: abre o e-mail na aba do Conferidor de Guias, mostra se ele já está em atendimento e cola a resposta pronta no webmail.",
-  "version": "1.2.0",
+  "description": "Ponte entre o webmail da Promédica e o Conferidor de Guias: abre pedidos com 1 clique, exibe status em tempo real e abre/preenche a resposta pronta no webmail.",
+  "version": "1.3.0",
   "minimum_chrome_version": "111",
   "icons": {
     "16": "icones/icon-32.png",
@@ -48,7 +48,9 @@
     },
     {
       "matches": [
-        "https://*.vercel.app/*"
+        "https://*.vercel.app/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
       ],
       "js": [
         "conferidor.js"

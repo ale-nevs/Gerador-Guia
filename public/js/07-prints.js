@@ -27,30 +27,45 @@ const PRINTS_GEO = PRINTS_LAYOUTS[0];   // compatibilidade
 const PRINTS_MEM = new Map();   // guia.id -> { leituras: [{tipo, campos, itens}], crops } (só em memória)
 
 const OCR = {
-  worker: null, carregando: null, tarefa: Promise.resolve(),
+  max: (typeof navigator !== 'undefined' && (navigator.hardwareConcurrency || 2) >= 4) ? 2 : 1,
+  workers: [], livres: [], fila: [], carregando: null,
   async iniciar(aviso) {
-    if (this.worker) return this.worker;
+    if (this.workers.length) return this.workers[0];
     if (this.carregando) return this.carregando;
     this.carregando = (async () => {
       if (location.protocol === 'file:') throw new Error('A leitura de prints precisa do site publicado (não funciona abrindo o arquivo direto).');
       if (aviso) aviso('Carregando o leitor de imagens (só na primeira vez, alguns segundos)…');
       if (!window.Tesseract) await new Promise((ok, erro) => { const s = document.createElement('script'); s.src = 'ocr/tesseract.min.js'; s.onload = ok; s.onerror = () => erro(new Error('Não consegui carregar o leitor de imagens (pasta ocr).')); document.head.appendChild(s); });
-      this.worker = await Tesseract.createWorker('por', 1, { workerPath: 'ocr/worker.min.js', corePath: 'ocr/', langPath: 'ocr/', gzip: false });
-      return this.worker;
+      const n = Math.max(1, this.max);
+      const criados = await Promise.all(Array.from({ length: n }, () => Tesseract.createWorker('por', 1, { workerPath: 'ocr/worker.min.js', corePath: 'ocr/', langPath: 'ocr/', gzip: false })));
+      this.workers = criados;
+      this.livres = [...criados];
+      this.despachar();
+      return this.workers[0];
     })();
     try { return await this.carregando; } finally { this.carregando = null; }
   },
-  /* uma leitura por vez (o worker é sequencial) */
+  despachar() {
+    while (this.livres.length && this.fila.length) {
+      const w = this.livres.pop(), job = this.fila.shift();
+      Promise.resolve().then(() => job.fn(w)).then(
+        res => { this.livres.push(w); this.despachar(); job.ok(res); },
+        err => { this.livres.push(w); this.despachar(); job.erro(err); }
+      );
+    }
+  },
+  async usar(fn, aviso) {
+    await this.iniciar(aviso);
+    return new Promise((ok, erro) => { this.fila.push({ fn, ok, erro }); this.despachar(); });
+  },
+  /* executa leituras concorrentes distribuídas entre os workers do pool */
   ler(canvas, { psm = '7', lista = '' } = {}) {
-    const rodar = async () => {
-      const w = await this.iniciar();
+    const img = canvas && canvas.toDataURL ? canvas.toDataURL('image/png') : canvas;
+    return this.usar(async w => {
       await w.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: lista, preserve_interword_spaces: '1' });
-      // como PNG em data URL (síncrono): o canvas direto ou o toBlob podem custar ~1 s por leitura em alguns navegadores
-      const img = canvas && canvas.toDataURL ? canvas.toDataURL('image/png') : canvas;
       const { data } = await w.recognize(img);
       return { texto: (data.text || '').replace(/\s+/g, ' ').trim(), conf: data.confidence };
-    };
-    const p = this.tarefa.then(rodar, rodar); this.tarefa = p.catch(() => { }); return p;
+    });
   }
 };
 
@@ -278,22 +293,20 @@ const PRINTS_ROTULOS = {
 const normPalavra = t => semAcento(String(t || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
 /* lê o print inteiro uma vez e devolve as palavras com a posição (em pixels do print) */
 OCR.palavras = function (cv, reg) {
-  const rodar = async () => {
-    const w = await this.iniciar();
-    // reg: só a região da janela (print da tela inteira); ampliada para o texto ficar com ~2x o tamanho original
-    const [rx, ry, rw, rh] = reg || [0, 0, cv.width, cv.height];
-    const e = Math.max(1, Math.min(2, 2800 / rw));
-    const c = document.createElement('canvas'); c.width = Math.round(rw * e); c.height = Math.round(rh * e);
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(cv, rx, ry, rw, rh, 0, 0, c.width, c.height);
+  const [rx, ry, rw, rh] = reg || [0, 0, cv.width, cv.height];
+  const e = Math.max(1, Math.min(2, 2800 / rw));
+  const c = document.createElement('canvas'); c.width = Math.round(rw * e); c.height = Math.round(rh * e);
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(cv, rx, ry, rw, rh, 0, 0, c.width, c.height);
+  const img = c.toDataURL('image/png');
+  return this.usar(async w => {
     await w.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '', preserve_interword_spaces: '0' });
-    const { data } = await w.recognize(c.toDataURL('image/png'), {}, { blocks: true, text: false });
+    const { data } = await w.recognize(img, {}, { blocks: true, text: false });
     const ws = [];
     for (const bk of data.blocks || []) for (const pa of bk.paragraphs || []) for (const l of pa.lines || []) for (const wd of l.words || []) {
       const b = wd.bbox; ws.push({ t: wd.text, n: normPalavra(wd.text), x0: rx + b.x0 / e, y0: ry + b.y0 / e, x1: rx + b.x1 / e, y1: ry + b.y1 / e, cx: rx + (b.x0 + b.x1) / 2 / e, cy: ry + (b.y0 + b.y1) / 2 / e, conf: wd.confidence });
     }
     return ws;
-  };
-  const p = this.tarefa.then(rodar, rodar); this.tarefa = p.catch(() => { }); return p;
+  });
 };
 /* um título do print confere com o de referência? (aceita um caractere trocado nos títulos longos) */
 function confereTitulo(lido, ref) {
@@ -408,56 +421,55 @@ async function lerPrintTela(file, aviso, sistema) {
     /* 2) plano B: poucos títulos legíveis (imagem ruim): barra amarela do topo, só no layout do sistema escolhido */
     const barra = acharBarra(cv); diag.barra = barra;
     const c = barra && ancorasPossiveis(barra).find(x => x.L.nome === sistema);
-    if (c) { const g = await confereRotulos(cv, c, L.rotGuia), p = await confereRotulos(cv, c, L.rotProc); if (g || p) { an = c; tipo = p > g ? 'proc' : 'guia'; diag.planoB = true; } }
+    if (c) { const [g, p] = await Promise.all([confereRotulos(cv, c, L.rotGuia), confereRotulos(cv, c, L.rotProc)]); if (g || p) { an = c; tipo = p > g ? 'proc' : 'guia'; diag.planoB = true; } }
     if (!an) return { erro: 'Não consegui localizar os campos neste print: os títulos da tela "Liberação de Senhas" não ficaram legíveis. Use a tecla Print Screen (ou a Ferramenta de Captura) sem reduzir a imagem e cole de novo.', diag };
   }
   const anDe = k => cal ? anLocal(cal, L, L[k]) : an;
   const crops = {}, G = L;
   if (tipo === 'guia') {
     if (telaVazia(cv, anDe)) return { erro: 'A tela deste print está vazia (nenhuma guia aberta). Abra a guia no sistema e tire o print de novo.', diag };
-    // parte de baixo: aba CID aberta? (pode estar em Terapia, Internação...)
     let abaCid;
     if (cal) { const sc = titulosNoLugar(ws, cal, R.cid), st = titulosNoLugar(ws, cal, R.terapia); abaCid = sc > 0 ? true : st > 0 ? false : null; }
     if (abaCid == null) abaCid = !G.rotCid || !!(await confereRotulos(cv, cal ? anLocal(cal, L, G.rotCid[0]) : an, G.rotCid));
     diag.abaCid = abaCid;
     const campos = {};
-    for (const [k, base] of Object.entries(DEF_GUIA)) {
-      if (k === 'cid' && !abaCid) continue;
-      const cx = G[k];
-      const def = { ...base, caixa: cx }, a = anDe(k);
+    const entradas = Object.entries(DEF_GUIA).filter(([k]) => !(k === 'cid' && !abaCid));
+    const lidos = await Promise.all(entradas.map(async ([k, base]) => {
+      const cx = G[k], def = { ...base, caixa: cx }, a = anDe(k);
       const r = await lerCampo(cv, a, def);
       let valor = r.valor, incerto = r.incerto, origem = 'recorte';
-      if (incerto && def.valida) {   // reserva: a palavra lida no print inteiro, dentro da mesma caixa
+      if (incerto && def.valida) {
         const v = palavraNaCaixa(ws, a, cx, def.norm || (x => x), def.valida); if (v) { valor = v; incerto = false; origem = 'tela'; }
       }
-      if (!def.valida && valor) {   // nomes: letra a mais no começo (borda da célula borrada no JPEG: "IMRA", "HJANY")? confere com a leitura do print inteiro
+      if (!def.valida && valor) {
         const kx = a.sx || a.esc, ky = a.sy || a.esc, x0 = a.dx + cx[0] * kx - 3, x1 = a.dx + cx[2] * kx, y0 = a.dy + cx[1] * ky - 2, y1 = a.dy + cx[3] * ky + 2;
         const prim = ws.filter(w => w.cx > x0 && w.cx < x1 && w.cy > y0 && w.cy < y1).sort((p, q) => p.x0 - q.x0)[0];
         const pw = prim ? limparNome(prim.t) : '', [t0, ...resto] = valor.split(' ');
         if (pw.length >= 2 && t0.length === pw.length + 1 && t0.slice(1) === pw && /^[IJHLW1|]/.test(t0)) { valor = [pw, ...resto].join(' '); origem = 'recorte+tela'; }
       }
-      campos[k] = { valor, bruto: r.bruto, conf: r.conf, incerto, origem, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) };
-      crops[k] = miniatura(cv, a, def.caixa);
-    }
+      return [k, { valor, bruto: r.bruto, conf: r.conf, incerto, origem, var: r.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) }, miniatura(cv, a, def.caixa)];
+    }));
+    for (const [k, obj, mini] of lidos) { campos[k] = obj; crops[k] = mini; }
     return { tipo, layout: G.nome, campos, crops, diag, ctx: { cv, anDe, G, ws } };
   }
   const Lg = G.linhas, caixaGrade = [Lg.cod[0], Lg.topo, Lg.qtd[1], Lg.topo + Lg.passo * Lg.max];
   an = refinarGrade(cv, cal ? anLocal(cal, L, caixaGrade) : an);
-  const itens = [];
-  for (let i = 0; i < Lg.max; i++) {
+  const normCod = v => { const t = soDigitos(v); return t.length > 8 ? t.slice(-8) : t; };
+  const filas = await Promise.all(Array.from({ length: Lg.max }, async (_, i) => {
     const y0 = Lg.topo + Lg.passo * i, y1 = y0 + Lg.alt;
     const cxCod = [Lg.cod[0], y0 + 2, Lg.cod[1], y1 - 1];
-    const normCod = v => { const t = soDigitos(v); return t.length > 8 ? t.slice(-8) : t; };
     const cod = await lerCampo(cv, an, { caixa: cxCod, lista: '0123456789', norm: normCod, valida: v => /^\d{8}$/.test(v), vazioOk: true, variantes: VAR_PADRAO });
-    if (cod.vazio) continue;
+    if (cod.vazio) return null;
     if (cod.incerto) { const v = palavraNaCaixa(ws, an, cxCod, normCod, v => /^\d{8}$/.test(v)); if (v) { cod.valor = v; cod.incerto = false; } }
-    const qtd = await lerCampo(cv, an, { caixa: [Lg.qtd[0], y0 + 2, Lg.qtd[1], y1 - 1], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,3}$/.test(v) && +v >= 1, variantes: VAR_CURTO });
-    const num = await lerCampo(cv, an, { caixa: [Lg.item[0], y0 + 2, Lg.item[1], y1 - 1], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,2}$/.test(v) && +v >= 1, variantes: VAR_CURTO });
-    if (cod.valor.length < 5) continue;   // sem código legível não é linha de item (borda da grade, barra de rolagem)
-    itens.push({ fila: i, n: Number(num.valor) || null, codigo: cod.valor, qtd: qtd.valor === '' ? null : Number(qtd.valor), st: statusLinha(cv, an, y0), conf: Math.min(cod.conf, qtd.conf), incerto: cod.incerto || qtd.incerto,
-      img: miniatura(cv, an, [Lg.cod[0] - 2, y0 + 1, Lg.qtd[1] + 2, y1], 2), varCod: cod.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`), varQtd: qtd.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) });
-  }
-  // numeração: as linhas são consecutivas; vale o deslocamento mais frequente entre o nº lido e a posição na grade
+    if (cod.valor.length < 5) return null;
+    const [qtd, num] = await Promise.all([
+      lerCampo(cv, an, { caixa: [Lg.qtd[0], y0 + 2, Lg.qtd[1], y1 - 1], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,3}$/.test(v) && +v >= 1, variantes: VAR_CURTO }),
+      lerCampo(cv, an, { caixa: [Lg.item[0], y0 + 2, Lg.item[1], y1 - 1], lista: '0123456789', norm: soDigitos, valida: v => /^\d{1,2}$/.test(v) && +v >= 1, variantes: VAR_CURTO })
+    ]);
+    return { fila: i, n: Number(num.valor) || null, codigo: cod.valor, qtd: qtd.valor === '' ? null : Number(qtd.valor), st: statusLinha(cv, an, y0), conf: Math.min(cod.conf, qtd.conf), incerto: cod.incerto || qtd.incerto,
+      img: miniatura(cv, an, [Lg.cod[0] - 2, y0 + 1, Lg.qtd[1] + 2, y1], 2), varCod: cod.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`), varQtd: qtd.leituras.map(x => `${x.bruto} (${Math.round(x.conf)})`) };
+  }));
+  const itens = filas.filter(Boolean);
   const cont = new Map(); itens.forEach(it => { if (it.n) cont.set(it.n - it.fila, (cont.get(it.n - it.fila) || 0) + 1); });
   const desl = [...cont.entries()].sort((a, b) => b[1] - a[1])[0];
   if (desl) itens.forEach(it => { it.n = desl[0] + it.fila; });

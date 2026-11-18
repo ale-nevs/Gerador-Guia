@@ -338,6 +338,7 @@ function cfgPrefs() {
       <div style="max-width:300px"><label class="lbl" for="pParado">Avisar “atendimento parado” após (minutos na mesma etapa; 0 = não avisar)</label><input type="number" id="pParado" min="0" max="240" data-cfg="preferencias.minutosParado" value="${p.minutosParado ?? 10}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>
+      <label class="switch"><input type="checkbox" data-cfg="preferencias.exigirConfirmarGlosa" ${p.exigirConfirmarGlosa ? 'checked' : ''}><span><b>Exigir marcação manual de “Retirou alguma glosa?” em toda guia</b> (desligado = pré-marca “Não” e só pede detalhes quando o operador mudar para “Sim”)</span></label>
     </div></div>
   <div class="card"><div class="card-h"><h2>Motivos de não autorização</h2></div>
     ${cfgEdit.motivos.map((m, i) => `<div class="linha-flex" style="margin-bottom:8px"><input type="text" data-cfg="motivos.${i}.nome" value="${esc(m.nome)}" style="flex:2;min-width:220px;width:auto" aria-label="Motivo ${i + 1}">
@@ -348,7 +349,11 @@ function cfgPrefs() {
     ${cfgEdit.glosas.map((g, i) => `<div class="linha-flex" style="margin-bottom:6px"><input type="text" data-cfg="glosas.${i}" value="${esc(g)}" style="flex:1;min-width:220px;width:auto" aria-label="Glosa ${i + 1}"><button class="btn sm ghost ico" data-act="glosaRem" data-i="${i}" aria-label="Remover glosa" title="Remover glosa">${ic('trash', 'sm')}</button></div>`).join('')}
     <div class="acoes" style="margin-top:6px"><button class="btn line" data-act="glosaAdd">${ic('plus')}Adicionar glosa</button></div></div>
   <div class="card"><div class="card-h"><h2>Privacidade dos registros</h2></div>
-    <button class="btn dng" data-act="limparAntigos">${ic('trash')}Apagar registros com mais de 180 dias</button></div>`;
+    <p class="dica" style="margin:0 0 10px">Você pode anonimizar apenas o nome do beneficiário nos registros antigos (mantendo estatísticas e carteiras para conciliação) ou apagar completamente os registros antigos.</p>
+    <div class="linha-flex">
+      <button class="btn line" data-act="anonimizarAntigos">${ic('shield')}Anonimizar nomes com mais de 180 dias</button>
+      <button class="btn dng" data-act="limparAntigos">${ic('trash')}Apagar registros com mais de 180 dias</button>
+    </div></div>`;
 }
 
 /* ---------- 10. Informações ---------- */
@@ -360,5 +365,5 @@ function cfgInfo() {
     <dt>Onde ficam as configurações</dt><dd>${Pasta.ok ? 'Arquivos config.json e parametrizacoes.json na pasta compartilhada, com cópia neste computador.' : 'Somente neste computador (sem pasta compartilhada).'}</dd>
     <dt>Preferência de tema</dt><dd>Neste computador (${Tema.pref() === 'auto' ? 'automático' : Tema.pref()}).</dd>
     <dt>Operadores / clínicas</dt><dd>${cfg.operadores.length} / ${cfg.clinicas.length}</dd>
-    <dt>Dados guardados</dt><dd>Registros: carteira, códigos, quantidades, número e resultado da guia. Sem nome do beneficiário, CID ou médico. Parametrizações incluem o nome do médico informado por você.</dd></dl></div>`;
+    <dt>Dados guardados</dt><dd>Pasta <code>registros/</code>: carteira, nome/iniciais do beneficiário (para acompanhamento e conciliação), códigos, quantidades, número e resultado da guia (sem CID ou médico). Pasta <code>auditoria/</code>: texto do e-mail, dados lidos e prints da conferência (se habilitado em Preferências). Parametrizações incluem o nome do médico informado por você.</dd></dl></div>`;
 }

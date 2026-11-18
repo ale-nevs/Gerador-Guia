@@ -9,7 +9,75 @@ const guiaAtiva = () => (S ? S.guias[S.ativa] : null);
 // Último médico lido por remetente, só neste computador: serve de sugestão quando um pedido da mesma clínica vem sem médico
 const chaveMedico = () => (S && S.email && S.email.remetente && S.email.remetente.email) ? 'medico.' + S.email.remetente.email.toLowerCase() : '';
 function lembrarMedico() { const k = chaveMedico(); if (!k) return; const g = S.guias.find(x => x.pedido.medico && x.pedido.medico.nome); if (g) LS.set(k, g.pedido.medico.bruto); }
-function persistir() { if (Abas.pausada) return; if (S) { LS.set('atual', S); lembrarMedico(); } else LS.del('atual'); }
+function persistir() { if (typeof Abas !== 'undefined' && Abas.pausada) return; if (S) { LS.set('atual', S); lembrarMedico(); } else LS.del('atual'); }
+
+/* ---------- Fila de atendimentos pausados (IndexedDB deste computador: nunca perde dados ao trocar de e-mail) ---------- */
+const Fila = {
+  lista: [], max: 15,
+  async init() { const l = await idbGet('filaAtendimentos'); this.lista = Array.isArray(l) ? l : []; },
+  async salvar() { try { await idbSet('filaAtendimentos', this.lista); } catch (e) { } },
+  tem(chave) { return !!this.achar(chave); },
+  achar(chave) {
+    if (!chave) return null;
+    return this.lista.find(st => st.atendId === chave || (st.email && st.email.messageId === chave) || (st.guias || []).some(g => g.id === chave)) || null;
+  },
+  async estacionar(st) {
+    if (!st || !st.guias || st.guias.every(guiaTerminal)) return false;
+    const copia = clonar(st);
+    copia.pausadoEm = agora();
+    copia.pausadoPor = operador() || '';
+    this.lista = [copia, ...this.lista.filter(x => x.atendId !== copia.atendId && (!copia.email || !x.email || x.email.messageId !== copia.email.messageId))].slice(0, this.max);
+    await this.salvar();
+    return true;
+  },
+  async remover(chave) {
+    const alvo = this.achar(chave); if (!alvo) return false;
+    this.lista = this.lista.filter(x => x.atendId !== alvo.atendId);
+    await this.salvar();
+    return true;
+  },
+  async retomar(chave) {
+    const alvo = this.achar(chave); if (!alvo) return null;
+    if (S && S.atendId !== alvo.atendId && !S.guias.every(guiaTerminal)) await this.estacionar(S);
+    this.lista = this.lista.filter(x => x.atendId !== alvo.atendId);
+    await this.salvar();
+    S = clonar(alvo);
+    delete S.pausadoEm;
+    persistir();
+    return S;
+  }
+};
+
+/* ---------- Fila ordenada de cópia da Etapa 3 (Modo Turbo / Barra de espaço) ---------- */
+function filaCopia(g) {
+  if (!g || !S) return [];
+  const p = g.pedido;
+  const ordemCampos = [
+    ['executante', 'Credenciado executante'],
+    ['medico_nome', 'Nome do médico'],
+    ['medico_crm', p.medico.conselho || 'CRM'],
+    ['local', 'Local do pedido'],
+    ['data', 'Data do pedido'],
+    ['carteira', 'Carteira'],
+    ['benef', 'Beneficiário'],
+    ['cid', 'CID']
+  ];
+  const fila = [];
+  const push = (key, rot, val) => {
+    if (!val) return;
+    fila.push({ key, rot, val, rotulo: rot, valor: val, ok: !!(g.copiados && g.copiados[key] === val) });
+  };
+  ordemCampos.forEach(([k, rot]) => push(k, rot, typeof valorCopia === 'function' ? valorCopia(g, k).trim() : ''));
+  p.itens.forEach((it, i) => {
+    if (it.codigo) push('c:' + it.codigo, `Código #${i + 1}`, it.codigo);
+    if (it.qtd != null) push('q:' + it.codigo, `Qtd. de ${it.codigo}`, String(it.qtd));
+  });
+  return fila;
+}
+function proximoParaCopiar(g) {
+  return filaCopia(g).find(f => !f.ok) || null;
+}
+
 function clinicaDe(s) { return s && s.clinicaId ? cfg.clinicas.find(c => c.id === s.clinicaId) || null : null; }
 const PALAVRAS_VAZIAS = new Set(['clinica', 'clinicas', 'de', 'da', 'do', 'das', 'dos', 'e', 'autorizacao', 'convenio', 'contato', 'espaco', 're', 'res', 'enc', 'fw', 'fwd', 'pedido', 'guia', 'guias', 'terapia', 'terapias', 'integrada', 'multidisciplinar']);
 const tokens = s => semAcento(s).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !PALAVRAS_VAZIAS.has(w));
@@ -32,14 +100,15 @@ function sugerirClinica(email) {
 }
 function novaGuia(bloco, idx, st) {
   const p = bloco.pedido, e = st.email;
+  const glosaInicial = (cfg && cfg.preferencias && cfg.preferencias.exigirConfirmarGlosa) ? null : 'nao';
   return {
     id: uid(), idx, chave: bloco.chave, multi: bloco.multi, pedido: p, textoBloco: bloco.texto.trim(),
     carteiraUsada: p.carteira || '', executante: null,
     status: 'em_andamento', vista: 2, etapa: 2, abertoEm: agora(), abertoPor: operador(),
     copiados: {}, itensEditados: false, editandoItens: false,
-    cega: { iniciada: false, tentativas: 0, linhas: '', entradas: [], resultado: null, ok: false, historico: [] },
+    cega: { iniciada: false, tentativas: 0, entradas: [], resultado: null, ok: false, historico: [] },
     numero: '',
-    resultado: { situacao: null, motivoId: '', motivoTxt: '', naoAut: {}, obsAdicionais: '', glosa: { resp: null, itens: {} }, emailPrestador: (e.responderPara && e.responderPara.email) || e.remetente.email || '' },
+    resultado: { situacao: null, motivoId: '', motivoTxt: '', naoAut: {}, obsAdicionais: '', glosa: { resp: glosaInicial, itens: {} }, emailPrestador: (e.responderPara && e.responderPara.email) || e.remetente.email || '' },
     usarCorrecao: /^\s*(re|res)\s*:/i.test(e.assunto),
     respEdit: null, respExtras: [], respInc: [], obsEdit: null, obsExtras: [], obsInc: [],
     param: null, semGuia: null, semGuiaCopiado: false, conf: {}
@@ -289,7 +358,7 @@ function aplicarParametrizacao(g) {
   return true;
 }
 
-/* ---------- Registro gravado (sem nome, CID ou médico) ---------- */
+/* ---------- Registro gravado (com nome do beneficiário para busca e auditoria; CID, médico e texto completo ficam em auditoria/) ---------- */
 function resultadoParaRegistro(g) { const r = g.resultado; if (g.semGuia) return { situacao: 'sem_guia', modelo: g.semGuia }; const gl = glosaDe(g), temGlosa = (r.situacao === 'autorizada' || r.situacao === 'parcial') && gl.resp === 'sim', okI = new Set(itensGlosaveis(g).map(i => i.codigo));
   return { situacao: r.situacao, motivoId: r.motivoId || '', motivoTxt: r.motivoTxt || '', naoAut: r.naoAut, glosaResp: (r.situacao === 'autorizada' || r.situacao === 'parcial') ? gl.resp : null, glosas: temGlosa ? Object.entries(gl.itens).filter(([c]) => okI.has(c)).map(([c, x]) => ({ c, g: x.glosa || '', m: x.motivo || '' })) : [] }; }
 const leituraCorrigida = g => !!(g.itensEditados || ['beneficiario', 'medico', 'cid', 'emissao', 'local'].some(k => ['digitado', 'aprendido'].includes((g.origem || {})[k])) || g.pedido.itens.some(i => ['digitado', 'aprendido'].includes(i.origemCod)));

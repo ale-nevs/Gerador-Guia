@@ -1,5 +1,5 @@
 'use strict';
-const VERSAO = '2.1.0';
+const VERSAO = '2.2.0';
 const HIST_DIAS = 30;        // janela técnica de leitura dos registros (não configurável)
 const MAX_BENEFICIARIOS = 5; // beneficiários diferentes por e-mail
 
@@ -104,7 +104,12 @@ const ICONES = {
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V22h16"/>',
   chevup: '<path d="m18 15-6-6-6 6"/>',
   chevdown: '<path d="m6 9 6 6 6-6"/>',
-  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>'
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
+  keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+  sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
+  checkcircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'
 };
 const ic = (n, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${ICONES[n] || ''}</svg>`;
 const ANIMAIS = [['🐶', 'Cachorro'], ['🐱', 'Gato'], ['🦊', 'Raposa'], ['🐻', 'Urso'], ['🐼', 'Panda'], ['🐨', 'Coala'], ['🦁', 'Leão'], ['🐯', 'Tigre'], ['🐸', 'Sapo'], ['🐵', 'Macaco'], ['🦉', 'Coruja'], ['🐧', 'Pinguim'], ['🐢', 'Tartaruga'], ['🦄', 'Unicórnio'], ['🐙', 'Polvo'], ['🦋', 'Borboleta']];
@@ -123,7 +128,11 @@ const corPorTexto = s => 'idc-' + (parseInt(hashTexto(String(s)), 36) % 10);
 const Tema = {
   pref() { return LS.get('tema', 'auto'); },
   efetivo() { const p = this.pref(); return p === 'escuro' || (p !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; },
-  aplicar() { document.documentElement.setAttribute('data-theme', this.efetivo()); },
+  aplicar() {
+    const ef = this.efetivo();
+    document.documentElement.setAttribute('data-theme', ef);
+    try { if (typeof Mini !== 'undefined' && Mini.aberto()) Mini.win.document.documentElement.setAttribute('data-theme', ef); } catch (e) { }
+  },
   definir(p) { LS.set('tema', p); this.aplicar(); },
   alternar() { this.definir(this.efetivo() === 'dark' ? 'claro' : 'escuro'); }
 };
@@ -226,21 +235,31 @@ function htmlParaEmail(html) {
 }
 const escH = s => esc(s).replace(/\n/g, '<br>');
 
-/* ---------- Modal ---------- */
+/* ---------- Modal (acessível: focus trap, inert no fundo, restauração de foco) ---------- */
 let modalAtual = null;
+const SELETOR_FOCAVEL = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+function definirInertFundo(ativo) {
+  ['#topoHeader', '#navWrap', '#barraSync', '#barraPausados', '#app', '#rodapePrincipal'].forEach(sel => {
+    const el = $(sel); if (!el) return;
+    if (ativo) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+  });
+}
 function abrirModal({ titulo, sub = '', icone = 'info', corpo, rodape = '', tamanho = '', aoFechar = null, risco = '', lateral = false }) {
+  const focoAnterior = modalAtual && modalAtual.focoAnterior ? modalAtual.focoAnterior : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
   fecharModal(true);
+  definirInertFundo(true);
   const fundo = document.createElement('div'); fundo.className = 'modal-fundo' + (lateral ? ' lateral' : ''); fundo.id = 'modalFundo';
   fundo.innerHTML = `<div class="modal ${tamanho} ${risco ? 'risco-' + risco : ''} ${lateral ? 'lateral' : ''}" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
     <div class="modal-h"><span class="caixa">${ic(icone, 'lg')}</span><div><h2 id="modalTitulo">${esc(titulo)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
-      <button class="btn ico" data-act="fecharModal" aria-label="Fechar" title="Fechar">${ic('x')}</button></div>
+      <button class="btn ico" data-act="fecharModal" aria-label="Fechar" title="Fechar (Esc)">${ic('x')}</button></div>
     <div class="modal-b" id="modalCorpo">${corpo}</div>${rodape ? `<div class="modal-f" id="modalRodape">${rodape}</div>` : ''}</div>`;
   fundo.addEventListener('mousedown', e => { if (e.target === fundo) fundo.dataset.fechar = '1'; else delete fundo.dataset.fechar; });
   fundo.addEventListener('click', e => { if (e.target === fundo && fundo.dataset.fechar) fecharModal(); });
   $('#modalRoot').appendChild(fundo);
-  modalAtual = { aoFechar, sujo: false };
+  modalAtual = { aoFechar, sujo: false, focoAnterior };
   fundo.addEventListener('input', ev => { if (modalAtual && ev.target.matches('textarea, input[type=text], [contenteditable]')) modalAtual.sujo = true; });
-  const foco = $('[autofocus],input,textarea,select,.ed', fundo); if (foco) setTimeout(() => foco.focus(), 30);
+  const foco = $('[autofocus],input:not([type=hidden]),textarea,select,.ed,button[data-act=fecharModal]', fundo);
+  if (foco) setTimeout(() => { try { foco.focus(); } catch (e) { } }, 25);
 }
 /* Confirmação em modal (com o nome do item). Resolve true / texto do campo, ou null se a pessoa voltar. */
 function confirmar({ titulo, texto, ok = 'Confirmar', risco = 'bad', icone = 'alert', campo = null }) {
@@ -250,13 +269,13 @@ function confirmar({ titulo, texto, ok = 'Confirmar', risco = 'bad', icone = 'al
       rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal" id="cfVoltar">Voltar</button><button class="btn ${risco === 'bad' ? 'perigo' : 'pri'}" id="cfOk">${ok}</button>`,
       aoFechar: () => { if (!feito) res(null); } });
     $('#cfOk').addEventListener('click', () => { feito = true; const v = campo ? $('#cfCampo').value.trim() : true; fecharModal(true); res(v); });
-    if (!campo) setTimeout(() => { const b = $('#cfVoltar'); if (b) b.focus(); }, 40);
+    if (!campo) setTimeout(() => { const b = $('#cfVoltar'); if (b) b.focus(); }, 35);
   });
 }
 /* "JANY GLEYDE DA SILVA" → "JANY G. D. S." */
 const nomeCurto = n => { const p = String(n || '').trim().split(/\s+/).filter(Boolean); return p.length ? p[0] + (p.length > 1 ? ' ' + p.slice(1).map(w => w[0] + '.').join(' ') : '') : ''; };
 function fecharModal(silencioso) {
-  const f = $('#modalFundo'); if (!f) return;
+  const f = $('#modalFundo'); if (!f) { definirInertFundo(false); return; }
   if (!silencioso && modalAtual && modalAtual.sujo && !modalAtual.descartar) {   // texto digitado: pergunta antes de descartar
     const m = f.querySelector('.modal'); let bar = m.querySelector('.modal-desc');
     if (!bar) { bar = document.createElement('div'); bar.className = 'modal-desc'; bar.setAttribute('role', 'alert');
@@ -264,14 +283,31 @@ function fecharModal(silencioso) {
       m.appendChild(bar); }
     bar.querySelector('[data-act=modalContinuar]').focus(); return;
   }
-  const cb = modalAtual && modalAtual.aoFechar; f.remove(); modalAtual = null; M = null;
+  const cb = modalAtual && modalAtual.aoFechar;
+  const focoAnt = modalAtual && modalAtual.focoAnterior;
+  f.remove(); modalAtual = null; M = null;
+  definirInertFundo(false);
+  if (!silencioso && focoAnt && document.contains(focoAnt)) {
+    setTimeout(() => { try { focoAnt.focus({ preventScroll: true }); } catch (e) { } }, 10);
+  }
   if (cb && !silencioso) cb();
 }
 let M = null; // estado do modal aberto
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modalFundo')) { e.preventDefault(); fecharModal(); } });
+document.addEventListener('keydown', e => {
+  const f = $('#modalFundo'); if (!f) return;
+  if (e.key === 'Escape') { e.preventDefault(); fecharModal(); return; }
+  if (e.key === 'Tab') {
+    const m = f.querySelector('.modal'); if (!m) return;
+    const focaveis = $$(SELETOR_FOCAVEL, m).filter(el => el.offsetParent !== null || el === document.activeElement);
+    if (!focaveis.length) { e.preventDefault(); return; }
+    const pri = focaveis[0], ult = focaveis[focaveis.length - 1];
+    if (e.shiftKey && (document.activeElement === pri || !m.contains(document.activeElement))) { e.preventDefault(); ult.focus(); }
+    else if (!e.shiftKey && (document.activeElement === ult || !m.contains(document.activeElement))) { e.preventDefault(); pri.focus(); }
+  }
+});
 
 /* ---------- Cor de identificação do operador (RGB + transparência) ---------- */
-const CORES_PADRAO_HEX = ['#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d', '#4f46e5', '#7c3aed', '#c026d3', '#db2777', '#b45309'];
+const CORES_PADRAO_HEX = ['#1e4678', '#2563eb', '#0284c7', '#0891b2', '#0d9488', '#16a34a', '#65a30d', '#d97706', '#e11d48', '#be123c'];
 const hexValido = h => /^#[0-9a-f]{6}$/i.test(h || '');
 function estiloCor(hex, alfaPct) {
   const h = hexValido(hex) ? hex.slice(1) : '2c4a70';

@@ -198,7 +198,7 @@ Object.assign(acoes, {
   tstLerTexto() { const t = $('#tstTexto').value; if (!t.trim()) { toast('Cole o texto do e-mail.', 'bad'); return; } testarEmails([{ nome: 'texto colado ' + (TESTE.emails.length + 1), email: emailDeTexto(t, '') }]); },
   tstReler(b) { const t = TESTE.emails.find(x => x.id === b.dataset.id); if (t) testarEmails([{ nome: t.nome, email: t.email }], t.id); },
   tstRemover(b) { const k = b.dataset.tipo === 'p' ? 'prints' : 'emails'; TESTE[k] = TESTE[k].filter(t => t.id !== b.dataset.id); render(); },
-  tstLimpar() { if (!confirm('Apagar todos os testes desta tela?')) return; TESTE.prints = []; TESTE.emails = []; render(); },
+  async tstLimpar() { if (!(await confirmar({ titulo: 'Limpar testes', texto: 'Apagar todos os testes de leitura desta tela?', ok: 'Limpar testes', icone: 'trash' }))) return; TESTE.prints = []; TESTE.emails = []; render(); },
   async tstCopiar() { try { await navigator.clipboard.writeText(resumoTeste()); toast('Resumo copiado.'); } catch (e) { baixar('teste-leitura.txt', resumoTeste()); } },
   tstBaixar() { baixar(nomeArquivo('teste_leitura', isoDia(new Date()), 'json').replace('.json', `_${new Date().toTimeString().slice(0, 5).replace(':', 'h')}.json`), JSON.stringify(montarRegistroTeste(), null, 1), 'application/json'); toast('Registro baixado. Envie o arquivo ao suporte.'); }
 });
@@ -497,17 +497,56 @@ const Apr = {
     this.lista = (d && Array.isArray(d.itens)) ? d.itens : []; this.pronto = true;
   },
   chave: e => [e.tipo, e.clinicaId || '', e.campo, e.lido, e.correto].join('|'),
+  mesclarListas(remota, local, excluida) {
+    const mapa = new Map();
+    for (const src of [remota || [], local || []]) {
+      for (const it of src) {
+        const k = this.chave(it); if (excluida && k === excluida) continue;
+        const ex = mapa.get(k);
+        if (!ex) mapa.set(k, clonar(it));
+        else {
+          ex.n = Math.max(ex.n || 1, it.n || 1);
+          if ((it.ultimo || '') > (ex.ultimo || '')) { ex.ultimo = it.ultimo; if (it.ref) ex.ref = it.ref; }
+          if ((it.primeiro || '') && (!ex.primeiro || it.primeiro < ex.primeiro)) ex.primeiro = it.primeiro;
+          ex.ops = unicos([...(ex.ops || []), ...(it.ops || [])]).slice(-5);
+        }
+      }
+    }
+    return [...mapa.values()];
+  },
   async registrar(e) {
-    if (!e.lido && e.lido !== 0 || String(e.lido) === String(e.correto)) return;
-    await this.carregar();   // relê antes de gravar (outro operador pode ter gravado)
+    if ((!e.lido && e.lido !== 0) || String(e.lido) === String(e.correto)) return;
+    await this.carregar();
     const k = this.chave(e), x = this.lista.find(y => this.chave(y) === k), op = operador();
     if (x) { x.n++; x.ultimo = agora(); if (op && !x.ops.includes(op)) x.ops = [...x.ops, op].slice(-5); if (e.ref) x.ref = e.ref; }
     else this.lista.push({ tipo: e.tipo, clinicaId: e.clinicaId || '', clinica: e.clinica || '', campo: e.campo, lido: String(e.lido), correto: String(e.correto), ref: e.ref || '', sistema: e.sistema || '', n: 1, primeiro: agora(), ultimo: agora(), ops: op ? [op] : [] });
     const doc = { atualizadoEm: agora(), itens: this.lista };
     LS.set('aprendizado', doc);
-    if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } }
+    if (Pasta.ok) {
+      try {
+        const salvo = await Pasta.transacaoJson(['aprendizado'], 'correcoes.json', { itens: [] }, remoto => ({
+          atualizadoEm: agora(),
+          itens: this.mesclarListas(remoto && remoto.itens, this.lista, null)
+        }));
+        if (salvo && Array.isArray(salvo.itens)) { this.lista = salvo.itens; LS.set('aprendizado', salvo); }
+      } catch (er) { }
+    }
   },
-  async remover(k) { await this.carregar(); this.lista = this.lista.filter(y => this.chave(y) !== k); const doc = { atualizadoEm: agora(), itens: this.lista }; LS.set('aprendizado', doc); if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } } },
+  async remover(k) {
+    await this.carregar();
+    this.lista = this.lista.filter(y => this.chave(y) !== k);
+    const doc = { atualizadoEm: agora(), itens: this.lista };
+    LS.set('aprendizado', doc);
+    if (Pasta.ok) {
+      try {
+        const salvo = await Pasta.transacaoJson(['aprendizado'], 'correcoes.json', { itens: [] }, remoto => ({
+          atualizadoEm: agora(),
+          itens: this.mesclarListas(remoto && remoto.itens, this.lista, k)
+        }));
+        if (salvo && Array.isArray(salvo.itens)) { this.lista = salvo.itens; LS.set('aprendizado', salvo); }
+      } catch (er) { }
+    }
+  },
   /* correções de e-mail desta clínica que batem com o que acabou de ser lido */
   sugestoes(p, cl) {
     if (!cl) return [];

@@ -18,28 +18,41 @@ function avisoEmailJaAtendido(email) {
 /* Webmail (extensão do Chrome): o botão flutuante "Abrir no conferidor" do webmail entrega o e-mail aqui */
 const webmailParaEmail = m => emailDeWebmail({
   uid: m.uid, folder: m.folder, messageId: m.messageId, assunto: m.assunto, fromNome: m.de && m.de.nome, fromEmail: m.de && m.de.email,
-  plain: m.plain, html: m.html, data: m.data, datas: m.datas, anexos: m.anexos
+  responderPara: m.responderPara, plain: m.plain, html: m.html, data: m.data, datas: m.datas, anexos: m.anexos
 });
 const nomesAtend = () => S ? unicos(S.guias.map(g => nomeCurto(g.pedido.beneficiario)).filter(Boolean)) : [];
 async function abrirDoWebmail(m) {
   let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Não consegui ler este e-mail.' }; }
   if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Escolha o operador no Conferidor.' }; }
-  if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
-  if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return { ok: false, motivo: 'O atendimento aberto foi mantido.' };
+  if (S && S.email && S.email.messageId === email.messageId) { aba = 'atend'; render(); toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
+  if (S) {
+    if (S.guias.some(x => !guiaTerminal(x))) {
+      await Fila.estacionar(S);
+      toast('Atendimento anterior guardado em Pausados (no topo).');
+    } else S = null;
+  }
   aba = 'atend';
+  const pausado = Fila.achar(email.messageId);
+  if (pausado) {
+    const ret = await Fila.retomar(pausado.atendId);
+    if (ret) { S = ret; persistir(); render(); window.scrollTo(0, 0); toast('Rascunho retomado de Pausados.'); return { ok: true, nomes: nomesAtend() }; }
+  }
   try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); return { ok: false, motivo: e.message }; }
-  return { ok: !!S, nomes: nomesAtend() };
+  return { ok: !!S, nomes: nomesAtend(), motivo: S ? '' : 'Abertura cancelada no Conferidor.' };
 }
 /* para o botão do webmail: este e-mail já está em atendimento ou já foi atendido? */
 async function statusWebmail(m) {
-  let id; try { id = webmailParaEmail(m).messageId; } catch (e) { return { info: null }; }
-  if (S && S.email && S.email.messageId === id) return { info: { nivel: 'info', texto: 'Já está aberto no Conferidor.' } };
+  const pastaDesconectada = !!(Pasta.suportado && !Pasta.ok);
+  let id; try { id = webmailParaEmail(m).messageId; } catch (e) { return { info: null, pastaDesconectada }; }
+  if (S && S.email && S.email.messageId === id) return { info: { nivel: 'info', texto: 'Já está aberto no Conferidor.' }, pastaDesconectada };
+  const pausado = Fila.achar(id);
+  if (pausado) return { info: { nivel: 'info', texto: `Pausado neste computador (Etapa ${pausado.vista || 2}) — clique para retomar.` }, pastaDesconectada };
   try { await Reg.carregar(); } catch (e) { }
   const rs = Reg.cache.filter(r => r.messageId === id && !r.tipo).sort((a, b) => (carimboReg(a) < carimboReg(b) ? 1 : -1));
-  const r = rs[0]; if (!r) return { info: null };
-  if (r.status === 'concluido') return { info: { nivel: 'ok', texto: `Já atendido por ${r.operador || 'operador'} em ${fmtDH(r.concluidoEm || r.atualizadoEm)}${r.guia ? ' · guia ' + r.guia : ''}` } };
-  if (r.status === 'em_andamento') return { info: { nivel: 'warn', texto: `Em atendimento ${r.operador === operador() ? 'por você' : 'agora por ' + (r.operador || 'outro operador')} desde ${fmtHora(r.abertoEm || r.atualizadoEm)}` } };
-  return { info: { nivel: 'info', texto: `${STATUS[r.status] || r.status} por ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)}` } };
+  const r = rs[0]; if (!r) return { info: null, pastaDesconectada };
+  if (r.status === 'concluido') return { info: { nivel: 'ok', texto: `Já atendido por ${r.operador || 'operador'} em ${fmtDH(r.concluidoEm || r.atualizadoEm)}${r.guia ? ' · guia ' + r.guia : ''}` }, pastaDesconectada };
+  if (r.status === 'em_andamento') return { info: { nivel: 'warn', texto: `Em atendimento ${r.operador === operador() ? 'por você' : 'agora por ' + (r.operador || 'outro operador')} desde ${fmtHora(r.abertoEm || r.atualizadoEm)}` }, pastaDesconectada };
+  return { info: { nivel: 'info', texto: `${STATUS[r.status] || r.status} por ${r.operador || 'operador'} em ${fmtDH(r.atualizadoEm)}` }, pastaDesconectada };
 }
 window.addEventListener('message', ev => {
   const d = ev.data;
@@ -48,18 +61,28 @@ window.addEventListener('message', ev => {
   const responder = r => { if (d.pid) window.postMessage({ __conferidorPagina: 'resposta', pid: d.pid, ...r }, location.origin); };
   if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg).then(responder, () => responder({ ok: false })); }
   if (d.__conferidorExt === 'status' && d.msg) statusWebmail(d.msg).then(responder, () => responder({ info: null }));
-  if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
+  if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? (d.colado ? 'Resposta inserida direto no editor do webmail — confira e envie.' : 'Resposta enviada ao webmail: clique em "Inserir resposta" (ou Responder) lá.') : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
 });
 async function iniciar(email) {
+  if (S && S.guias.some(x => !guiaTerminal(x))) {
+    await Fila.estacionar(S);
+    toast('Atendimento anterior guardado em Pausados.');
+  }
+  const pausado = Fila.achar(email.messageId);
+  if (pausado) {
+    const ret = await Fila.retomar(pausado.atendId);
+    if (ret) { S = ret; persistir(); render(); window.scrollTo(0, 0); toast('Rascunho retomado de Pausados.'); return; }
+  }
   await Reg.carregarTudo(); await Param.carregar();
   const aviso = avisoEmailJaAtendido(email);
-  if (aviso && !confirm(aviso)) return;
+  if (aviso && !(await confirmar({ titulo: 'E-mail já atendido', texto: esc(aviso).replace(/\n+/g, '<br>'), ok: 'Abrir mesmo assim', icone: 'alert', risco: 'warn' }))) return;
   S = novoEstado(email);
   S.ativa = 0; S.vista = S.guias.length > 1 ? 1 : 2;
   for (const x of S.guias) await gravarGuia(x, 'em_andamento');
   persistir(); render(); window.scrollTo(0, 0);
 }
 function finalizarAtendimento(texto) {
+  if (S && S.atendId) Fila.remover(S.atendId).catch(() => { });
   if (texto) { ultimoConcluido = { texto, em: agora() }; LS.set('ultimo', ultimoConcluido); }
   S = null; persistir(); render(); window.scrollTo(0, 0); toast('Registrado.');
 }
@@ -97,15 +120,52 @@ function atualizarConcluir(g) {
   const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
 }
 function estadoCopiaBtn(b, ok) { b.classList.toggle('copiado', ok); const r = b.dataset.rot; b.innerHTML = ok ? `${ic('check', 'sm')}${r ? 'Copiado' : ''}` : `${ic('copy', 'sm')}${r ? esc(r) : ''}`; }
+function atualizarBarraTurboDom(g) {
+  if (!S || S.vista !== 3 || typeof htmlBarraTurbo !== 'function') return;
+  const tb = $('.barra-turbo'); if (tb) tb.outerHTML = htmlBarraTurbo(g);
+  $$('.proximo-copiar').forEach(x => x.classList.remove('proximo-copiar'));
+  const nx = typeof proximoParaCopiar === 'function' ? proximoParaCopiar(g) : null;
+  if (nx) {
+    const nb = nx.key.startsWith('c:') || nx.key.startsWith('q:') ? $(`[data-act=copiarItem][data-tipo="${nx.key[0]}"][data-codigo="${nx.key.slice(2)}"]`) : $(`[data-act=copiarCampo][data-campo="${nx.key}"]`);
+    if (nb) nb.classList.add('proximo-copiar');
+  }
+  Mini.atualizar();
+}
 
 /* ====================================================================
    Ações (data-act)
    ==================================================================== */
 const acoes = {
   /* ---- gerais ---- */
-  aba(b) {
-    if (aba === 'config' && cfgDirty && b.dataset.aba !== 'config' && !confirm('Há alterações não salvas nas configurações. Sair e descartá-las?')) return;
-    aba = b.dataset.aba; if (aba === 'atend' && !S) { /* nada */ } if (aba !== 'config') { cfgEdit = null; cfgDirty = false; cfgErros = []; } render();
+  async aba(b) {
+    if (aba === 'config' && cfgDirty && b.dataset.aba !== 'config' && !(await confirmar({ titulo: 'Descartar alterações?', texto: 'Há alterações não salvas nas configurações. Sair e descartá-las?', ok: 'Sair e descartar', icone: 'undo', risco: 'warn' }))) return;
+    aba = b.dataset.aba; if (aba !== 'config') { cfgEdit = null; cfgDirty = false; cfgErros = []; } render();
+  },
+  abrirAtalhos() { abrirModalAtalhos(); },
+  async pausarAtual() {
+    if (!S) return;
+    await Fila.estacionar(S);
+    S = null; persistir(); render(); window.scrollTo(0, 0);
+    toast('Atendimento pausado. Retome quando quiser pela barra no topo.');
+  },
+  async retomarPausado(b) {
+    const id = b.dataset.id, idx = b.dataset.idx != null ? +b.dataset.idx : null;
+    if (S && S.atendId === id) {
+      aba = 'atend'; if (idx != null && S.guias[idx]) S.ativa = idx;
+      persistir(); render(); window.scrollTo(0, 0); return;
+    }
+    if (S && S.guias.some(x => !guiaTerminal(x))) await Fila.estacionar(S);
+    const ret = await Fila.retomar(id);
+    if (!ret) { toast('Esse rascunho não está mais salvo neste computador.', 'bad'); render(); return; }
+    S = ret; if (idx != null && S.guias[idx]) S.ativa = idx;
+    aba = 'atend'; persistir(); render(); window.scrollTo(0, 0);
+    toast('Atendimento retomado.');
+  },
+  async removerPausado(b) {
+    const id = b.dataset.id, x = (Fila.lista || []).find(p => p.atendId === id);
+    const rot = (x && ((x.guias && x.guias[0] && x.guias[0].pedido && x.guias[0].pedido.beneficiario) || (x.email && x.email.assunto))) || 'atendimento';
+    if (!(await confirmar({ titulo: 'Remover de Pausados', texto: `Remover o rascunho pausado de <b>${esc(rot)}</b> deste computador?`, ok: 'Remover rascunho', icone: 'trash' }))) return;
+    await Fila.remover(id); render(); toast('Rascunho pausado removido.');
   },
   async pasta() {
     if (!Pasta.suportado) { toast('Use o Google Chrome ou o Edge para acessar a pasta compartilhada.', 'bad'); return; }
@@ -137,7 +197,7 @@ const acoes = {
     } catch (e) { toast('O navegador não liberou a área de transferência. Use Ctrl+V com a página selecionada.', 'bad'); }
   },
   limparPrints() { const g = guiaAtiva(); PRINTS_MEM.delete(g.id); g.prints = null; sincronizarObsPrints(g); if (g.cega.via === 'prints') { g.cega.ok = false; g.cega.via = null; } persistir(); render(); },
-  obsAutoRestaurar() { if (!confirm('Restaurar os textos e as marcações padrão das observações automáticas?')) return; cfgEdit.obsAuto = obsAutoPadrao(); marcarSujo(); render(); },
+  async obsAutoRestaurar() { if (!(await confirmar({ titulo: 'Restaurar padrões', texto: 'Restaurar os textos e as marcações padrão das observações automáticas?', ok: 'Restaurar padrões', icone: 'undo', risco: 'warn' }))) return; cfgEdit.obsAuto = obsAutoPadrao(); marcarSujo(); render(); },
   topoMini() { Vis.set(Vis.simples() ? 'completa' : 'simples'); render(); },
   async visualizacao(b) {
     const v = b.dataset.v;
@@ -181,7 +241,7 @@ const acoes = {
   },
   async ignorarGuia() {
     const g = guiaAtiva();
-    if (!confirm(`Ignorar a solicitação de ${nomeGuia(g)}? Use quando a leitura separou o pedido por engano. As demais guias continuam.`)) return;
+    if (!(await confirmar({ titulo: 'Ignorar solicitação', texto: `Ignorar a solicitação de <b>${esc(nomeGuia(g))}</b>? Use quando a leitura separou o pedido por engano. As demais guias continuam.`, ok: 'Ignorar solicitação', icone: 'x', risco: 'warn' }))) return;
     await gravarGuia(g, 'descartado');
     const prox = S.guias.findIndex(x => !guiaTerminal(x));
     if (prox >= 0) { S.ativa = prox; mudarVista(Math.max(2, S.guias[prox].vista || 2)); } else mudarVista(1);
@@ -260,7 +320,8 @@ const acoes = {
     render(); toast('Parametrização salva' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.'));
   },
   async pmExcluir() {
-    const id = M.id, cl = cfg.clinicas.find(c => c.id === M.clinicaId); if (!confirm(`Excluir a parametrização de ${cl ? cl.nome : 'esta clínica'}, carteira ${M.carteira || '—'}? Os próximos atendimentos deixam de usá-la.`)) return;
+    const id = M.id, cl = cfg.clinicas.find(c => c.id === M.clinicaId);
+    if (!(await confirmar({ titulo: 'Excluir parametrização', texto: `Excluir a parametrização de <b>${esc(cl ? cl.nome : 'esta clínica')}</b>, carteira <b>${esc(M.carteira || '—')}</b>? Os próximos atendimentos deixam de usá-la.`, ok: 'Excluir parametrização', icone: 'trash' }))) return;
     await Param.remover(id); if (S) S.guias.forEach(g => { if (g.param && g.param.id === id) g.param = null; });
     fecharModal(true); persistir(); render(); toast('Parametrização excluída.');
   },
@@ -270,13 +331,30 @@ const acoes = {
     const g = guiaAtiva(), campo = b.dataset.campo, el = $('#' + b.dataset.ref), v = (el ? el.value : '').trim();
     if (!v) { toast('O campo está vazio: preencha-o antes de copiar.', 'bad'); return; }
     if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
-    g.copiados[campo] = v; persistir(); estadoCopiaBtn(b, true); toast('Copiado: ' + v);
+    g.copiados[campo] = v; persistir(); estadoCopiaBtn(b, true); atualizarBarraTurboDom(g); toast('Copiado: ' + v);
   },
   async copiarItem(b) {
     const g = guiaAtiva(), it = g.pedido.itens.find(x => x.codigo === b.dataset.codigo); if (!it) return;
     const v = b.dataset.tipo === 'c' ? it.codigo : String(it.qtd);
     if (!(await copiar(v))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
-    g.copiados[b.dataset.tipo + ':' + it.codigo] = v; persistir(); estadoCopiaBtn(b, true); toast('Copiado: ' + v);
+    g.copiados[b.dataset.tipo + ':' + it.codigo] = v; persistir(); estadoCopiaBtn(b, true); atualizarBarraTurboDom(g); toast('Copiado: ' + v);
+  },
+  async copiarProximo() {
+    const g = guiaAtiva(); if (!g) return;
+    const fila = filaCopia(g); if (!fila.length) { toast('Não há campos preenchidos para copiar.', 'bad'); return; }
+    let prox = proximoParaCopiar(g);
+    if (!prox) {
+      fila.forEach(x => { delete g.copiados[x.key]; });
+      $$('[data-act=copiarCampo].copiado, [data-act=copiarItem].copiado').forEach(x => estadoCopiaBtn(x, false));
+      prox = fila[0];
+    }
+    if (!(await copiar(prox.val))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
+    g.copiados[prox.key] = prox.val;
+    const bt = prox.key.startsWith('c:') || prox.key.startsWith('q:') ? $(`[data-act=copiarItem][data-tipo="${prox.key[0]}"][data-codigo="${prox.key.slice(2)}"]`) : $(`[data-act=copiarCampo][data-campo="${prox.key}"]`);
+    if (bt) estadoCopiaBtn(bt, true);
+    persistir(); atualizarBarraTurboDom(g);
+    const feitos = fila.filter(x => g.copiados[x.key] === x.val).length;
+    toast(`Copiado (${feitos}/${fila.length}): ${prox.rot} — ${prox.val}`);
   },
   iniciarCega() { const g = guiaAtiva(); g.cega.iniciada = true; g.cega.tentativas = Math.max(1, g.cega.tentativas); persistir(); render(); $('#cegaN')?.focus(); },
   verItens() { const g = guiaAtiva(); g.cega = { ...g.cega, iniciada: false, linhas: '', entradas: [], resultado: null, ok: false }; persistir(); render(); },
@@ -317,31 +395,40 @@ const acoes = {
   },
   async copiarResp() {
     const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
-    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Copiar mesmo assim?', ok: 'Copiar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
     const r = await copiarRico(htmlParaEmail(html), texto);
     if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
   },
-  responderWebmail() {
+  async responderWebmail() {
     const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
-    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    const quem = nomesAtend(); 
-    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' } }, location.origin);
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Levar ao webmail mesmo assim?', ok: 'Levar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
+    const quem = nomesAtend();
+    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '', messageId: S.email.messageId || '' } }, location.origin);
     g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
   },
   async copiarRespSimples() {
     const g = guiaAtiva(), texto = htmlPlano(serializarEditor($('#edResp')));
-    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Copiar mesmo assim?', ok: 'Copiar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
     if (!(await copiar(texto))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast('Resposta copiada como texto simples.');
   },
   resetResp() { const g = guiaAtiva(); g.respEdit = null; g.respExtras = []; g.respInc = []; persistir(); render(); },
   async copiarRespConcluida() { const r = respostaDaGuia(guiaAtiva(), false); const ok = await copiarRico(htmlParaEmail(r.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')), r.texto); toast(ok ? 'Resposta copiada.' : 'Não foi possível copiar.', ok ? '' : 'bad'); },
+  responderWebmailConcluida() {
+    const g = guiaAtiva(); if (!g) return;
+    const r = respostaDaGuia(g, false), quem = nomesAtend();
+    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(r.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')), texto: r.texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '', messageId: S.email.messageId || '' } }, location.origin);
+    toast('Resposta enviada para a aba do webmail.');
+  },
   async concluirGuia() {
     const g = guiaAtiva(), st = situacaoGuia(g), pend = pendenciasConclusao(g, st);
     if (pend.length) { toast(pend[0], 'bad'); return; }
     if (g.semGuia) { g.resultado.situacao = 'sem_guia'; g.numero = ''; }
     await gravarGuia(g, 'concluido'); g.vista = 4; g.etapa = 4;
+    if (S && S.email && S.email.messageId) {
+      window.postMessage({ __conferidorPagina: 'atendimentoAtualizado', messageId: S.email.messageId, guia: g.semGuia ? 'sem guia' : g.numero, operador: operador() }, location.origin);
+    }
     await depoisDeGuiaTratada(g, resumoUltimo(g));
   },
   async reabrirGuia() { const g = guiaAtiva(); g.status = 'em_andamento'; g.vista = 4; await gravarGuia(g, 'em_andamento'); mudarVista(4); toast('Guia reaberta para correção.'); },
@@ -353,10 +440,20 @@ const acoes = {
   },
   desfazerSemGuia() { const g = guiaAtiva(); g.semGuia = null; g.respEdit = null; g.respExtras = []; mudarVista(2); },
   respostaEmail() { abrirRespostaEmail(); },
+  async responderWebmailModal() {
+    const html = serializarEditor($('#edModal')), texto = htmlPlano(html);
+    if (!texto) { toast('O texto está vazio.', 'bad'); return; }
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Levar ao webmail mesmo assim?', ok: 'Levar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
+    const quem = S ? nomesAtend() : [];
+    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: (S && S.email && S.email.assunto) || '', messageId: (S && S.email && S.email.messageId) || '' } }, location.origin);
+    M.copiou = true;
+    if ($('#modalEstado')) $('#modalEstado').innerHTML = `${ic('check', 'sm')} Resposta levada ao webmail.`;
+    toast('Resposta enviada para a aba do webmail.');
+  },
   async copiarModalRico() {
     const html = serializarEditor($('#edModal')), texto = htmlPlano(html);
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
-    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Copiar mesmo assim?', ok: 'Copiar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
     const r = await copiarRico(htmlParaEmail(html), texto); if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} ${r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples (o navegador não permitiu formatação).'}`; toast(r === 'rico' ? 'Copiado com formatação.' : 'Copiado como texto simples.');
@@ -364,7 +461,7 @@ const acoes = {
   async copiarModalSimples() {
     const texto = htmlPlano(serializarEditor($('#edModal')));
     if (!texto) { toast('O texto está vazio.', 'bad'); return; }
-    if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
+    if (/\{[A-Z_]+\}/.test(texto) && !(await confirmar({ titulo: 'Campos sem valor', texto: 'Ainda há campos entre chaves sem preenchimento no texto. Copiar mesmo assim?', ok: 'Copiar mesmo assim', icone: 'alert', risco: 'warn' }))) return;
     if (!(await copiar(texto))) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     M.copiou = true;
     $('#modalEstado').innerHTML = `${ic('check', 'sm')} Copiado como texto simples.`; toast('Copiado como texto simples.');
@@ -496,7 +593,7 @@ const acoes = {
       toast('Configurações salvas' + (Pasta.ok ? ' na pasta compartilhada.' : ' neste computador.'));
     } catch (e) { toast('Erro ao salvar: ' + e.message, 'bad'); }
   },
-  descartarCfg() { if (cfgDirty && !confirm('Descartar todas as alterações não salvas?')) return; iniciarCfgEdit(); render(); },
+  async descartarCfg() { if (cfgDirty && !(await confirmar({ titulo: 'Descartar alterações?', texto: 'Descartar todas as alterações não salvas nas configurações?', ok: 'Descartar alterações', icone: 'undo', risco: 'warn' }))) return; iniciarCfgEdit(); render(); },
   exportarCfg() { const c = clonar(cfgEdit); prepararSalvar(c); baixar('config.json', JSON.stringify(configParaSalvar(c), null, 2), 'application/json'); },
   async exportarParam() { await Param.carregar(); baixar('parametrizacoes.json', JSON.stringify({ versao: 2, itens: Param.lista }, null, 2), 'application/json'); },
   async exportarPeriodo() {
@@ -509,15 +606,30 @@ const acoes = {
     baixar(nomeArquivo('Registros_' + diaBR(ini).replace(/\//g, '-') + '_a', fim, 'csv'), csvRegistros(regs), 'text/csv;charset=utf-8'); toast(`${pl(regs.length, 'linha exportada', 'linhas exportadas')}.`);
   },
   async limparAntigos() {
-    if (!confirm('Apagar registros com mais de 180 dias (pasta compartilhada e este computador)?')) return;
+    if (!(await confirmar({ titulo: 'Apagar registros antigos', texto: 'Apagar registros com mais de <b>180 dias</b> (na pasta compartilhada e neste computador)? Esta ação não pode ser desfeita.', ok: 'Apagar antigos', icone: 'trash' }))) return;
     const lim = isoDia(addDias(new Date(), -180)); let n = 0;
     for (const k of LS.chaves('reg.')) if (k.slice(4, 14) < lim) { LS.del(k); n++; }
-    if (Pasta.ok) for (const [m] of await Pasta.listar(['registros'])) for (const [f] of await Pasta.listar(['registros', m])) if (f.slice(0, 10) < lim && await Pasta.apagar(['registros', m], f)) n++;
+    if (Pasta.ok) {
+      for (const [m] of await Pasta.listar(['registros'])) {
+        let mexeu = false;
+        for (const [f] of await Pasta.listar(['registros', m])) {
+          if (f !== '_indice.json' && f.slice(0, 10) < lim && await Pasta.apagar(['registros', m], f)) { n++; mexeu = true; }
+        }
+        if (mexeu) await Pasta.apagar(['registros', m], '_indice.json');
+      }
+    }
     toast(n + ' arquivo(s) apagado(s).');
+  },
+  async anonimizarAntigos() {
+    if (!Pin.liberado() && Pin.definido()) { pedirPin(() => acoes.anonimizarAntigos()); return; }
+    if (!(await confirmar({ titulo: 'Anonimizar dados pessoais (> 180 dias)', texto: 'Substituir o nome completo do beneficiário pelas <b>iniciais</b> e mascarar a carteira nos registros com mais de <b>180 dias</b>? As quantidades, códigos, clínicas e indicadores são preservados (LGPD).', ok: 'Anonimizar registros', icone: 'lock', risco: 'warn' }))) return;
+    const n = await Reg.anonimizarAntigos(180);
+    render();
+    toast(n ? `${pl(n, 'registro anonimizado', 'registros anonimizados')}.` : 'Nenhum registro antigo com dados pessoais completos.');
   },
   /* ---- operadores ---- */
   opAdd() { cfgEdit.operadores.push({ id: 'op-' + Date.now().toString(36), nome: '', icone: animalAleatorio(), corRgb: CORES_PADRAO_HEX[cfgEdit.operadores.length % 10], corAlfa: 25 }); marcarSujo(); render(); },
-  opRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; } if (cfgEdit.operadores.length < 2) { toast('Mantenha ao menos um operador.', 'bad'); return; } if (!confirm('Remover este operador da lista? Os registros antigos continuam com o nome dele.')) return; cfgEdit.operadores.splice(+b.dataset.i, 1); marcarSujo(); render(); },
+  async opRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; } if (cfgEdit.operadores.length < 2) { toast('Mantenha ao menos um operador.', 'bad'); return; } if (!(await confirmar({ titulo: 'Remover operador', texto: `Remover <b>${esc(o.nome || 'este operador')}</b> da lista? Os registros antigos continuam com o nome dele.`, ok: 'Remover operador', icone: 'trash' }))) return; cfgEdit.operadores.splice(+b.dataset.i, 1); marcarSujo(); render(); },
   opIcone(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o)) { toast('Perfil protegido por senha.', 'bad'); return; } o.icone = b.dataset.v; marcarSujo(); render(); },
   async opSenha(b) {
     const i = +b.dataset.i, o = cfgEdit.operadores[i], s1 = $('#sn-' + i).value, s2 = $('#sc-' + i).value;
@@ -526,7 +638,7 @@ const acoes = {
     if (s1 !== s2) { toast('A confirmação não confere com a senha.', 'bad'); return; }
     o.senhaSalt = Senha.novoSal(); o.senhaHash = await Senha.hash(s1, o.senhaSalt); marcarSujo(); render(); toast('Senha definida. Clique em Salvar configurações para valer.');
   },
-  opSenhaRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o) || !confirm('Remover a senha deste operador?')) return; delete o.senhaHash; delete o.senhaSalt; marcarSujo(); render(); },
+  async opSenhaRem(b) { const o = cfgEdit.operadores[+b.dataset.i]; if (!perfilEditavel(o) || !(await confirmar({ titulo: 'Remover senha', texto: `Remover a senha de <b>${esc(o.nome || 'este operador')}</b>?`, ok: 'Remover senha', icone: 'unlock', risco: 'warn' }))) return; delete o.senhaHash; delete o.senhaSalt; marcarSujo(); render(); },
   async senhaOk(el) {
     const op = cfg.operadores.find(x => x.id === M.opId), v = $('#senhaIn').value;
     if (!op) return;
@@ -537,7 +649,7 @@ const acoes = {
   /* ---- clínicas ---- */
   clSel(b) { cfgClinicaSel = +b.dataset.i; render(); },
   clNova() { cfgEdit.clinicas.push({ id: 'nova-' + Date.now().toString(36), nome: '', cidade: '', executante: '', emails: [], apelidos: '', codigos: {}, leitura: normLeitura(), _lista: [] }); cfgClinicaSel = cfgEdit.clinicas.length - 1; marcarSujo(); render(); setTimeout(() => $('#cl-nome')?.focus(), 30); },
-  clRem(b) { const cl = cfgEdit.clinicas[+b.dataset.i]; if (!confirm(`Remover “${cl.nome || 'esta clínica'}” do cadastro? Os registros antigos são mantidos.`)) return; cfgEdit.clinicas.splice(+b.dataset.i, 1); cfgClinicaSel = Math.max(0, cfgClinicaSel - 1); marcarSujo(); render(); },
+  async clRem(b) { const cl = cfgEdit.clinicas[+b.dataset.i]; if (!(await confirmar({ titulo: 'Remover clínica', texto: `Remover <b>${esc(cl.nome || 'esta clínica')}</b> do cadastro? Os registros antigos são mantidos.`, ok: 'Remover clínica', icone: 'trash' }))) return; cfgEdit.clinicas.splice(+b.dataset.i, 1); cfgClinicaSel = Math.max(0, cfgClinicaSel - 1); marcarSujo(); render(); },
   clAddEmail(b) {
     const i = +b.dataset.i, cl = cfgEdit.clinicas[i], el = $('#novoEmail'), v = el.value.trim().toLowerCase();
     if (!v) return; if (!emailValido(v)) { toast('E-mail inválido.', 'bad'); return; }
@@ -553,7 +665,7 @@ const acoes = {
     if (!id) { toast('Escolha a clínica.', 'bad'); return; }
     if (!desc) { toast('Informe a descrição da terapia.', 'bad'); return; }
     const cl = cfg.clinicas.find(c => c.id === id);
-    if (cl && cl.codigos[codigo] !== undefined && cl.codigos[codigo] !== desc && !confirm(`O código ${codigo} já está cadastrado em ${cl.nome} como “${cl.codigos[codigo]}”. Substituir a descrição?`)) return;
+    if (cl && cl.codigos[codigo] !== undefined && cl.codigos[codigo] !== desc && !(await confirmar({ titulo: 'Substituir descrição', texto: `O código <b>${esc(codigo)}</b> já está cadastrado em <b>${esc(cl.nome)}</b> como “${esc(cl.codigos[codigo])}”. Substituir a descrição?`, ok: 'Substituir', icone: 'edit', risco: 'warn' }))) return;
     await alterarConfig(c => { const x = c.clinicas.find(y => y.id === id); if (x) x.codigos[codigo] = desc; });
     fecharModal(true); persistir(); render(); toast(`Código ${codigo} cadastrado em ${cl ? cl.nome : 'clínica'}.`);
   },
@@ -585,7 +697,7 @@ const acoes = {
   },
   /* ---- modelos ---- */
   modeloSel(b) { cfgModeloSel[b.dataset.c] = b.dataset.k; render(); },
-  modeloRestaurar(b) { const k = b.dataset.k; if (!confirm('Restaurar o texto padrão deste modelo? Suas alterações nele serão perdidas (até você descartar as alterações).')) return; cfgEdit.modelos[k].html = padraoHtml(MODELOS_PADRAO[k].texto); marcarSujo(); render(); },
+  async modeloRestaurar(b) { const k = b.dataset.k; if (!(await confirmar({ titulo: 'Restaurar texto padrão', texto: 'Restaurar o texto padrão deste modelo? Suas alterações nele serão perdidas (até você descartar as alterações).', ok: 'Restaurar padrão', icone: 'undo', risco: 'warn' }))) return; cfgEdit.modelos[k].html = padraoHtml(MODELOS_PADRAO[k].texto); marcarSujo(); render(); },
   inserirCampo(b) { const ed = $('#edModelo'); const f = CAMPO[b.dataset.k]; inserirNoEditor(ed, `<span class="tok" contenteditable="false" data-k="${f.k}" title="${esc(f.desc)}">${esc(f.nome)}</span>&nbsp;`); ed.dispatchEvent(new Event('input', { bubbles: true })); },
   glosaAdd() { cfgEdit.glosas.push(''); marcarSujo(); render(); },
   glosaRem(b) { cfgEdit.glosas.splice(+b.dataset.i, 1); marcarSujo(); render(); },
@@ -669,16 +781,24 @@ document.addEventListener('input', e => {
   if (t.dataset.cpcampo) {
     alterarCampoGuia(g, t.dataset.cpcampo, t.value);
     const bt = $(`[data-act=copiarCampo][data-campo="${t.dataset.cpcampo}"]`); if (bt) estadoCopiaBtn(bt, t.value.trim() !== '' && g.copiados[t.dataset.cpcampo] === t.value.trim());
-    persistir(); return;
+    persistir(); atualizarBarraTurboDom(g); return;
   }
   if (t.id === 'guia') {
     let v = t.value.toUpperCase().replace(/\s/g, ''); if (/^\d{8}$/.test(v)) v = 'T' + v;
+    if (t.value !== v) { const pos = (t.selectionStart || 0) + (v.length - t.value.length); t.value = v; try { t.setSelectionRange(pos, pos); } catch (er) { } }
     g.numero = v; persistir();
-    clearTimeout(window._tg); window._tg = setTimeout(() => { const pos = t.selectionStart; render(); const gi = $('#guia'); if (gi) { gi.focus(); gi.setSelectionRange(pos, pos); } }, 400);
+    const guiaOk = /^[TS]\d{7,8}$/.test(v), gd = t.closest('.guia-destaque'), aj = $('#guiaAjuda');
+    t.classList.toggle('invalido', Boolean(v && !guiaOk));
+    if (gd) { gd.classList.toggle('ok', guiaOk); gd.classList.toggle('erro', Boolean(v && !guiaOk)); }
+    if (aj) { aj.className = v && !guiaOk ? 'campo-erro' : 'campo-ajuda'; aj.innerHTML = v && !guiaOk ? ic('alert', 'sm') + 'Formato: T ou S + 7 ou 8 dígitos.' : ''; }
+    $$('[data-act=copiarResp],[data-act=copiarRespSimples],[data-act=responderWebmail]').forEach(b => { b.disabled = !guiaOk; });
+    if (g.respEdit == null && mostraResposta(g) && $('#edResp') && (g.resultado.situacao || usaConsolidada())) $('#edResp').innerHTML = respostaDaGuia(g, true).html;
+    if (g.obsEdit == null && $('#txtObs')) $('#txtObs').value = observacaoDaGuia(g);
+    atualizarConcluir(g); Mini.atualizar();
     return;
   }
   if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && g.copiados.obs !== t.value) $$('[data-act=copiarObs].copiado').forEach(x => estadoCopiaBtn(x, false)); return; }
-  if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); persistir(); return; }
+  if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); atualizarConcluir(g); persistir(); return; }
   if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return; }
 });
 document.addEventListener('change', async e => {
@@ -702,7 +822,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'impCfg') {
     const f = t.files[0]; if (!f) return;
     if (!Pin.liberado()) { t.value = ''; toast('Importar configurações exige o PIN do supervisor.', 'bad'); pedirPin(null); return; }
-    try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); const keep = cfgEdit; cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
+    try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
     return;
   }
   if (t.dataset.fp !== undefined && t.dataset.fp !== 'q') { painelFiltro[t.dataset.fp] = t.value; render(); return; }
@@ -744,7 +864,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.resf) {
     if (t.dataset.resf === 'usarCorrecao') { g.usarCorrecao = t.checked; g.respEdit = null; }
     else if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); }
-    else { g.resultado[t.dataset.resf] = t.value; if (g.respEdit == null) { /* o texto gerado acompanha */ } }
+    else { g.resultado[t.dataset.resf] = t.value; }
     persistir(); render(); return;
   }
 });
@@ -753,8 +873,20 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     const campos = $$('#cegaN, [data-cega]'); const i = campos.indexOf(e.target);
     if (i >= 0 && i < campos.length - 1) campos[i + 1].focus(); else acoes.conferir();
+    return;
   }
-  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); acoes[e.target.dataset.enter](e.target); }
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); acoes[e.target.dataset.enter](e.target); return; }
+  const digitando = e.target && e.target.matches && e.target.matches('input, textarea, select, [contenteditable="true"], button');
+  if (!modalAtual && !digitando && !e.ctrlKey && !e.metaKey) {
+    if (e.key === '?') { e.preventDefault(); abrirModalAtalhos(); return; }
+    if (e.code === 'Space' && !e.altKey && aba === 'atend' && S && S.vista === 3 && guiaAtiva() && !guiaAtiva().cega.iniciada) {
+      e.preventDefault(); acoes.copiarProximo(); return;
+    }
+  }
+  if (!modalAtual && e.altKey && !e.ctrlKey && !e.metaKey && aba === 'atend' && S && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const dest = S.vista + (e.key === 'ArrowRight' ? 1 : -1);
+    if (dest >= 1 && dest <= 4) { e.preventDefault(); acoes.irVista({ dataset: { v: String(dest) } }); }
+  }
 });
 document.addEventListener('dragover', e => { if (aba === 'atend' && !S) e.preventDefault(); });
 document.addEventListener('drop', e => { if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
@@ -781,16 +913,6 @@ document.addEventListener('visibilitychange', async () => {
   try { const antes = JSON.stringify(cfg.operadores); await carregarConfig(); if (JSON.stringify(cfg.operadores) !== antes) { if (cfgEdit) iniciarCfgEdit(); render(); } } catch (e) { }
 });
 
-// Botões secundários viram só ícone (o texto vai para dica e leitor de tela)
-const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
-function soIcone(raiz) {
-  raiz.querySelectorAll('.btn:not(.so):not(.pri)').forEach(b => {
-    if (!b.querySelector('svg.ic')) return;
-    const t = b.textContent.replace(/\s+/g, ' ').trim();
-    if (!t || !ROT_ICONE.test(t)) return;
-    b.classList.add('so'); if (!b.title) b.title = t; if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', t);
-  });
-}
 /* Escolha de clínica com busca: o <select> continua no lugar (escondido) e recebe a escolha */
 const buscaClinica = cl => [cl.nome, cl.cidade, ...(cl.emails || [])].filter(Boolean).join(' ');
 function realcarSelects(raiz) {
@@ -832,7 +954,7 @@ function realcarSelects(raiz) {
     lista.addEventListener('mousedown', ev => { const o = ev.target.closest('.combo-op'); if (o) { ev.preventDefault(); escolher(o.dataset.v); } });
   });
 }
-/* Dicas de mouse: o title vira uma dica no estilo do sistema (o texto continua acessível) */
+/* Dicas flutuantes acessíveis (aria-describedby + role="tooltip") */
 const Dica = {
   el: null, alvo: null, t: null,
   iniciar() {
@@ -846,20 +968,26 @@ const Dica = {
     this.esconder();
     if (a.hasAttribute('title')) { const t = a.getAttribute('title'); a.removeAttribute('title'); if (!t) return; a.dataset.dica = t; if (!a.getAttribute('aria-label') && !a.textContent.trim()) a.setAttribute('aria-label', t); }
     if (!a.dataset.dica) return;
-    this.alvo = a; this.t = setTimeout(() => this.mostrar(a), 380);
+    this.alvo = a; this.t = setTimeout(() => this.mostrar(a), 320);
   },
   mostrar(a) {
     if (!document.body.contains(a)) return;
-    const el = document.createElement('div'); el.className = 'dica-flut'; el.setAttribute('role', 'tooltip'); el.textContent = a.dataset.dica; document.body.appendChild(el); this.el = el;
+    const el = document.createElement('div'); el.id = 'dicaFlut'; el.className = 'dica-flut'; el.setAttribute('role', 'tooltip'); el.textContent = a.dataset.dica; document.body.appendChild(el); this.el = el;
+    if (!a.hasAttribute('aria-describedby')) { a.setAttribute('aria-describedby', 'dicaFlut'); a.dataset.dicaAria = '1'; }
     const r = a.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
     let x = r.left + r.width / 2 - w / 2, y = r.bottom + 8; x = Math.max(8, Math.min(x, innerWidth - w - 8));
     if (y + h > innerHeight - 8) { y = r.top - h - 8; el.classList.add('acima'); }
     el.style.left = x + 'px'; el.style.top = y + 'px';
   },
-  esconder() { clearTimeout(this.t); this.alvo = null; if (this.el) { this.el.remove(); this.el = null; } }
+  esconder() {
+    clearTimeout(this.t);
+    if (this.alvo && this.alvo.dataset && this.alvo.dataset.dicaAria) { this.alvo.removeAttribute('aria-describedby'); delete this.alvo.dataset.dicaAria; }
+    this.alvo = null;
+    if (this.el) { this.el.remove(); this.el = null; }
+  }
 };
 function iniciarSoIcone() {
   const alvos = ['#app', '#modalRoot'].map(s => document.querySelector(s)).filter(Boolean);
-  const mo = new MutationObserver(() => alvos.forEach(a => { soIcone(a); realcarSelects(a); }));
-  alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); soIcone(a); realcarSelects(a); });
+  const mo = new MutationObserver(() => alvos.forEach(a => realcarSelects(a)));
+  alvos.forEach(a => { mo.observe(a, { childList: true, subtree: true }); realcarSelects(a); });
 }

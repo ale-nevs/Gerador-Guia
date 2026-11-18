@@ -1,6 +1,6 @@
 # Conferidor de Guias: guia de implantação
 
-Versão 2.0.0 · outubro de 2026
+Versão 2.2.0 · novembro de 2026
 
 O Conferidor é uma página que roda no Chrome. Ela lê o .eml do pedido, aponta problemas e conduz a conferência da guia, item por item. Também gera a observação e a resposta, e registra tudo numa pasta compartilhada.
 
@@ -151,6 +151,16 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 - **PIN do supervisor** (Configurações › Perfil): protege alertas, modelos, observações automáticas, regras de leitura das clínicas, importação de configurações, **Virar regra** e a limpeza da auditoria. Liberado por 15 minutos.
 - **Histórico detalhado (Preferências):** mostra quanto a pasta `auditoria` ocupa e apaga as imagens dos prints mais antigas que 3, 6, 12 ou 24 meses, mantendo o texto. Os registros do Painel não são afetados.
 - **Segurança dos registros:** atendimento salvo com a pasta fora do ar fica guardado no computador, aparece num aviso fixo com contador e vai sozinho para a pasta quando ela volta (sem apagar o que já está lá). Duas abas do Conferidor no mesmo computador: a mais recente avisa e a outra fica pausada. Fechar a aba com atendimento aberto pede confirmação.
+
+### Novidades da versão 2.2 (redesign clínico, fila multi-atendimento, modo turbo e extensão v1.3)
+- **Visual Clínico renovado (Claro e Escuro):** tipografia `Inter` com números tabulares, cabeçalho translúcido fixo, paleta institucional Marinho + Verde-Água Clínico, cartões sem bordas laterais pesadas, foco visível de teclado, *focus trap* em janelas modais e link **Pular para o conteúdo principal**.
+- **Fila de atendimentos pausados (`Pausados`):** clique em **Pausar atendimento** (ou abra um novo pedido pelo webmail) para guardar o rascunho atual em `IndexedDB` (até 15 atendimentos) sem perder nada. Retome com 1 clique pela barra no topo, pelo Painel do Dia ou pela aba Acompanhamento.
+- **Modo Turbo na Etapa 3 e Atalhos (`?`):** aperte `Espaço` (ou o botão **Copiar próximo**) para copiar na sequência exata todos os campos e códigos pendentes. Use `Alt + →` / `Alt + ←` para navegar entre etapas e `?` para abrir o quadro de atalhos.
+- **Painel Flutuante (PiP) com finalização rápida:** além de copiar campos e colar prints, permite digitar o nº da guia, marcar a situação, copiar a observação, acionar **Responder no webmail** e concluir a guia sem sair da janelinha.
+- **Modo Simples sem travar a navegação:** mantém as abas principais compactas visíveis, recolhe o e-mail original em bloco expansível na Etapa 2 e empilha os passos numerados (`1`, `2`, `3`) na Etapa 4. Na Etapa 4, "Retirou alguma glosa?" já inicia em **Não** por padrão (pode voltar a exigir escolha manual em Preferências).
+- **OCR local paralelo (2 workers):** leitura até ~2× mais rápida dos recortes das abas *Dados da Guia* e *Procedimentos*.
+- **Concorrência SMB, índice mensal e LGPD:** gravações compartilhadas com releitura transacional (`config.json`, `parametrizacoes.json` com exclusões sincronizadas, `aprendizado` e `notas`), índice mensal consolidado (`registros/AAAA-MM/_indice.json`) para busca instantânea em Auditar e botão em Preferências para **anonimizar dados pessoais com mais de 180 dias** preservando estatísticas.
+- **Extensão v1.3.0:** reconhece `Reply-To`, guarda cache LRU dos e-mails abertos no SmarterMail, minimiza em pílula compacta, avisa se a pasta estiver desconectada e faz **Auto-Responder & Colar** em 1 clique no webmail.
 
 ### Importar lista de clínicas
 Em Configurações › Clínicas, **Importar lista** recebe a tabela copiada da planilha (número, nome, cidade e e-mails, uma clínica por linha; o cabeçalho é ignorado). **Pré-visualizar** mostra o que será feito: clínica nova, clínica a atualizar ou sem mudança. Uma clínica já cadastrada (reconhecida pelo e-mail ou pelo nome, ex.: "CLÍNICA CRIAR" = "Criar Clínica de Integração") só ganha os e-mails que faltam e a cidade, se estiver vazia; nada é apagado. E-mail que já pertence a outra clínica é ignorado e aparece em vermelho. Depois de importar, confira e clique em **Salvar configurações**.

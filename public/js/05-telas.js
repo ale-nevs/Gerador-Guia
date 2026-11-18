@@ -73,11 +73,17 @@ function pintarProgresso() {
 }
 setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
-const EXT_VERSAO = '1.2.0';   // versão da extensão publicada junto com o site
+const EXT_VERSAO = '1.3.0';   // versão da extensão publicada junto com o site
 const extDesatualizada = () => { const v = extInstalada(); if (!v) return false; const a = v.split('.').map(Number), b = EXT_VERSAO.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); } return false; };
+function pintarPausados() {
+  const el = document.getElementById('barraPausados'); if (!el || typeof Fila === 'undefined') return;
+  const itens = (Fila.lista || []).filter(x => !S || x.atendId !== S.atendId);
+  el.hidden = !itens.length;
+  if (!itens.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span class="pausados-rot">${ic('inbox', 'sm')}<b>Pausados (${itens.length})</b></span><div class="pausados-lista">${itens.map(x => `<div class="pausado-chip"><span class="pausado-txt" title="${esc((x.assunto || '') + (x.clinica ? ' · ' + x.clinica : ''))}"><b>${esc(curtoTxt(x.paciente || x.assunto || 'Atendimento', 30))}</b>${x.clinica ? ` <span class="muted">· ${esc(curtoTxt(x.clinica, 22))}</span>` : ''} <span class="tag">${x.totalGuias > 1 ? `${x.totalGuias} guias · ` : ''}Etapa ${x.vista || 2}</span></span><button type="button" class="btn sm pri" data-act="retomarPausado" data-id="${esc(x.atendId)}">${ic('play', 'sm')}Retomar</button><button type="button" class="btn sm ghost ico" data-act="removerPausado" data-id="${esc(x.atendId)}" title="Descartar rascunho pausado" aria-label="Descartar rascunho pausado">${ic('x', 'sm')}</button></div>`).join('')}</div>`;
+}
 function renderTopo() {
-  const op = operadorObj(), hoje = new Date();
-  const dataTxt = aba === 'painel' ? (painelModo === 'mes' ? 'Mês: ' + painelMes.split('-').reverse().join('/') : painelModo === 'semana' ? 'Semana: ' + rotuloSemana(painelSemana) : 'Dia: ' + diaBR(painelDia)) : fmtData(hoje);
+  const op = operadorObj();
   const pasta = !Pasta.suportado ? { c: 'alerta', i: 'alert', t: 'Use o Chrome ou Edge', d: 'Este navegador não permite acessar a pasta compartilhada.' }
     : Pasta.ok ? { c: 'ok', i: 'folder', t: 'Pasta: ' + Pasta.handle.name, d: 'Pasta compartilhada conectada. Configurações e registros ficam nela.' }
       : Pasta.handle ? { c: 'alerta', i: 'folder', t: 'Reautorizar pasta', d: 'A pasta lembrada precisa de autorização (um clique por dia).' }
@@ -88,14 +94,19 @@ function renderTopo() {
   document.body.classList.toggle('densa', Vis.densa());
   cab.style.cssText = mini && op ? estiloOp(op) : '';
   const nivel = !Pasta.suportado ? 'bad' : Pasta.ok ? 'ok' : Pasta.handle ? 'warn' : 'bad';
-  if (mini) pintarProgresso();
+  const abasHtml = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i, mini ? 'sm' : '')}<span class="txt-fino">${t}</span></button>`).join('');
+  const verEl = $('#verRodape'); if (verEl) verEl.textContent = 'v' + VERSAO;
+  document.title = 'Conferidor de Guias · Promédica';
   if (mini) {
+    pintarProgresso();
     $('#topoAcoes').innerHTML = `
     <label class="chip chip-op mini-op" title="Operador">${htmlAvatar(op)}<select id="operador" aria-label="Operador"><option value="">Escolher operador</option>${cfg.operadores.map(o => `<option value="${esc(o.id)}" ${op && op.id === o.id ? 'selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></label>
     <button class="chip mini-btn" data-act="pasta" title="${esc(pasta.t + ': ' + pasta.d)}" aria-label="${esc(pasta.t)}"><span class="luz ${nivel}"></span></button>
+    ${extDesatualizada() ? `<button class="chip pasta alerta mini-btn" data-act="baixarExtensao" title="Atualizar extensão (v${esc(extInstalada())} → v${EXT_VERSAO})" aria-label="Atualizar extensão">${ic('download', 'sm')}</button>` : ''}
+    <button class="chip mini-btn" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}</button>
     ${htmlSeletorVis(true)}`;
-    $('#abas').innerHTML = '';
-    document.title = 'Conferidor de Guias · Promédica';
+    $('#abas').innerHTML = abasHtml;
     return;
   }
   $('#topoAcoes').innerHTML = `
@@ -105,10 +116,7 @@ function renderTopo() {
     ${extDesatualizada() ? `<button class="chip pasta alerta" data-act="baixarExtensao" title="A extensão instalada (v${esc(extInstalada())}) é mais antiga que a do site (v${EXT_VERSAO}). Baixe a nova e recarregue em chrome://extensions." aria-label="Atualizar extensão">${ic('download', 'sm')}<span class="txt-fino">Atualizar extensão</span></button>` : extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     ${htmlSeletorVis(false)}`;
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
-    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
-  $('#verRodape').textContent = 'v' + VERSAO;
-  document.title = 'Conferidor de Guias · Promédica';
+  $('#abas').innerHTML = abasHtml;
 }
 
 /* ---------- Editor de texto rico ---------- */
@@ -236,7 +244,7 @@ function htmlPassos(g) {
 
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
-  renderTopo(); pintarSync(); queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
+  renderTopo(); pintarSync(); pintarPausados(); queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
   const app = $('#app');
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
@@ -320,17 +328,20 @@ function htmlUltimaGuia() {
   });
   return linhas.length ? `<div class="ult-guia">${ic('clip')}<div><div class="eyebrow">Última guia gerada para ${vistos.size > 1 ? 'estes beneficiários' : 'este beneficiário'}</div>${linhas.join('')}</div></div>` : '';
 }
-function htmlEmailCard() {
+function htmlEmailCorpo() {
   const e = S.email, cl = clinicaDe(S);
-  return `${htmlUltimaGuia()}<div class="card"><div class="card-h"><h2>E-mail recebido</h2></div>
-    <dl class="email-meta">
+  return `<dl class="email-meta">
       <dt>De</dt><dd>${esc(e.remetente.nome)} <span class="num">&lt;${esc(e.remetente.email)}&gt;</span> ${cl ? htmlClinica(cl) : `<span class="tag obs">${ic('info', 'sm')}Remetente não cadastrado</span>`}</dd>
+      ${e.responderPara && e.responderPara !== e.remetente.email ? `<dt>Responder</dt><dd><span class="num">${esc(e.responderPara)}</span></dd>` : ''}
       <dt>Recebido</dt><dd>${fmtDH(e.data)}</dd>
       <dt>Assunto</dt><dd>${esc(e.assunto)}</dd>
       ${e.anexos.length ? `<dt>Anexos</dt><dd><span class="tag info">${ic('clip', 'sm')}${pl(e.anexos.length, 'anexo', 'anexos')}</span> ${esc(e.anexos.join(', '))}</dd>` : ''}
     </dl>
     <pre class="original">${realceEmail()}</pre>
-    <p class="dica legenda-mk" style="margin-top:8px"><mark class="m-ok">código lido</mark> <mark class="m-warn">8 dígitos não usados</mark> <mark class="m-cart">carteira</mark> <mark class="m-benef">beneficiário</mark> <mark class="m-med">médico</mark> <mark class="m-cid">CID</mark> <mark class="m-data">data</mark> · passe o mouse num campo para achar o trecho.</p></div>`;
+    <p class="dica legenda-mk" style="margin-top:8px"><mark class="m-ok">código lido</mark> <mark class="m-warn">8 dígitos não usados</mark> <mark class="m-cart">carteira</mark> <mark class="m-benef">beneficiário</mark> <mark class="m-med">médico</mark> <mark class="m-cid">CID</mark> <mark class="m-data">data</mark> · passe o mouse num campo para achar o trecho.</p>`;
+}
+function htmlEmailCard() {
+  return `${htmlUltimaGuia()}<div class="card"><div class="card-h"><h2>E-mail recebido</h2></div>${htmlEmailCorpo()}</div>`;
 }
 function renderVisao(alvo) {
   const todas = S.guias.every(guiaTerminal), multi = S.guias.length > 1;
@@ -350,6 +361,7 @@ function renderVisao(alvo) {
       ${!multi ? `<button class="btn pri" data-act="selGuia" data-i="0">Seguir para o pedido${ic('right')}</button>` : ''}
       ${multi ? `<button class="btn ${todas ? 'pri' : 'line'}" data-act="respostaEmail">${ic('mail')}Resposta do e-mail (todas as guias)</button>` : ''}
       <span class="esp"></span>
+      ${!todas ? `<button class="btn line" data-act="pausarAtual" title="Guarda o rascunho em Pausados para abrir outro e-mail sem perder nada">${ic('inbox')}Pausar atendimento</button>` : ''}
       ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}
       <button class="btn dng" data-act="descartar">${ic('trash')}Descartar e-mail</button>
     </div></div></div>`;
@@ -359,12 +371,12 @@ function renderVisao(alvo) {
    Etapa 2: pedido e alertas
    ==================================================================== */
 function htmlTabelaItens(g, { copiar = false } = {}) {
-  const cl = clinicaDe(S);
+  const cl = clinicaDe(S), proxKey = copiar && typeof proximoParaCopiar === 'function' ? (proximoParaCopiar(g)?.key || '') : '';
   return `<div class="tabela-scroll"><table class="t"><thead><tr><th>#</th><th>Código</th><th>Qtd.</th><th>Descrição ${cl ? '(cadastro da clínica)' : '(referência)'}</th><th>Descrição do e-mail</th><th>Situação</th></tr></thead><tbody>
   ${g.pedido.itens.map((it, i) => {
     const ref = descRefItem(g, it), est = estadoItem(g, it);
-    const cpCod = copiar ? `<button class="btn cp ${g.copiados['c:' + it.codigo] === it.codigo ? 'copiado' : ''}" data-act="copiarItem" data-tipo="c" data-codigo="${it.codigo}" aria-label="Copiar código ${it.codigo}">${g.copiados['c:' + it.codigo] === it.codigo ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
-    const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
+    const cpCod = copiar ? `<button class="btn cp ${g.copiados['c:' + it.codigo] === it.codigo ? 'copiado' : ''} ${proxKey === 'c:' + it.codigo ? 'proximo-copiar' : ''}" data-act="copiarItem" data-tipo="c" data-codigo="${it.codigo}" aria-label="Copiar código ${it.codigo}">${g.copiados['c:' + it.codigo] === it.codigo ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
+    const cpQtd = copiar ? `<button class="btn cp ${g.copiados['q:' + it.codigo] === String(it.qtd) ? 'copiado' : ''} ${proxKey === 'q:' + it.codigo ? 'proximo-copiar' : ''}" data-act="copiarItem" data-tipo="q" data-codigo="${it.codigo}" aria-label="Copiar quantidade de ${it.codigo}">${g.copiados['q:' + it.codigo] === String(it.qtd) ? ic('check', 'sm') : ic('copy', 'sm')}</button>` : '';
     return `<tr><td class="c">${i + 1}</td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="cod">${it.codigo}</span>${it.origemCod ? htmlOrigem(it.origemCod) : ''}${cpCod}</div></td>
       <td><div class="t-celula" style="justify-content:flex-start"><span class="qtd ${copiar && it.qtd > 1 ? 'multi' : ''}" ${copiar && it.qtd > 1 ? 'title="Quantidade maior que 1"' : ''}>${it.qtd ?? '<span class="tag bad">' + ic('alert', 'sm') + 'Falta</span>'}</span>${ORIGEM_QTD[it.origemQtd] ? htmlOrigem(ORIGEM_QTD[it.origemQtd]) : ''}${it.qtd != null ? cpQtd : ''}</div></td>
@@ -422,12 +434,11 @@ const origemDe = (g, campo) => htmlOrigem(origemCampo(g, campo));
 const ORIGEM_QTD = { regra: 'regra', parametrizacao: 'param', manual: 'digitado', 'colada-crm': 'regra', aprendido: 'aprendido' };
 
 function renderPedido(alvo, g) {
-  const p = g.pedido, st = situacaoGuia(g), cl = clinicaDe(S);
+  const p = g.pedido, st = situacaoGuia(g), cl = clinicaDe(S), mini = Vis.simples();
   const cartInvalida = g.carteiraUsada && !cartValida(g.carteiraUsada);
-  alvo.innerHTML = `
-  <div class="grid2">
-    <div class="col-fixa">${htmlEmailCard()}</div>
-    <div class="stack">
+  const emailRetratil = `${htmlUltimaGuia()}<details class="card card-retratil"><summary class="card-retratil-sum">${ic('mail', 'sm')}<span><b>E-mail recebido</b> · ${esc(S.email.remetente.nome || S.email.remetente.email)} — ${esc(curtoTxt(S.email.assunto, 55))}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-xs)">Ver texto original</span></summary><div class="card-retratil-corpo">${htmlEmailCorpo()}</div></details>`;
+  const colunaForm = `<div class="stack">
+      ${mini ? emailRetratil : ''}
       <div class="card">
         <div class="card-h"><h2>Dados do pedido${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}${Notas.de(g.carteiraUsada || p.carteira) ? '' : `<button class="btn sm ghost" data-act="notaBenef" title="Recado que aparece sempre que esta carteira for atendida">${ic('message', 'sm')}Nota do beneficiário</button>`}</div>
         <div class="form-grid">
@@ -446,14 +457,16 @@ function renderPedido(alvo, g) {
         ${g.editandoItens ? htmlEditarItens(g) : htmlTabelaItens(g)}
       </div>
       ${htmlBannerParam(g)}
-      <div class="card">
-        <div class="card-h"><h2>Responder sem gerar guia</h2></div>
-        ${htmlRespSemGuia()}
-      </div>
-    </div>
-  </div>
+      <details class="card card-retratil" ${st.bloqueios.length ? 'open' : ''}>
+        <summary class="card-retratil-sum">${ic('mail', 'sm')}<span><b>Responder sem gerar guia</b></span>${st.bloqueios.length ? `<span class="tag warn">${ic('alert', 'sm')}Pedido com bloqueio</span>` : '<span class="muted" style="font-size:var(--fs-sm)">Pendência documental, carteira inválida ou devolução</span>'}<span class="esp"></span></summary>
+        <div class="card-retratil-corpo">${htmlRespSemGuia()}</div>
+      </details>
+    </div>`;
+  alvo.innerHTML = `
+  ${mini ? colunaForm : `<div class="grid2"><div class="col-fixa">${htmlEmailCard()}</div>${colunaForm}</div>`}
   ${htmlPainelAlertas(g, st)}
   <div class="acoes acoes-sec" style="margin-top:0"><span class="esp"></span>
+    <button class="btn sm line" data-act="pausarAtual" title="Guarda este rascunho em Pausados para abrir outro e-mail">${ic('inbox', 'sm')}Pausar atendimento</button>
     ${S.guias.length > 1 ? `<button class="btn sm ghost" data-act="ignorarGuia">${ic('x', 'sm')}Ignorar esta solicitação</button>` : ''}
     <button class="btn sm dng" data-act="descartar">${ic('trash', 'sm')}Descartar e-mail</button>
   </div>
@@ -474,11 +487,23 @@ function valorCopia(g, campo) {
 }
 function btnCopiaCampo(g, campo, ref, rotulo) {
   const v = valorCopia(g, campo).trim(), ok = v !== '' && g.copiados[campo] === v;
-  return `<button class="btn cp ${ok ? 'copiado' : ''}" data-act="copiarCampo" data-campo="${campo}" data-ref="${ref}" aria-label="Copiar ${esc(rotulo)}">${ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
+  const ehProx = S && S.vista === 3 && typeof proximoParaCopiar === 'function' && proximoParaCopiar(g)?.key === campo;
+  return `<button class="btn cp ${ok ? 'copiado' : ''} ${ehProx ? 'proximo-copiar' : ''}" data-act="copiarCampo" data-campo="${campo}" data-ref="${ref}" aria-label="Copiar ${esc(rotulo)}">${ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
 }
 function campoCopia(g, { campo, rot, sub, curto, mid, ph, mono }) {
   const id = 'cp-' + campo, v = valorCopia(g, campo);
   return `<div class="cp-campo ${curto ? 'curto' : ''} ${mid ? 'mid' : ''}"><div class="wrapin">${sub ? `<span class="sub">${sub}</span>` : ''}<input type="text" id="${id}" class="${mono ? 'num' : ''}" data-cpcampo="${campo}" value="${esc(v)}" placeholder="${esc(ph || '')}" aria-label="${esc(rot)}"></div>${btnCopiaCampo(g, campo, id, rot)}</div>`;
+}
+function htmlBarraTurbo(g) {
+  if (typeof filaCopia !== 'function' || g.cega.iniciada) return '';
+  const fila = filaCopia(g); if (!fila.length) return '';
+  const feitos = fila.filter(x => x.ok).length, prox = fila.find(x => !x.ok) || null;
+  return `<div class="barra-turbo" role="region" aria-label="Cópia sequencial">
+    <span class="turbo-prog"><span class="tag ${prox ? 'info' : 'ok'}">${ic(prox ? 'zap' : 'check', 'sm')}${feitos}/${fila.length} copiados</span></span>
+    <span class="turbo-txt">${prox ? `Próximo: <b>${esc(prox.rot)}</b> <span class="num muted">(${esc(curtoTxt(prox.val, 28))})</span>` : 'Todos os campos e itens desta guia já foram copiados.'}</span>
+    <span class="esp"></span>
+    <button type="button" class="btn sm ${prox ? 'pri' : 'line'}" data-act="copiarProximo">${ic(prox ? 'copy' : 'refresh', 'sm')}${prox ? 'Copiar próximo' : 'Recomeçar cópia'} <kbd>Espaço</kbd></button>
+  </div>`;
 }
 function renderGuia(alvo, g) {
   const p = g.pedido, cl = clinicaDe(S), st = situacaoGuia(g), podeSeguir = podeFinal(g, st);
@@ -486,11 +511,12 @@ function renderGuia(alvo, g) {
   const navGuia = htmlBarraAcao({ voltar: `<button class="btn" data-act="irVista" data-v="2">${ic('left')}Voltar ao pedido</button>`, status: statusBarra(g, st, podeSeguir || st.bloqueios.length ? [] : ['Falta conferir a grade: cole os prints do sistema ou faça a conferência sem prints.']), seguir: `<button class="btn pri" data-act="irVista" data-v="4" ${podeSeguir ? '' : 'disabled'}>Seguir para finalizar${ic('right')}</button>` });
   const botoesModo = Mini.aberto() ? `<span class="tag ok">${ic('pip', 'sm')}Painel flutuante aberto</span>` : '';
   if (Vis.simples()) {   // tela única: campos para copiar, prints, alertas e seguir
-    alvo.innerHTML = `<div class="stack"><div class="card"><div class="card-h"><h2>Gerar a guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}</div>${htmlMini(g, { semPrints: true })}</div>${htmlCartaoPrints(g)}${htmlPainelAlertas(g, st)}${navGuia}</div>`;
+    alvo.innerHTML = `<div class="stack">${htmlBarraTurbo(g)}<div class="card"><div class="card-h"><h2>Gerar a guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}</div>${htmlMini(g, { semPrints: true })}</div>${htmlCartaoPrints(g)}${htmlPainelAlertas(g, st)}${navGuia}</div>`;
     return;
   }
   alvo.innerHTML = `
   <div class="stack">
+  ${htmlBarraTurbo(g)}
   <div class="card">
     <div class="card-h"><h2>Dados da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${botoesModo}${cl ? htmlClinica(cl) : ''}${tagParam(g.param)}</div>
     <div class="cp-grupo"><span class="eyebrow">Executante e solicitação</span>
@@ -641,12 +667,12 @@ function htmlSituacao(g) {
     ${op('parcial', 'halfcircle', 'Parcialmente autorizada', 'Somente parte dos itens foi autorizada.')}
     ${op('nao', 'x', 'Não autorizada', 'A guia foi gerada, mas a autorização não foi concedida.')}</div>${extra}`;
 }
-function htmlCardObs(g) {
+function htmlCardObs(g, numerada = false) {
   const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
   return `<div class="card">
-  <div class="card-h"><h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
+  <div class="card-h">${numerada ? '<span class="etapa-num">2</span>' : ''}<h2>Observação da guia</h2><span class="tag info" title="O campo de observação do sistema oficial aceita só texto simples.">${ic('info', 'sm')}Texto simples</span><span class="esp"></span>
 </div>
-  <textarea id="txtObs" rows="9" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
+  <textarea id="txtObs" rows="7" aria-label="Observação da guia">${esc(obsTxt)}</textarea>
   <div class="acoes"><button class="btn cp ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs" data-rot="Copiar observação">${g.copiados.obs === obsTxt ? ic('check', 'sm') + 'Copiado' : ic('copy', 'sm') + 'Copiar observação'}</button>${g.obsEdit != null ? `<button class="btn sm ghost" data-act="resetObs">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}</div>
       </div>`;
 }
@@ -682,15 +708,15 @@ function renderFinal(alvo, g) {
   alvo.innerHTML = `
   ${multi && !showResp ? `<div class="aviso">${ic('info')}<div>Este e-mail tem ${guiasAtivas().length} guias. Aqui você registra o número, o resultado e a observação desta guia. A <b>resposta à clínica, com todas as guias</b>, aparece na última guia (faltam ${faltam}).</div></div>` : ''}
   ${multi && showResp ? `<div class="banner-param">${ic('mail', 'lg')}<div class="esp"><b>Última guia do e-mail.</b> A resposta abaixo reúne o resultado de todas as guias geradas neste e-mail.</div></div>` : ''}
-  <div class="${showResp ? 'grid2' : ''}">
+  <div class="${showResp && !Vis.simples() ? 'grid2' : 'stack'}">
     <div class="stack">
       <div class="card">
-        <div class="card-h"><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
+        <div class="card-h"><span class="etapa-num">1</span><h2>Número e resultado da guia${S.guias.length > 1 ? ` — guia ${g.idx + 1}` : ''}</h2><span class="esp"></span>${tagParam(g.param)}</div>
         ${g.prints && g.prints.ign && Object.keys(g.prints.ign).length ? `<div class="aviso" style="margin-bottom:12px">${ic('alert')}<div><b>Divergências ignoradas na conferência pelos prints.</b> As observações marcadas na etapa 3 já estão nas <b>observações adicionais</b> abaixo (e vão para a resposta à clínica): detalhe o motivo. Você pode finalizar normalmente.</div></div>` : ''}
         <div class="guia-destaque ${guiaOk ? 'ok' : (g.numero ? 'erro' : '')}"><label class="lbl" for="guia">${ic('filecheck')}Número da guia gerada no sistema oficial</label>
           <div class="guia-linha"><input type="text" id="guia" class="num ${g.numero && !guiaOk ? 'invalido' : ''}" value="${esc(g.numero)}" maxlength="10" placeholder="T00000000 ou S00000000" autocomplete="off" aria-describedby="guiaAjuda">
           <button class="btn cp btn-obs ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-act="copiarObs" data-rot="Copiar observação da guia" title="Copia o texto da observação (abaixo) para colar no sistema">${g.copiados.obs === obsTxt ? ic('check') + 'Copiado' : ic('copy') + 'Copiar observação da guia'}</button></div>
-          <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') : ''}${g.numero && !guiaOk ? 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
+          <div class="${g.numero && !guiaOk ? 'campo-erro' : 'campo-ajuda'}" id="guiaAjuda">${g.numero && !guiaOk ? ic('alert', 'sm') + 'Formato: T ou S + 7 ou 8 dígitos.' : ''}</div></div>
         <div class="form-grid">
           ${showResp ? `<div><label class="lbl" for="emailPrest">E-mail da clínica</label>
             <div class="cp-campo"><div class="wrapin"><input type="text" id="emailPrest" data-resf="emailPrestador" value="${esc(r.emailPrestador)}" class="${r.emailPrestador && !emailValido(r.emailPrestador) ? 'invalido' : ''}" placeholder="contato@clinica.com.br"></div>
@@ -702,11 +728,11 @@ function renderFinal(alvo, g) {
         ${htmlSituacao(g)}
         <div style="margin-top:12px"><div class="linha-flex" style="justify-content:space-between;margin-bottom:3px"><label class="lbl" for="rObs" style="margin:0">Observações adicionais (entram na resposta à clínica)</label><button class="btn sm" data-act="incluirObs">${ic('plus', 'sm')}Incluir observação</button></div><textarea id="rObs" data-resf="obsAdicionais" rows="2">${esc(r.obsAdicionais)}</textarea></div>
       </div>
-      ${htmlCardObs(g)}
+      ${htmlCardObs(g, true)}
     </div>
     ${showResp ? `<div class="stack">
       <div class="card">
-        <div class="card-h"><h2>${multi ? 'Resposta à clínica (todas as guias)' : 'Resposta à clínica'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
+        <div class="card-h"><span class="etapa-num">3</span><h2>${multi ? 'Resposta à clínica (todas as guias)' : 'Resposta à clínica'}</h2>${resp ? `<span class="tag ac">${ic('mail', 'sm')}${esc(nomeModelo(resp.modelo))}</span>` : ''}<span class="esp"></span>
           ${!multi && r.situacao === 'autorizada' && /^\s*(re|res)\s*:/i.test(S.email.assunto) ? `<label class="chk" style="font-size:var(--fs-sm)"><input type="checkbox" data-resf="usarCorrecao" ${g.usarCorrecao ? 'checked' : ''}>Usar modelo de correção</label>` : ''}</div>
         ${!resp ? (() => { const sv = r.situacao; r.situacao = 'autorizada'; let pv = null; try { pv = respostaDaGuia(g, true); } catch (er) { } r.situacao = sv;
           return `<div class="aviso-simples" style="margin-bottom:8px">${ic('info', 'sm')}<div>Prévia com o modelo provável (<b>autorizada</b>). Escolha a situação para confirmar o modelo e liberar a cópia.</div></div>${pv ? `<div class="previa previa-provavel"><div class="previa-c">${pv.html}</div></div>` : ''}`; })() : `
@@ -714,7 +740,7 @@ function renderFinal(alvo, g) {
         ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
         <div class="acoes"><button class="btn pri" data-act="copiarResp" ${guiaOk ? '' : 'disabled'} title="${guiaOk ? 'Copia texto formatado, para colar no e-mail' : 'Informe o número da guia'}">${ic('copy')}Copiar com formatação</button>
           <button class="btn line" data-act="copiarRespSimples" ${guiaOk ? '' : 'disabled'}>${ic('copy')}Copiar texto simples</button>
-          ${extInstalada() ? `<button class="btn line" data-act="responderWebmail" ${guiaOk ? '' : 'disabled'} title="Leva a resposta para o webmail: lá ela é colada no corpo da resposta com um clique. O envio continua sendo feito por você no webmail.">${ic('send')}Responder no webmail</button>` : ''}
+          ${extInstalada() ? `<button class="btn line" data-act="responderWebmail" ${guiaOk ? '' : 'disabled'} title="Leva a resposta para o webmail e abre o editor de resposta automaticamente.">${ic('send')}Responder no webmail</button>` : ''}
           ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}
           ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>`}
       </div>
@@ -742,6 +768,7 @@ function renderFinalSemGuia(alvo, g) {
     ${resp && resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
     ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
     <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
+      ${extInstalada() ? `<button class="btn line" data-act="responderWebmail" title="Leva a resposta para o webmail e abre o editor de resposta automaticamente.">${ic('send')}Responder no webmail</button>` : ''}
       ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div></div>` : ''}
   </div>
   ${pend.length > 1 ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
@@ -762,12 +789,27 @@ function renderConcluida(alvo, g) {
         ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${g.semGuia ? '' : htmlCardObs(g)}</div>
     ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta à clínica${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
-      <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
+      <div class="acoes"><button class="btn pri" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button>${extInstalada() ? `<button class="btn line" data-act="responderWebmailConcluida">${ic('send')}Responder no webmail</button>` : ''}</div></div>`}</div>`;
 }
 
 /* ====================================================================
-   Modais: resposta rápida, resposta do e-mail, observação, parametrização
+   Modais: atalhos, resposta do e-mail, observação, parametrização
    ==================================================================== */
+function abrirModalAtalhos() {
+  const itens = [
+    ['Espaço', 'Copia o próximo campo ou código pendente na Etapa 3 (e no painel flutuante)'],
+    ['Ctrl + V', 'Cola print(s) do sistema oficial na Etapa 3 para conferência automática por OCR'],
+    ['Alt + → / Alt + ←', 'Avança ou volta entre as etapas liberadas do atendimento'],
+    ['?', 'Abre este resumo de atalhos de teclado'],
+    ['Esc', 'Fecha janelas de diálogo (modais) abertas'],
+    ['Ctrl + B / Ctrl + I', 'Negrito e itálico nos editores de resposta e modelos de e-mail']
+  ];
+  abrirModal({
+    titulo: 'Atalhos de teclado', sub: 'Agilize o lançamento e a conferência das guias', icone: 'keyboard', tamanho: 'm',
+    corpo: `<div class="atalhos-grid">${itens.map(([k, d]) => `<div class="atalho-it"><span class="atalho-tecla"><kbd>${esc(k)}</kbd></span><span class="atalho-desc">${esc(d)}</span></div>`).join('')}</div>`,
+    rodape: `<span style="flex:1"></span><button class="btn pri" data-act="fecharModal">Entendi</button>`
+  });
+}
 function abrirRespostaEmail() {
   const g = guiaAtiva() || S.guias[0], pend = S.guias.filter(x => !guiaTerminal(x)).length;
   const r = renderModelo('resposta_multipla', ctxDe(g), { marcar: true });
@@ -776,7 +818,7 @@ function abrirRespostaEmail() {
     titulo: 'Resposta do e-mail', sub: `${pl(S.guias.filter(x => x.status !== 'descartado').length, 'guia', 'guias')} neste e-mail`, icone: 'mail', tamanho: 'g',
     corpo: `${pend ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>${pend === 1 ? '1 guia ainda não foi processada' : pend + ' guias ainda não foram processadas'}. O texto indica essas guias como pendentes; envie esta resposta só se for o caso.</div></div>` : ''}
       ${htmlEditor({ id: 'edModal', valor: r.html, minAltura: 280 })}`,
-    rodape: `<span class="dica" id="modalEstado"></span><button class="btn" data-act="fecharModal">Fechar</button><button class="btn line" data-act="copiarModalSimples">${ic('copy')}Copiar texto simples</button><button class="btn pri" data-act="copiarModalRico">${ic('copy')}Copiar com formatação</button>`
+    rodape: `<span class="dica" id="modalEstado"></span><button class="btn" data-act="fecharModal">Fechar</button><button class="btn line" data-act="copiarModalSimples">${ic('copy')}Copiar texto simples</button>${extInstalada() ? `<button class="btn line" data-act="responderWebmailModal">${ic('send')}Responder no webmail</button>` : ''}<button class="btn pri" data-act="copiarModalRico">${ic('copy')}Copiar com formatação</button>`
   });
 }
 
@@ -986,13 +1028,14 @@ async function renderPainel(app) {
     <div class="tabela-scroll"><table class="t"><thead><tr><th>${longo ? 'Data' : 'Hora'}</th><th>Clínica</th><th>Guia</th><th>Carteira</th><th>Serviços</th><th>Nº da guia</th><th>Status</th><th>Resultado</th><th>Observações</th><th></th></tr></thead><tbody>
     ${lista.map(r => {
       const tot = r.totalGuias || 1, canc = r.status === 'cancelado';
+      const retomar = r.status === 'em_andamento' && r.atendimentoId && ((S && S.atendId === r.atendimentoId) || (typeof Fila !== 'undefined' && Fila.tem(r.atendimentoId)));
       return `<tr style="${canc ? 'opacity:.7' : ''}"><td class="c num">${longo ? fmtData(r.abertoEm) + '<br>' : ''}${fmtHora(r.abertoEm)}</td><td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}${r.operador ? `<div style="margin-top:4px" title="Quem gerou">${htmlOperador(r.operador, r.operadorId)}</div>` : ''}</td>
       <td class="c">${tot > 1 ? `<span class="sq idc idc-${(r.idxGuia || 0) % 10}" title="Guia ${(r.idxGuia || 0) + 1} de ${tot}">${(r.idxGuia || 0) + 1}/${tot}</span>` : '—'}</td>
       <td class="num">${esc(r.carteira || '')}</td><td class="num">${(r.itens || []).map(i => `${i.c} × ${i.q ?? '?'}${i.aut === false ? ' <span class="tag bad">' + ic('x', 'sm') + 'negado</span>' : ''}`).join('<br>')}</td><td class="num"><b>${esc(r.guia || '')}</b></td>
       <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
       <td>${tagResultado(resultadoDe(r))}</td>
       <td>${obsCelula(r)}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${r.id}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
+      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${retomar ? `<button class="btn sm pri" data-act="retomarPausado" data-id="${esc(r.atendimentoId)}" data-idx="${r.idxGuia || 0}">${ic('play', 'sm')}Retomar</button>` : ''}${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${r.id}">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${r.id}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${r.id}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${r.id}">Excluir guia</button></div></td></tr>`;
     }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`}
     </tbody></table></div>
   </div>
@@ -1086,7 +1129,8 @@ async function renderQuadro(app) {
   <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
     ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = Math.max(0, Math.round((Date.now() - new Date(r.atualizadoEm || r.abertoEm)) / 60000));
+      const retomar = r.atendimentoId && ((S && S.atendId === r.atendimentoId) || (typeof Fila !== 'undefined' && Fila.tem(r.atendimentoId)));
       return `<div class="card-q"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
       <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl((r.itens || []).length, 'item', 'itens')} · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</div>
-      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
+      <div class="linha-flex" style="margin-top:6px;justify-content:space-between">${htmlOperador(r.operador, r.operadorId)}${retomar ? `<button class="btn sm pri" data-act="retomarPausado" data-id="${esc(r.atendimentoId)}" data-idx="${r.idxGuia || 0}">${ic('play', 'sm')}Retomar</button>` : ''}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }

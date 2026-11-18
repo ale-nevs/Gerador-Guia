@@ -7,13 +7,20 @@ let miniMsg = '';
 function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
   if (!g || !S) return `<div class="mini"><p class="muted">Nenhum atendimento aberto no conferidor.</p></div>`;
   const p = g.pedido, st = situacaoGuia(g), av = prontoPrints(g) ? avaliarPrints(g) : null, cl = clinicaDe(S);
-  const linha = (chave, rot, v) => { const ok = v !== '' && g.copiados[chave] === v; return `<button type="button" class="mini-row ${ok ? 'ok' : ''} ${v ? '' : 'vazio'}" data-mcopy="${esc(chave)}" ${v ? '' : 'disabled'} title="${v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(rot)}</span><span class="v num">${esc(v || '—')}</span>${ic(ok ? 'check' : 'copy', 'sm')}</button>`; };
+  const prox = typeof proximoParaCopiar === 'function' ? proximoParaCopiar(g) : null;
+  const linha = (chave, rot, v) => {
+    const ok = v !== '' && g.copiados[chave] === v, ehProx = prox && prox.key === chave;
+    return `<button type="button" class="mini-row ${ok ? 'ok' : ''} ${ehProx ? 'proximo' : ''} ${v ? '' : 'vazio'}" data-mcopy="${esc(chave)}" ${v ? '' : 'disabled'} title="${v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(rot)}</span><span class="v num">${esc(v || '—')}</span>${ic(ok ? 'check' : 'copy', 'sm')}</button>`;
+  };
   const nCopiar = MINI_CAMPOS.filter(([k]) => valorCopia(g, k).trim()).length + p.itens.length * 2, nFeito = MINI_CAMPOS.filter(([k]) => { const v = valorCopia(g, k).trim(); return v && g.copiados[k] === v; }).length + p.itens.filter(it => g.copiados['c:' + it.codigo] === it.codigo).length + p.itens.filter(it => g.copiados['q:' + it.codigo] === String(it.qtd)).length;
   const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
+  const podeFin = flutuante && g.status !== 'concluido' && !g.semGuia && podeFinal(g, st);
+  const pendFin = podeFin ? pendenciasConclusao(g, st) : [];
+  const obsTxt = podeFin ? (g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g)) : '';
   return `<div class="mini">
     <div class="mini-h"><div><b>${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''}</div></div><span class="tag ${nFeito >= nCopiar ? 'ok' : ''}">${nFeito}/${nCopiar} copiados</span></div>
     ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}: resolva no conferidor antes de gerar a guia.</div>` : ''}
-    <div class="mini-sec">Para lançar no sistema (clique para copiar)</div>
+    <div class="mini-sec-row"><span class="mini-sec">Para lançar no sistema</span>${nCopiar ? `<button type="button" class="btn sm pri" data-mact="proximo" title="Copia o próximo item da fila (Atalho: Espaço)">${ic('copy', 'sm')}${prox ? 'Próximo: ' + esc(prox.rot) : 'Recomeçar fila'}</button>` : ''}</div>
     <div class="mini-lista">${MINI_CAMPOS.map(([k, r]) => linha(k, r, valorCopia(g, k).trim())).join('')}
       ${p.itens.map(it => `<div class="mini-item">${linha('c:' + it.codigo, 'Código', it.codigo)}${linha('q:' + it.codigo, 'Qtd.', it.qtd == null ? '' : String(it.qtd))}</div>`).join('') || '<p class="muted">Sem serviços.</p>'}</div>
     ${semPrints ? '' : `<div class="mini-sec">Conferência pelos prints</div>
@@ -23,8 +30,20 @@ function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
         ${av.avisos.filter(a => /Falta/.test(a)).map(a => `<div class="mini-div">• ${esc(a)}</div>`).join('')}` : '<p class="muted" style="margin:0 0 6px">Nenhum print lido ainda.</p>'}
       <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('eye', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
       ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
-      <div class="mini-num">Nº da guia: <b class="num">${esc(g.numero || '—')}</b>${g.numero ? ` <span class="muted">(${g.numeroOrigem === 'print' ? 'do print' : 'digitado'})</span>` : ''}</div>
+      ${!podeFin ? `<div class="mini-num">Nº da guia: <b class="num">${esc(g.numero || '—')}</b>${g.numero ? ` <span class="muted">(${g.numeroOrigem === 'print' ? 'do print' : 'digitado'})</span>` : ''}</div>` : ''}
     </div>`}
+    ${podeFin ? `<div class="mini-sec">Finalizar rápido</div>
+    <div class="mini-fin">
+      <div class="mini-fin-linha"><input type="text" class="num" data-minp="guia" value="${esc(g.numero || '')}" maxlength="10" placeholder="Nº guia (T00000000)" aria-label="Número da guia"><button type="button" class="btn sm ${g.copiados.obs === obsTxt ? 'copiado' : ''}" data-mact="obs" title="Copiar observação da guia">${ic(g.copiados.obs === obsTxt ? 'check' : 'copy', 'sm')}Obs.</button></div>
+      <div class="seg mini-seg" role="radiogroup" aria-label="Situação">
+        ${[['autorizada', 'Autorizada'], ['parcial', 'Parcial'], ['nao', 'Negada']].map(([k, t]) => `<button type="button" class="${g.resultado.situacao === k ? 'ativo' : ''}" data-msit="${k}">${t}</button>`).join('')}
+      </div>
+      ${g.resultado.situacao && g.resultado.situacao !== 'autorizada' ? `<div class="muted" style="font-size:11px">Para detalhar motivo/itens negados, clique em “Ir para o conferidor”.</div>` : ''}
+      <div class="mini-btns">
+        ${extInstalada() && mostraResposta(g) ? `<button type="button" class="btn sm line" data-mact="webmail" ${/^[TS]\d{7,8}$/.test(g.numero) && g.resultado.situacao ? '' : 'disabled'}>${ic('send', 'sm')}Webmail</button>` : ''}
+        <button type="button" class="btn sm pri" data-mact="concluir" ${pendFin.length ? 'disabled title="' + esc(pendFin[0]) + '"' : ''}>${ic('check', 'sm')}Concluir guia</button>
+      </div>
+    </div>` : g.status === 'concluido' && flutuante ? `<div class="mini-al ok" style="margin-top:8px">${ic('check', 'sm')}Guia ${esc(g.numero || '')} concluída!</div>` : ''}
     <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button>` : `<button type="button" class="btn sm line" data-act="modoSimples">${ic('layers', 'sm')}Voltar ao modo completo</button>`}</div>
   </div>`;
 }
@@ -40,31 +59,71 @@ async function miniCopiar(chave, win) {
   if (!ok) { miniMsg = 'Não consegui copiar: clique de novo.'; Mini.atualizar(); return; }
   g.copiados[chave] = v; miniMsg = 'Copiado: ' + v; persistir(); render();
 }
+async function miniCopiarProximo(win) {
+  const g = guiaAtiva(); if (!g) return;
+  const fila = filaCopia(g); if (!fila.length) return;
+  let prox = proximoParaCopiar(g);
+  if (!prox) { fila.forEach(x => { delete g.copiados[x.key]; }); prox = fila[0]; }
+  await miniCopiar(prox.key, win);
+}
 const Mini = {
   win: null,
   aberto() { return !!(this.win && !this.win.closed); },
   async abrir() {
     if (this.aberto()) { this.win.focus(); return; }
     try {
-      if ('documentPictureInPicture' in window) this.win = await documentPictureInPicture.requestWindow({ width: 380, height: 700 });
-      else { this.win = window.open('', 'conferidorPainel', 'popup,width=400,height=720'); if (!this.win) { toast('O navegador bloqueou a janela do painel. Permita pop-ups para este site.', 'bad'); return; } }
+      if ('documentPictureInPicture' in window) this.win = await documentPictureInPicture.requestWindow({ width: 390, height: 720 });
+      else { this.win = window.open('', 'conferidorPainel', 'popup,width=400,height=740'); if (!this.win) { toast('O navegador bloqueou a janela do painel. Permita pop-ups para este site.', 'bad'); return; } }
     } catch (e) { toast('Não foi possível abrir o painel flutuante: ' + e.message, 'bad'); return; }
     const d = this.win.document; d.title = 'Conferidor — painel';
     d.head.innerHTML = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
-    document.querySelectorAll('style, link[rel=stylesheet]').forEach(n => { if (n.tagName === 'LINK') { const l = d.createElement('link'); l.rel = 'stylesheet'; l.href = n.href; d.head.appendChild(l); } else d.head.appendChild(n.cloneNode(true)); });   // o visual está em css/app.css: no painel vai com o endereço completo
+    document.querySelectorAll('style, link[rel=stylesheet]').forEach(n => { if (n.tagName === 'LINK') { const l = d.createElement('link'); l.rel = 'stylesheet'; l.href = n.href; d.head.appendChild(l); } else d.head.appendChild(n.cloneNode(true)); });
     d.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || 'light');
     d.body.innerHTML = '<div id="miniApp" class="mini-janela"></div>';
     d.addEventListener('click', e => this.clique(e));
+    d.addEventListener('input', e => this.digitar(e));
+    d.addEventListener('keydown', e => {
+      if (e.code === 'Space' && !(e.target && e.target.matches && e.target.matches('input, textarea, button'))) { e.preventDefault(); miniCopiarProximo(this.win); }
+    });
     d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (fs.length && S) { e.preventDefault(); miniMsg = 'Lendo o print…'; this.atualizar(); processarPrints(fs).then(() => { miniMsg = ''; this.atualizar(); }); } });
     this.win.addEventListener('pagehide', () => { this.win = null; if (Vis.get() === 'flutuante') Vis.set('completa'); render(); });
     this.atualizar(); render();
   },
-  atualizar() { if (!this.aberto()) { this.win = null; return; } const el = this.win.document.getElementById('miniApp'); if (el) el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }); },
+  atualizar() {
+    if (!this.aberto()) { this.win = null; return; }
+    const d = this.win.document, el = d.getElementById('miniApp'); if (!el) return;
+    if (d.activeElement && d.activeElement.dataset && d.activeElement.dataset.minp === 'guia') return;
+    el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true });
+  },
+  digitar(e) {
+    if (!S || !e.target || !e.target.dataset || e.target.dataset.minp !== 'guia') return;
+    const g = guiaAtiva(); if (!g) return;
+    let v = e.target.value.toUpperCase().replace(/\s/g, ''); if (/^\d{8}$/.test(v)) v = 'T' + v;
+    if (e.target.value !== v) e.target.value = v;
+    g.numero = v; persistir();
+    const pend = pendenciasConclusao(g, situacaoGuia(g));
+    const bc = this.win.document.querySelector('[data-mact="concluir"]'); if (bc) bc.disabled = pend.length > 0;
+    const bw = this.win.document.querySelector('[data-mact="webmail"]'); if (bw) bw.disabled = !(/^[TS]\d{7,8}$/.test(g.numero) && g.resultado.situacao);
+  },
   async clique(e) {
     const c = e.target.closest('[data-mcopy]'); if (c) { await miniCopiar(c.dataset.mcopy, this.win); return; }
+    const s = e.target.closest('[data-msit]');
+    if (s && S) { const g = guiaAtiva(); if (g) { g.resultado.situacao = s.dataset.msit; g.respEdit = null; persistir(); render(); } return; }
     const b = e.target.closest('[data-mact]'); if (!b) return;
     const a = b.dataset.mact;
     if (a === 'abrir') { window.focus(); return; }
+    if (a === 'proximo') { await miniCopiarProximo(this.win); return; }
+    if (a === 'obs' && S) {
+      const g = guiaAtiva(), v = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
+      try { await this.win.navigator.clipboard.writeText(v); g.copiados.obs = v; miniMsg = 'Observação copiada!'; persistir(); render(); } catch (er) { miniMsg = 'Clique de novo para copiar.'; this.atualizar(); }
+      return;
+    }
+    if (a === 'webmail' && S) {
+      const g = guiaAtiva(), r = respostaDaGuia(g, false), quem = nomesAtend();
+      window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(r.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')), texto: r.texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '', messageId: S.email.messageId || '' } }, location.origin);
+      g.copiados.resp = true; miniMsg = 'Resposta enviada ao webmail!'; persistir(); render(); return;
+    }
+    if (a === 'concluir' && S) { await acoes.concluirGuia(); this.atualizar(); return; }
     if (a === 'capturar') { miniMsg = Captura.ativa() ? 'Capturando…' : ''; this.atualizar(); await capturarJanela(this.win.navigator); miniMsg = ''; this.atualizar(); return; }
     if (a === 'colar') {
       try {
@@ -88,7 +147,9 @@ document.addEventListener('focusin', e => { const t = e.target; if (t && t.datas
 document.addEventListener('click', e => {
   const c = e.target.closest && e.target.closest('[data-mcopy]'); if (c) { miniCopiar(c.dataset.mcopy); return; }
   const b = e.target.closest && e.target.closest('[data-mact]'); if (!b) return;
-  if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
+  if (b.dataset.mact === 'proximo') miniCopiarProximo();
+  else if (b.dataset.mact === 'capturar') capturarJanela();
+  else if (b.dataset.mact === 'colar') acoes.colarPrint();
 });
 
 /* ---------- Quem está com o Conferidor aberto agora (batimento na pasta a cada minuto) ---------- */
@@ -127,9 +188,17 @@ const Notas = {
   de(cart) { const k = normCart(cart || ''); const n = k && this.itens[k]; return n && n.texto ? n : null; },
   async salvar(cart, texto) {
     const k = normCart(cart || ''); if (!k) return false;
-    await this.carregar(); this.itens[k] = { texto: texto.trim(), por: operador(), em: agora() };   // texto vazio = removida (fica a marca para não voltar)
+    await this.carregar(); this.itens[k] = { texto: texto.trim(), por: operador(), em: agora() };
     const doc = { atualizadoEm: agora(), itens: this.itens }; LS.set('notasBenef', doc);
-    if (Pasta.ok) { try { await Pasta.gravar(['notas'], 'beneficiarios.json', doc); } catch (er) { toast('A nota ficou só neste computador: não consegui gravar na pasta.', 'bad'); } }
+    if (Pasta.ok) {
+      try {
+        const salvo = await Pasta.transacaoJson(['notas'], 'beneficiarios.json', { itens: {} }, remoto => {
+          const mesclado = this.juntar(remoto && remoto.itens, this.itens);
+          return { atualizadoEm: agora(), itens: mesclado };
+        });
+        if (salvo && salvo.itens) { this.itens = salvo.itens; LS.set('notasBenef', salvo); }
+      } catch (er) { toast('A nota ficou só neste computador: não consegui gravar na pasta.', 'bad'); }
+    }
     return true;
   }
 };
@@ -204,6 +273,7 @@ async function init() {
   Presenca.bater();
   await Apr.carregar();
   await Notas.carregar();
+  await Fila.init();
   S = LS.get('atual', null);
   if (S && S.v !== 2) S = null;
   render();

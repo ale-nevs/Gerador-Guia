@@ -1,31 +1,29 @@
-# Extensão do Chrome/Edge: "Abrir no conferidor"
+# Extensão do Chrome/Edge: "Abrir no conferidor" (v1.3.0)
 
-Cria um botão flutuante no webmail (`https://mail.promedica.com.br`) que abre o e-mail aberto direto na aba do
-Conferidor de Guias. Sem baixar o .eml, sem copiar e colar.
+Cria um botão flutuante no webmail (`https://mail.promedica.com.br`) integrado em tempo real com a aba do
+**Conferidor de Guias** — sem precisar baixar arquivos `.eml` nem copiar e colar respostas manualmente.
 
-## Como funciona
-1. No webmail, a extensão observa a resposta que o próprio SmarterMail recebe ao abrir um e-mail
-   (`POST /api/v1/mail/message`) e guarda os campos úteis (remetente, assunto, data, texto, nomes dos anexos)
-   só na memória da aba.
-2. Aparece o botão flutuante **Abrir no conferidor** (canto inferior direito, com o assunto do e-mail).
-3. Ao clicar, a extensão entrega o e-mail à aba do Conferidor (abre uma, se já souber o endereço) e a traz para a
-   frente. O Conferidor abre o pedido. Se houver atendimento aberto, ele pergunta antes de substituir.
-4. Ao abrir um e-mail, o botão já mostra se ele **está em atendimento** (e por quem) ou **já foi atendido** (com o nº da guia),
-   consultando o Conferidor. Depois do clique, mostra "Abrindo…" e "Aberto: NOME" com o beneficiário lido.
-5. Se o e-mail for fechado (o texto dele sai da tela), o botão fica cinza ("E-mail fechado") e só manda o último e-mail com
-   um segundo clique de confirmação.
-6. **Responder no webmail**: na etapa 4 do Conferidor, o botão "Responder no webmail" leva a resposta pronta para o webmail.
-   Lá, clique em **Responder**, clique no corpo do texto e no botão flutuante **Colar resposta**. Revise e envie você mesmo.
-7. Nada é respondido, enviado ou aberto sem o clique do operador: o envio do e-mail é sempre no webmail.
+## Como funciona na versão 1.3.0
+1. **Captura local (GET e POST + Reply-To):** a extensão observa no navegador a resposta que o SmarterMail recebe ao abrir um e-mail (`/api/v1/mail/message`) e guarda apenas os metadados úteis (remetente, `Reply-To`, assunto, data, corpo e nomes de anexos) num **cache local LRU (até 40 mensagens)** na memória da aba.
+2. **Troca instantânea entre e-mails em cache:** um `MutationObserver` leve (com debounce) acompanha o painel de leitura. Ao clicar de volta num e-mail já carregado antes pelo SmarterMail, o botão reconhece automaticamente a mensagem visível sem reenviar o e-mail errado.
+3. **Status ao vivo e avisos preventivos:** antes mesmo do clique, o botão consulta o Conferidor e mostra:
+   - se o pedido **já foi atendido** (com operador e nº da guia);
+   - se **está em atendimento** agora por você ou por um colega;
+   - se está salvo em **Pausados** (rascunho pronto para retomar);
+   - aviso caso a **pasta compartilhada esteja desconectada** no Conferidor.
+   Ao concluir uma guia no Conferidor, o selo no webmail é atualizado automaticamente.
+4. **Minimizar sem perder o botão:** o botão `–` recolhe o card numa pílula discreta (`Conferidor`) no canto inferior direito, podendo ser reexpandido a qualquer momento.
+5. **Auto-Responder & Colar em 1 clique:** na Etapa 4 do Conferidor (ou no Painel Flutuante), clicar em **Responder no webmail** foca a aba do webmail, aciona automaticamente **Responder** e insere o HTML formatado no início do editor (acima do histórico citado). Se o editor não abrir sozinho, o botão vira **Inserir resposta** para colar com 1 clique.
+6. **Revisão humana sempre:** nada é enviado sozinho — o operador sempre confere destinatário/texto e clica em **Enviar** no webmail.
 
-## Instalar
-1. No Conferidor, clique no ícone de download do topo e baixe o .zip. Descompacte.
-2. `chrome://extensions` (ou `edge://extensions`) > **Modo do desenvolvedor** > **Carregar sem compactação** > pasta descompactada.
-3. Abra o Conferidor numa aba, recarregue o webmail (F5) e abra um e-mail.
+## Instalar ou atualizar
+1. No Conferidor, clique no botão da extensão no topo e baixe o `.zip` atualizado. Descompacte em uma pasta fixa.
+2. Abra `chrome://extensions` (ou `edge://extensions`) > ative **Modo do desenvolvedor** > **Carregar sem compactação** > selecione a pasta descompactada.
+3. Abra o Conferidor numa aba, recarregue o webmail (`F5`) e abra um e-mail.
 
-## Observações
-- Permissões: apenas o webmail da Promédica e páginas `*.vercel.app` que tenham a marca `conferidor-guias`.
-  Se o Conferidor usar domínio próprio (não `vercel.app`), inclua-o em `content_scripts[2].matches` do `manifest.json`.
-- Depende do formato da API interna do SmarterMail (`captura-main.js`). Se uma atualização dele mudar isso, só esse
-  arquivo precisa de ajuste.
-- Para gerar o .zip do site depois de mudar a extensão: `python3 extensao/empacotar.py`.
+## Desenvolvimento e empacotamento
+- Permissões restritas ao webmail da Promédica (`https://mail.promedica.com.br/*`) e páginas `*.vercel.app` / `localhost` / `127.0.0.1` identificadas com `<meta name="conferidor-guias">`.
+- Sempre que alterar arquivos em `extensao/`, gere novamente o pacote publicado pelo site executando:
+  ```bash
+  python3 extensao/empacotar.py
+  ```

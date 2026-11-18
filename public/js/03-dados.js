@@ -6,8 +6,11 @@ function idbAbrir() { return new Promise((res, rej) => { const r = indexedDB.ope
 async function idbGet(k) { try { const db = await idbAbrir(); return await new Promise(res => { const t = db.transaction('kv').objectStore('kv').get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(null); }); } catch (e) { return null; } }
 async function idbSet(k, v) { const db = await idbAbrir(); await new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
 
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+const erroTransitorioPasta = e => !!(e && ['InvalidModificationError', 'NoModificationAllowedError', 'NotReadableError', 'AbortError', 'OperationError'].includes(e.name));
+
 const Pasta = {
-  handle: null, ok: false, erro: null, suportado: 'showDirectoryPicker' in window,
+  handle: null, ok: false, erro: null, suportado: typeof window !== 'undefined' && 'showDirectoryPicker' in window,
   async init() {
     if (!this.suportado) return;
     this.handle = await idbGet('pasta');
@@ -24,17 +27,49 @@ const Pasta = {
   async dir(partes, criar) { let d = this.handle; for (const p of partes) d = await d.getDirectoryHandle(p, { create: !!criar }); return d; },
   /* undefined = arquivo não existe; erro de leitura lança (para não sobrescrever um arquivo que só não foi lido) */
   async lerSeguro(partes, nome) {
-    let d; try { d = await this.dir(partes, false); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
-    let fh; try { fh = await d.getFileHandle(nome); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
-    return JSON.parse(await (await fh.getFile()).text());
+    const atrasos = [0, 120, 320];
+    let ultErro = null;
+    for (let i = 0; i < atrasos.length; i++) {
+      if (atrasos[i]) await esperar(atrasos[i]);
+      try {
+        let d; try { d = await this.dir(partes, false); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
+        let fh; try { fh = await d.getFileHandle(nome); } catch (e) { if (e && e.name === 'NotFoundError') return undefined; throw e; }
+        return JSON.parse(await (await fh.getFile()).text());
+      } catch (e) {
+        ultErro = e;
+        if (!erroTransitorioPasta(e) && !(e instanceof SyntaxError && i < atrasos.length - 1)) throw e;
+      }
+    }
+    throw ultErro;
   },
-  async ler(partes, nome) { try { const d = await this.dir(partes, false); const f = await (await d.getFileHandle(nome)).getFile(); return JSON.parse(await f.text()); } catch (e) { return null; } },
+  async ler(partes, nome) { try { const v = await this.lerSeguro(partes, nome); return v === undefined ? null : v; } catch (e) { return null; } },
   async gravar(partes, nome, obj) {
-    try {
-      const d = await this.dir(partes, true); const fh = await d.getFileHandle(nome, { create: true });
-      const w = await fh.createWritable(); await w.write(JSON.stringify(obj, null, 1)); await w.close();
-      if (this.erro) { this.erro = null; if (typeof pintarSync === 'function') pintarSync(); }
-    } catch (e) { this.erro = e.message || 'falha ao gravar'; if (typeof pintarSync === 'function') pintarSync(); throw e; }
+    const atrasos = [0, 140, 360, 780];
+    let ultErro = null;
+    const payload = JSON.stringify(obj, null, 1);
+    for (let i = 0; i < atrasos.length; i++) {
+      if (atrasos[i]) await esperar(atrasos[i]);
+      try {
+        const d = await this.dir(partes, true); const fh = await d.getFileHandle(nome, { create: true });
+        const w = await fh.createWritable(); await w.write(payload); await w.close();
+        if (this.erro) { this.erro = null; if (typeof pintarSync === 'function') pintarSync(); }
+        return;
+      } catch (e) {
+        ultErro = e;
+        if (!erroTransitorioPasta(e)) break;
+      }
+    }
+    this.erro = (ultErro && ultErro.message) || 'falha ao gravar';
+    if (typeof pintarSync === 'function') pintarSync();
+    throw ultErro;
+  },
+  /* Lê o JSON atual da pasta, aplica o mesclador sem perder dados concorrentes e regrava com retentativa */
+  async transacaoJson(partes, nome, padrao, mesclador) {
+    const atual = await this.lerSeguro(partes, nome);
+    const base = atual !== undefined && atual !== null ? atual : clonar(padrao);
+    const novo = await mesclador(base, atual);
+    await this.gravar(partes, nome, novo);
+    return novo;
   },
   /* confere de novo se a permissão da pasta ainda vale (ela expira) */
   async verificar() {
@@ -457,7 +492,7 @@ const OBS_AUTO = {
   cid: { nome: 'CID diferente', texto: 'CID no sistema difere do informado no pedido.', padrao: false }
 };
 const obsAutoPadrao = () => Object.fromEntries(Object.entries(OBS_AUTO).map(([k, v]) => [k, { texto: v.texto, padrao: v.padrao }]));
-const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10, guardarPrints: true, minutosParado: 10 };
+const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10, guardarPrints: true, minutosParado: 10, exigirConfirmarGlosa: false };
 
 /* Motor de modelos: campos entre chaves → texto/HTML. Falta de valor fica visível. */
 function modeloHtmlBruto(k) { return (cfg.modelos[k] || {}).html || ''; }
@@ -536,6 +571,7 @@ function mesclarConfig(base, c) {
     if (Number.isInteger(p.acoesMinutos) && p.acoesMinutos >= 0 && p.acoesMinutos <= 1440) r.preferencias.acoesMinutos = p.acoesMinutos;
     if (Number.isInteger(Number(p.minutosParado)) && Number(p.minutosParado) >= 0 && Number(p.minutosParado) <= 240) r.preferencias.minutosParado = Number(p.minutosParado);
     if (typeof p.guardarPrints === 'boolean') r.preferencias.guardarPrints = p.guardarPrints;
+    if (typeof p.exigirConfirmarGlosa === 'boolean') r.preferencias.exigirConfirmarGlosa = p.exigirConfirmarGlosa;
   }
   if (c.obsAuto) for (const k in OBS_AUTO) { const o = c.obsAuto[k]; if (!o) continue; if (typeof o.texto === 'string' && o.texto.trim()) r.obsAuto[k].texto = o.texto.trim(); if (typeof o.padrao === 'boolean') r.obsAuto[k].padrao = o.padrao; }
   if (Array.isArray(c.glosas)) r.glosas = unicos(c.glosas.map(g => String(g).trim()).filter(Boolean));
@@ -565,7 +601,7 @@ async function mesclarOperadoresDaPasta(novo) {
   const arq = normOperadores(p.operadores), eu = operadorObj();
   arq.forEach(o => {
     const i = novo.operadores.findIndex(x => x.id === o.id);
-    if (i < 0) { if (!cfgOpsIni.includes(o.id)) novo.operadores.push(o); }                       // criado por outro
+    if (i < 0) { if (typeof cfgOpsIni === 'undefined' || !cfgOpsIni.includes(o.id)) novo.operadores.push(o); }                       // criado por outro
     else if (o.senhaHash && !(eu && eu.id === o.id)) novo.operadores[i] = { ...novo.operadores[i], ...o };   // protegido: vale o arquivo
   });
 }
@@ -576,8 +612,31 @@ async function salvarConfig(novo) {
   cfg = mesclarConfig(configPadrao(), obj);
 }
 async function alterarConfig(fn) {
-  // relê o arquivo da pasta antes de alterar, para não sobrescrever mudanças de outro operador
-  await carregarConfig(); const c = clonar(cfg); fn(c); await salvarConfig(c);
+  // relê o arquivo da pasta antes de alterar e une adições concorrentes de clínicas/códigos/e-mails
+  await carregarConfig();
+  const antes = clonar(cfg);
+  const c = clonar(cfg);
+  fn(c);
+  if (Pasta.ok) {
+    try {
+      const disco = await Pasta.lerSeguro([], 'config.json');
+      if (disco && Array.isArray(disco.clinicas)) {
+        disco.clinicas.forEach(cd => {
+          const id = cd.id || slug(cd.nome || '');
+          const tinhaAntes = antes.clinicas.some(x => x.id === id);
+          const alvo = c.clinicas.find(x => x.id === id);
+          if (!alvo && !tinhaAntes) { c.clinicas.push(cd); return; }
+          if (alvo) {
+            const antCl = antes.clinicas.find(x => x.id === id) || { emails: [], codigos: {} };
+            (cd.emails || []).forEach(em => { const e = String(em).toLowerCase().trim(); if (e && !(antCl.emails || []).includes(e) && !alvo.emails.includes(e)) alvo.emails.push(e); });
+            Object.entries(cd.codigos || {}).forEach(([cod, desc]) => { if (antCl.codigos[cod] === undefined && alvo.codigos[cod] === undefined) alvo.codigos[cod] = desc; });
+          }
+        });
+      }
+      await mesclarOperadoresDaPasta(c);
+    } catch (e) { }
+  }
+  await salvarConfig(c);
 }
 const modoDe = tipo => (cfg.alertas[tipo] && MODOS[cfg.alertas[tipo].modo]) ? cfg.alertas[tipo].modo : ALERTAS[tipo].modo;
 
@@ -604,26 +663,61 @@ function htmlClinica(cl, nomeFallback) {
   return `<span class="tag id idc ${corClinica(cl)}">${ic('building', 'sm')}${esc(cl.nome)}</span>`;
 }
 
-/* Parametrizações: referência por clínica + carteira (arquivo próprio na pasta compartilhada) */
+/* Parametrizações: referência por clínica + carteira (arquivo próprio na pasta compartilhada, com mesclagem atômica por id) */
+function juntarDocsParam(a, b) {
+  const exc = new Set([...((a && a.excluidos) || []), ...((b && b.excluidos) || [])]);
+  const mapa = new Map();
+  [...((a && a.itens) || []), ...((b && b.itens) || [])].forEach(it => {
+    if (!it || !it.id || exc.has(it.id)) return;
+    const x = mapa.get(it.id);
+    if (!x || (it.atualizadoEm || '') >= (x.atualizadoEm || '')) mapa.set(it.id, it);
+  });
+  return { versao: 2, atualizadoEm: agora(), itens: [...mapa.values()], excluidos: [...exc] };
+}
 const Param = {
-  lista: [],
+  lista: [], excluidos: [],
   async carregar() {
     let d = LS.get('param', null);
-    if (Pasta.ok) { const p = await Pasta.ler([], 'parametrizacoes.json'); if (p) { d = p; LS.set('param', p); } }
+    if (Pasta.ok) {
+      const p = await Pasta.ler([], 'parametrizacoes.json');
+      if (p) { d = d ? juntarDocsParam(p, d) : p; LS.set('param', d); }
+    }
     this.lista = (d && d.itens) || [];
-  },
-  async gravar() {
-    const doc = { versao: 2, atualizadoEm: agora(), itens: this.lista };
-    if (!LS.set('param', doc)) throw new Error('não foi possível gravar neste computador');
-    if (Pasta.ok) await Pasta.gravar([], 'parametrizacoes.json', doc);
+    this.excluidos = (d && d.excluidos) || [];
   },
   async salvar(p) {
+    p = { ...p, atualizadoEm: p.atualizadoEm || agora() };
     await this.carregar();
+    this.excluidos = this.excluidos.filter(x => x !== p.id);
     const i = this.lista.findIndex(x => x.id === p.id);
     if (i >= 0) this.lista[i] = p; else this.lista.push(p);
-    await this.gravar();
+    let doc = { versao: 2, atualizadoEm: agora(), itens: this.lista, excluidos: this.excluidos };
+    if (Pasta.ok) {
+      doc = await Pasta.transacaoJson([], 'parametrizacoes.json', { versao: 2, itens: [], excluidos: [] }, disco => {
+        const d = clonar(disco);
+        d.excluidos = (d.excluidos || []).filter(x => x !== p.id);
+        return juntarDocsParam(d, doc);
+      });
+      this.lista = doc.itens; this.excluidos = doc.excluidos || [];
+    }
+    if (!LS.set('param', doc)) throw new Error('não foi possível gravar neste computador');
   },
-  async remover(id) { await this.carregar(); this.lista = this.lista.filter(x => x.id !== id); await this.gravar(); },
+  async remover(id) {
+    await this.carregar();
+    this.lista = this.lista.filter(x => x.id !== id);
+    this.excluidos = unicos([...(this.excluidos || []), id]);
+    let doc = { versao: 2, atualizadoEm: agora(), itens: this.lista, excluidos: this.excluidos };
+    if (Pasta.ok) {
+      doc = await Pasta.transacaoJson([], 'parametrizacoes.json', { versao: 2, itens: [], excluidos: [] }, disco => {
+        const m = juntarDocsParam(disco, doc);
+        m.itens = m.itens.filter(x => x.id !== id);
+        m.excluidos = unicos([...(m.excluidos || []), id]);
+        return m;
+      });
+      this.lista = doc.itens; this.excluidos = doc.excluidos || [];
+    }
+    LS.set('param', doc);
+  },
   achar(clinicaId, carteira) { return this.lista.find(x => x.clinicaId === clinicaId && x.carteira === carteira) || null; },
   porId(id) { return this.lista.find(x => x.id === id) || null; }
 };
@@ -644,6 +738,9 @@ const assinaturaReg = d => d ? JSON.stringify([(d.registros || []).map(r => r.id
 const Reg = {
   cache: [],
   arquivo(dia, op) { return { partes: ['registros', dia.slice(0, 7)], nome: `${dia}_${slug(op)}.json` }; },
+  async invalidarIndiceMes(ym) {
+    if (Pasta.ok && ym && ym < isoDia(new Date()).slice(0, 7)) { try { await Pasta.apagar(['registros', ym], '_indice.json'); } catch (e) { } }
+  },
   async salvar(reg) {
     const { partes, nome } = this.arquivo(reg.dia, reg.operador || 'sem-operador');
     const chave = `reg.${reg.dia}.${slug(reg.operador || 'sem-operador')}`;
@@ -655,10 +752,11 @@ const Reg = {
     const i = doc.registros.findIndex(r => r.id === reg.id);
     if (i >= 0) doc.registros[i] = reg; else doc.registros.push(reg);
     LS.set(chave, doc);
-    if (Pasta.ok && !erro) { try { await Pasta.gravar(partes, nome, doc); } catch (e) { erro = e; } }
+    if (Pasta.ok && !erro) { try { await Pasta.gravar(partes, nome, doc); await this.invalidarIndiceMes(reg.dia.slice(0, 7)); } catch (e) { erro = e; } }
     if (!Pasta.ok || erro) this.pendente(chave, reg.id); else this.pendente(chave, null);
     const j = this.cache.findIndex(r => r.id === reg.id);
     if (j >= 0) this.cache[j] = reg; else this.cache.push(reg);
+    this.mesclarHist([reg]);
     if (erro) toast('Não consegui gravar na pasta compartilhada. O registro está guardado neste computador e será enviado depois.', 'bad');
     pintarSync();
   },
@@ -676,10 +774,10 @@ const Reg = {
     const p = this.pendentes(); let n = 0;
     for (const k of (chaves || Object.keys(p))) {
       const local = LS.get(k, null); if (!local) { delete p[k]; continue; }
-      const dia = k.slice(4, 14), partes = ['registros', dia.slice(0, 7)], nome = `${dia}_${k.slice(15)}.json`;
+      const dia = k.slice(4, 14), ym = dia.slice(0, 7), partes = ['registros', ym], nome = `${dia}_${k.slice(15)}.json`;
       try {
         const lido = await Pasta.lerSeguro(partes, nome), junto = juntarDocsReg(lido, local);
-        if (!lido || assinaturaReg(junto) !== assinaturaReg(lido)) await Pasta.gravar(partes, nome, junto);
+        if (!lido || assinaturaReg(junto) !== assinaturaReg(lido)) { await Pasta.gravar(partes, nome, junto); await this.invalidarIndiceMes(ym); }
         LS.set(k, junto); if (p[k]) n += p[k].length; delete p[k];
       } catch (e) { }
     }
@@ -700,7 +798,7 @@ const Reg = {
     if (Pasta.ok) {
       const meses = new Set(); for (let d = 0; d <= dias; d += 10) meses.add(isoDia(addDias(new Date(), -d)).slice(0, 7)); meses.add(limite.slice(0, 7));
       for (const m of meses) for (const [n, h] of await Pasta.listar(['registros', m])) {
-        if (!n.endsWith('.json') || n.slice(0, 10) < limite) continue;
+        if (!n.endsWith('.json') || n.startsWith('_') || n.slice(0, 10) < limite) continue;
         try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
       }
       for (const k of Object.keys(this.pendentes())) if (k.slice(4, 14) >= limite) { const d = LS.get(k, null); if (d) docs.push(d); }
@@ -714,7 +812,7 @@ const Reg = {
     this.cache = [...mapa.values()];
   },
   doDia(dia) { return this.cache.filter(r => r.dia === dia); },
-  /* Histórico completo (sem limite de dias): guia gerada mais recente de cada carteira */
+  /* Histórico completo (sem limite de dias): usa índice consolidado _indice.json por mês encerrado */
   hist: {}, histPronto: false,
   todos: {},
   mesclarHist(regs) {
@@ -729,10 +827,26 @@ const Reg = {
   },
   async carregarTudo() {
     if (this.histPronto) { await this.carregar(); this.mesclarHist(this.cache); return; }
-    const docs = [];
-    if (Pasta.ok) for (const [m] of await Pasta.listar(['registros'])) for (const [n, h] of await Pasta.listar(['registros', m])) {
-      if (!n.endsWith('.json')) continue;
-      try { docs.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
+    const docs = [], mesAtual = isoDia(new Date()).slice(0, 7);
+    if (Pasta.ok) {
+      for (const [m] of await Pasta.listar(['registros'])) {
+        if (!/^\d{4}-\d{2}$/.test(m)) continue;
+        if (m < mesAtual) {
+          const idx = await Pasta.ler(['registros', m], '_indice.json');
+          if (idx && idx.versao === 1 && Array.isArray(idx.registros)) { docs.push(idx); continue; }
+        }
+        const docsMes = [];
+        for (const [n, h] of await Pasta.listar(['registros', m])) {
+          if (!n.endsWith('.json') || n.startsWith('_')) continue;
+          try { docsMes.push(JSON.parse(await (await h.getFile()).text())); } catch (e) { }
+        }
+        docs.push(...docsMes);
+        if (m < mesAtual && docsMes.length) {
+          const mapaM = new Map(), exclM = new Set(docsMes.flatMap(d => d.excluidos || []));
+          docsMes.flatMap(d => d.registros || []).forEach(r => { if (!r || exclM.has(r.id)) return; const a = mapaM.get(r.id); if (!a || carimboReg(r) >= carimboReg(a)) mapaM.set(r.id, r); });
+          Pasta.gravar(['registros', m], '_indice.json', { versao: 1, mes: m, atualizadoEm: agora(), registros: [...mapaM.values()], excluidos: [...exclM] }).catch(() => { });
+        }
+      }
     }
     for (const k of LS.chaves('reg.')) { const d = LS.get(k, null); if (d) docs.push(d); }
     this.hist = {}; this.todos = {};
@@ -748,10 +862,47 @@ const Reg = {
     const marcar = d => { d.registros = (d.registros || []).filter(x => x.id !== id); d.excluidos = [...new Set([...(d.excluidos || []), id])]; return d; };
     for (const k of LS.chaves('reg.' + r.dia)) { const d = LS.get(k, null); if (d && (d.registros || []).some(x => x.id === id)) LS.set(k, marcar(d)); }
     const pend = this.pendentes(); Object.keys(pend).forEach(k => { pend[k] = pend[k].filter(x => x !== id); if (!pend[k].length) delete pend[k]; }); LS.set('regPendentes', pend);
-    if (Pasta.ok) { const partes = ['registros', r.dia.slice(0, 7)]; for (const [n] of await Pasta.listar(partes)) { if (!n.startsWith(r.dia) || !n.endsWith('.json')) continue; const doc = await Pasta.ler(partes, n); if (doc && (doc.registros || []).some(x => x.id === id)) await Pasta.gravar(partes, n, marcar(doc)); } }
+    if (Pasta.ok) {
+      const ym = r.dia.slice(0, 7), partes = ['registros', ym];
+      for (const [n] of await Pasta.listar(partes)) {
+        if (!n.startsWith(r.dia) || !n.endsWith('.json') || n.startsWith('_')) continue;
+        const doc = await Pasta.ler(partes, n); if (doc && (doc.registros || []).some(x => x.id === id)) await Pasta.gravar(partes, n, marcar(doc));
+      }
+      await this.invalidarIndiceMes(ym);
+    }
     this.cache = this.cache.filter(x => x.id !== id); delete this.todos[id];
     Object.values(this.hist).forEach(l => { const i = l.findIndex(x => x.id === id); if (i >= 0) l.splice(i, 1); });
     return true;
+  },
+  async anonimizarAntigos(dias = 180) {
+    const lim = isoDia(addDias(new Date(), -dias)); let alterados = 0;
+    const anonDoc = doc => {
+      let mudou = false;
+      (doc.registros || []).forEach(r => {
+        if (r && r.dia && r.dia < lim && (r.paciente || r.carteira) && !r.anonimizado) {
+          if (r.paciente) r.paciente = nomeCurto(r.paciente) || r.pacienteIni || '—';
+          if (r.carteira && r.carteira.length >= 10) r.carteira = r.carteira.slice(0, 4) + '*'.repeat(r.carteira.length - 8) + r.carteira.slice(-4);
+          r.anonimizado = true; r.atualizadoEm = agora();
+          mudou = true; alterados++;
+        }
+      });
+      return mudou;
+    };
+    for (const k of LS.chaves('reg.')) { if (k.slice(4, 14) < lim) { const d = LS.get(k, null); if (d && anonDoc(d)) LS.set(k, d); } }
+    if (Pasta.ok) {
+      for (const [m] of await Pasta.listar(['registros'])) {
+        if (!/^\d{4}-\d{2}$/.test(m) || m > lim.slice(0, 7)) continue;
+        let tocouMes = false;
+        for (const [n] of await Pasta.listar(['registros', m])) {
+          if (!n.endsWith('.json') || n.startsWith('_') || n.slice(0, 10) >= lim) continue;
+          const doc = await Pasta.ler(['registros', m], n);
+          if (doc && anonDoc(doc)) { await Pasta.gravar(['registros', m], n, doc); tocouMes = true; }
+        }
+        if (tocouMes) await this.invalidarIndiceMes(m);
+      }
+    }
+    this.histPronto = false;
+    return alterados;
   },
   ultimaGuia(carteira, atendId) {
     const l = (this.hist[carteira] || []).filter(r => r.atendimentoId !== atendId).sort((a, b) => ((a.concluidoEm || '') < (b.concluidoEm || '') ? 1 : -1));
