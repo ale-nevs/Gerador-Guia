@@ -161,6 +161,7 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - **Quadro e topo compacto se atualizam sozinhos:** o Acompanhamento relê a pasta a cada 30 s e o topo compacto a cada 20 s, sem clicar em Atualizar (a busca do Auditar fica como está).
 - **Falha ao ler a pasta:** o cartão "Com o Conferidor aberto agora" avisa que não conseguiu ler e mostra o último retrato, marcado como incompleto, em vez de parecer que ninguém está on-line.
 - **Tempo na etapa por guia:** ao passar para a próxima guia do e-mail, o "nesta etapa há N min" começa do zero (antes herdava o tempo da guia anterior).
+- **Credenciado executante:** como o Médico solicitante, o **Ignorar** na conferência pelos prints aceita na hora, sem ler o print de novo e sem o modal de motivo (fica na linha do tempo da guia). Nome do beneficiário e carteira continuam pedindo o motivo.
 - **Prints em fila:** dois prints colados ou capturados em seguida na mesma guia são lidos um depois do outro; o mais novo é sempre o que vale.
 - **Captura com a aba em segundo plano:** se o Chrome não mandar a imagem atual, a captura avisa (clique na aba do Conferidor ou cole o print com Ctrl+V) em vez de conferir uma imagem antiga.
 - **Segurança:** os arquivos de presença vindos da pasta são conferidos campo a campo (tipo, tamanho e faixa) antes de ir para a tela, e uma tela que demora para carregar não pinta mais por cima da tela aberta depois.
