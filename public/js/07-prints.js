@@ -616,8 +616,19 @@ function aplicarPrints(g) {
   return av;
 }
 
-async function processarPrints(files, aviso) {
-  const g = guiaAtiva(); if (!g) { if (aviso) aviso('Nenhum atendimento aberto para receber o print.'); return; }
+/* uma leitura por guia de cada vez: um print colado enquanto o anterior ainda está sendo lido espera a vez,
+   e assim o mais novo é sempre o último aplicado (antes, uma leitura mais antiga que terminasse depois sobrescrevia a nova) */
+const FILA_PRINTS = new Map();
+function processarPrints(files, aviso) {
+  const g = guiaAtiva(); if (!g) { if (aviso) aviso('Nenhum atendimento aberto para receber o print.'); return Promise.resolve(); }
+  const antes = FILA_PRINTS.get(g.id);
+  if (antes && aviso) aviso('Esperando terminar a leitura do print anterior…');
+  const vez = (antes || Promise.resolve()).then(() => lerPrintsDaGuia(g, files, aviso));
+  const fim = vez.catch(() => { }); FILA_PRINTS.set(g.id, fim);
+  fim.then(() => { if (FILA_PRINTS.get(g.id) === fim) FILA_PRINTS.delete(g.id); });
+  return vez;
+}
+async function lerPrintsDaGuia(g, files, aviso) {
   const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; if (aviso && t) aviso(t); };
   const erros = [];
   const mem = PRINTS_MEM.get(g.id) || { leituras: [] }; PRINTS_MEM.set(g.id, mem);

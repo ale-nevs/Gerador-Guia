@@ -251,7 +251,7 @@ ${intro.split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${esc(p).replace(/\
 
   /* ---------- telas ---------- */
   async render(app) {
-    if (!this.carregadoEm || Date.now() - new Date(this.carregadoEm) > 8000) { if (!this.listas.length) app.innerHTML = htmlEsqueleto(6); await this.carregar(this.dia); }
+    if (!this.carregadoEm || Date.now() - new Date(this.carregadoEm) > 8000) { const gen = Redesenho.gen; if (!this.listas.length) app.innerHTML = htmlEsqueleto(6); await this.carregar(this.dia); if (gen !== Redesenho.gen) return; }   // outra tela foi aberta enquanto carregava
     const L = this.atual(), eu = operadorObj();
     const abas = [['continuar', 'filecheck', 'Continuar ' + this.nomeCurto(L)], ['acompanhar', 'activity', 'Acompanhar'], ['email', 'mail', 'E-mail de entrega']];
     const topo = `<div class="card lst-topo"><div class="linha-flex">

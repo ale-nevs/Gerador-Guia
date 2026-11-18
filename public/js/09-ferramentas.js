@@ -622,11 +622,13 @@ function confirmarIgnorar(g, x, motivo) {
   aplicarPrints(g); persistir(); render();
   toast(ign.leitura ? 'Marcado como erro de leitura do print. Sem observação para a clínica.' : ign.on !== false ? 'Divergência aceita: a observação para a clínica foi incluída na etapa 4 (você pode desmarcar).' : 'Divergência aceita.');
 }
+/* campos em que Ignorar aceita na hora (sem ler o print de novo e sem pedir motivo); fica registrado na linha do tempo */
+const IGNORAR_DIRETO = { 'c:profissional': 'Médico solicitante', 'c:credNome': 'Credenciado executante' };
 Object.assign(acoes, {
   async ignorarPrint(b) {
     const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
     const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
-    if (x.chave === 'c:profissional') { confirmarIgnorar(g, x, { tipo: 'direto', texto: 'Médico solicitante aceito como está (sem confirmação)' }); return; }   // médico: ignora direto, sem releitura nem modal
+    if (IGNORAR_DIRETO[x.chave]) { confirmarIgnorar(g, x, { tipo: 'direto', texto: IGNORAR_DIRETO[x.chave] + ' aceito como está (sem confirmação)' }); return; }   // ignora direto, sem releitura nem modal
     const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; };
     b.disabled = true;
     let rr = null; try { rr = await relerDivergencia(g, x, msg); } catch (e) { console.error(e); }
@@ -732,8 +734,11 @@ const Captura = {
     if (bmp) { c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); if (bmp.close) bmp.close(); }
     else {
       const v = this.video;
-      await Promise.race([new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok()) : ok())), new Promise(ok => setTimeout(ok, 700))]);
+      const novo = await Promise.race([new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok(true)) : ok(false))), new Promise(ok => setTimeout(() => ok(false), 700))]);
       if (!v.videoWidth) throw new Error('a captura não mandou imagem. A janela do sistema está minimizada?');
+      /* sem quadro novo, a imagem do vídeo só vale se ele está tocando com a aba visível (janela parada não manda quadro novo);
+         com a aba do Conferidor em segundo plano o Chrome pausa o vídeo, e a imagem seria a de antes: melhor avisar que conferir um print velho */
+      if (!novo && (document.hidden || v.paused || v.ended)) throw new Error('o Chrome não mandou a imagem atual porque a aba do Conferidor está em segundo plano. Clique na aba do Conferidor e capture de novo, ou tire o print e cole com Ctrl+V no painel.');
       c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
     }
     const url = c.toDataURL('image/png'), bin = atob(url.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
