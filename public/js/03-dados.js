@@ -551,7 +551,7 @@ function configParaSalvar(c) {
   return {
     versao: VERSAO, atualizadoEm: agora(), atualizadoPor: operador(),
     operadores: c.operadores.map(o => ({ id: o.id, nome: o.nome, icone: o.icone, corRgb: o.corRgb, corAlfa: o.corAlfa, ...(o.senhaHash ? { senhaHash: o.senhaHash, senhaSalt: o.senhaSalt } : {}) })),
-    clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', nota: (cl.nota || '').trim(), codigos: cl.codigos || {}, leitura: normLeitura(cl.leitura) })),
+    clinicas: c.clinicas.map(cl => ({ id: cl.id, nome: cl.nome, cidade: cl.cidade || '', executante: cl.executante || '', emails: cl.emails || [], apelidos: cl.apelidos || '', nota: (cl.nota || '').trim(), lista: !!cl.lista, codigos: cl.codigos || {}, leitura: normLeitura(cl.leitura) })),
     modelos: Object.fromEntries(Object.entries(c.modelos).map(([k, m]) => [k, { nome: m.nome, html: m.html, texto: htmlPlano(m.html), ...(MODELOS_META[k].custom ? { uso: m.uso || '' } : {}) }])),
     alertas: c.alertas, motivos: c.motivos, glosas: c.glosas || [], obsAuto: c.obsAuto, preferencias: c.preferencias,
     supervisor: c.supervisor && c.supervisor.pinHash ? { pinHash: c.supervisor.pinHash, pinSalt: c.supervisor.pinSalt } : null

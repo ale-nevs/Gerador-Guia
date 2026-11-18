@@ -6,7 +6,7 @@ Página auxiliar para conferência de guias de autorização de terapias.
 
 - Roda inteiramente no navegador (Chrome ou Edge). Nenhum dado é enviado para a internet.
 - Este repositório contém **apenas o código da página**. Configurações (`config.json`), registros e e-mails ficam na pasta compartilhada da equipe, **nunca aqui**.
-- Site estático: tudo em `public/`. `index.html` só monta a página; o visual está em `css/app.css` e o código em `js/` (de `01-base.js` a `10-painel-e-inicio.js`, carregados nessa ordem). Também há `ocr/`, `fonts/` (Inter, licença OFL), imagens e a extensão. Não há build.
+- Site estático: tudo em `public/`. `index.html` só monta a página; o visual está em `css/app.css` e o código em `js/` (de `01-base.js` a `11-painel-e-inicio.js`, carregados nessa ordem; `10-listas.js` são as listas do dia da Erasmo Neto). Também há `ocr/`, `fonts/` (Inter, licença OFL), imagens e a extensão. Não há build.
 
 ## Publicação na Vercel
 

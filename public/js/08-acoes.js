@@ -25,6 +25,8 @@ async function abrirDoWebmail(m) {
   let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Não consegui ler este e-mail.' }; }
   if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Escolha o operador no Conferidor.' }; }
   if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
+  const clL = ehEmailLista(email);
+  if (clL) { await Lista.abrirEmail(email, clL); return { ok: true, nomes: ['lista do dia · ' + clL.nome] }; }
   if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return { ok: false, motivo: 'O atendimento aberto foi mantido.' };
   aba = 'atend';
   try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); return { ok: false, motivo: e.message }; }
@@ -51,6 +53,12 @@ window.addEventListener('message', ev => {
   if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
 });
 async function iniciar(email) {
+  const clL = ehEmailLista(email);
+  if (clL) { await Lista.abrirEmail(email, clL); return 'lista'; }
+  const nBlocos = lerListaTexto(email.textoCompleto || email.textoPrincipal).length;
+  if (nBlocos > MAX_BENEFICIARIOS && confirm(`Este e-mail tem ${nBlocos} blocos de beneficiário (o atendimento normal vai até ${MAX_BENEFICIARIOS}). Abrir como lista do dia, dividida entre os operadores?`)) {
+    const ac = acharClinica(email); await Lista.abrirEmail(email, (ac && ac.cl) || { id: '', nome: email.remetente.nome || email.remetente.email || 'Lista' }); return 'lista';
+  }
   await Reg.carregarTudo(); await Param.carregar();
   const aviso = avisoEmailJaAtendido(email);
   if (aviso && !confirm(aviso)) return;
@@ -322,11 +330,18 @@ const acoes = {
     if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
   },
-  responderWebmail() {
-    const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
+  responderWebmail(b) {
+    if (!extInstalada()) { toast('Para levar a resposta direto ao webmail, instale a extensão do Chrome (passo a passo abaixo).'); acoes.baixarExtensao(); return; }
+    const fonte = (b && b.dataset.fonte) || 'editor';
+    if (fonte === 'lista') { Lista.responderWebmail(b.dataset.lista); return; }
+    const g = guiaAtiva(); if (!g) return;
+    let html;
+    if (fonte === 'concluida') html = htmlParaEmail(respostaDaGuia(g, false).html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1'));
+    else { const ed = $('#edResp'); if (!ed) { toast('Abra a resposta na etapa 4 para levá-la ao webmail.', 'bad'); return; } html = htmlParaEmail(serializarEditor(ed)); }
+    const texto = htmlPlano(html);
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    const quem = nomesAtend(); 
-    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' } }, location.origin);
+    const quem = nomesAtend();
+    enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' });
     g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
   },
   async copiarRespSimples() {
@@ -476,6 +491,9 @@ const acoes = {
     if (await Notas.salvar(cart, t)) { evento(g, 'regra', t.trim() ? 'Nota fixa do beneficiário: ' + t.trim() : 'Nota fixa do beneficiário removida'); fecharModal(true); persistir(); render(); toast(t.trim() ? 'Nota salva.' : 'Nota removida.'); }
   },
   okParado() { if (S) { S.vistaDesde = agora(); S.avisoParado = null; persistir(); render(); } },
+  erroInicio() { aba = 'atend'; if (S) { S.vista = 1; } render(); },
+  async erroCopiar() { if (await copiar(window.__ultimoErro || '')) toast('Detalhes copiados.'); },
+  erroSemAtend() { try { LS.set('atual.copia', S); } catch (e) { } S = null; persistir(); aba = 'atend'; render(); toast('Atendimento fechado. Uma cópia ficou guardada neste computador.'); },
   verAlertas() { const el = $('.painel-al'); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');
@@ -783,7 +801,13 @@ document.addEventListener('visibilitychange', async () => {
 
 // Botões secundários viram só ícone (o texto vai para dica e leitor de tela)
 const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
+/* Antes, esta função tirava o texto de vários botões secundários (Corrigir guia, Excluir guia, Adicionar…, Remover…),
+   obrigando a decorar ícones. Agora os botões mantêm o texto; só os botões feitos para ser só ícone (classe "so", como os de
+   copiar) ficam sem texto, sempre com dica e nome acessível. */
+const enviarAoWebmail = resposta => window.postMessage({ __conferidorPagina: 'responderWebmail', resposta }, location.origin);
 function soIcone(raiz) {
+  raiz.querySelectorAll('.btn.so').forEach(b => { const t = b.getAttribute('aria-label') || b.dataset.dica || ''; if (t && !b.title && !b.dataset.dica) b.title = t; });
+  return;
   raiz.querySelectorAll('.btn:not(.so):not(.pri)').forEach(b => {
     if (!b.querySelector('svg.ic')) return;
     const t = b.textContent.replace(/\s+/g, ' ').trim();

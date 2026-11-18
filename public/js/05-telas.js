@@ -105,8 +105,10 @@ function renderTopo() {
     ${extDesatualizada() ? `<button class="chip pasta alerta" data-act="baixarExtensao" title="A extensão instalada (v${esc(extInstalada())}) é mais antiga que a do site (v${EXT_VERSAO}). Baixe a nova e recarregue em chrome://extensions." aria-label="Atualizar extensão">${ic('download', 'sm')}<span class="txt-fino">Atualizar extensão</span></button>` : extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     ${htmlSeletorVis(false)}`;
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
-    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
+  const temLista = Lista.listas.length || cfg.clinicas.some(c => c.lista || /erasmo/i.test(c.nome)), pendL = Lista.pendentesMeus();
+  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ...(temLista ? [['lista', 'rows', Lista.nomeCurto()]] : []), ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span>${k === 'lista' && pendL ? ` <span class="tag warn">${pendL}</span>` : ''}</button>`).join('')
+    + (pendL && aba !== 'lista' ? `<span class="esp" style="flex:1"></span><button class="btn sm lst-continuar" data-act="irLista" title="Suas guias pendentes da lista do dia">${ic('right', 'sm')}Continuar ${esc(Lista.nomeCurto())} (${pendL})</button>` : '');
   $('#verRodape').textContent = 'v' + VERSAO;
   document.title = 'Conferidor de Guias · Promédica';
 }
@@ -235,9 +237,65 @@ function htmlPassos(g) {
 }
 
 /* ---------- Tela principal do atendimento ---------- */
+/* Redesenho seguro:
+   - durante um clique (botão do mouse apertado) a tela não é trocada: se trocasse, o botão sob o mouse sumiria e o clique se perderia;
+   - logo depois de editar um campo (evento change), espera o foco ir para o próximo campo;
+   - depois de redesenhar, devolve o foco, o cursor e a rolagem das listas internas, se a tela for a mesma. */
+const Redesenho = { baixo: false, pendente: false, t: 0 };
+document.addEventListener('pointerdown', e => { if (e.button === 0 && e.isPrimary !== false) Redesenho.baixo = true; }, true);
+document.addEventListener('click', () => { Redesenho.baixo = false; }, true);
+['pointerup', 'pointercancel'].forEach(tp => document.addEventListener(tp, () => setTimeout(() => { Redesenho.baixo = false; if (Redesenho.pendente) render(); }, 0), true));
+window.addEventListener('blur', () => { if (Redesenho.baixo) { Redesenho.baixo = false; if (Redesenho.pendente) setTimeout(render, 0); } });
+const SEL_ROLAGEM = '.tabela-scroll, .lista-cl, pre.original, .col-fixa, .lst-fila';
+const chaveTela = () => [aba, S ? S.vista : 0, S ? S.ativa : 0, aba === 'config' ? cfgSecao : '', aba === 'lista' ? Lista.sub : ''].join('|');
+const ATR_FOCO = ['data-campo', 'data-cpcampo', 'data-act', 'data-cfg', 'data-ei', 'data-cega', 'data-i', 'data-codigo', 'data-tipo', 'data-k', 'data-v', 'data-item', 'name'];
+function chaveFoco(el) { if (el.id) return '#' + CSS.escape(el.id); const k = ATR_FOCO.map(a => el.getAttribute(a) != null ? `[${a}="${CSS.escape(el.getAttribute(a))}"]` : '').join(''); return k ? el.tagName.toLowerCase() + k : ''; }
+function guardarEstadoTela(app) {
+  const st = { tela: chaveTela(), rol: [...app.querySelectorAll(SEL_ROLAGEM)].map(e => e.scrollTop) }, ae = document.activeElement;
+  if (ae && ae !== document.body && app.contains(ae)) st.foco = { chave: chaveFoco(ae), s: ae.selectionStart, e: ae.selectionEnd };
+  return st;
+}
+function restaurarEstadoTela(app, st) {
+  if (!st || st.tela !== chaveTela()) return;
+  const nos = [...app.querySelectorAll(SEL_ROLAGEM)]; if (nos.length === st.rol.length) nos.forEach((n, i) => { if (st.rol[i]) n.scrollTop = st.rol[i]; });
+  const ae = document.activeElement;
+  if (st.foco && st.foco.chave && (!ae || ae === document.body || !document.contains(ae))) {
+    let n = null; try { n = app.querySelector(st.foco.chave); } catch (e) { n = null; }
+    if (n && typeof n.focus === 'function' && !n.disabled) { n.focus({ preventScroll: true }); try { if (st.foco.s != null && n.setSelectionRange && /^(text|search|email|tel|password|number)?$/.test(n.type || '')) n.setSelectionRange(st.foco.s, st.foco.e); } catch (e) { } }
+  }
+}
 function render() {
-  renderTopo(); pintarSync(); queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
-  const app = $('#app');
+  const ev = window.event;
+  if (Redesenho.baixo || (ev && ev.type === 'change')) {
+    Redesenho.pendente = true;
+    if (!Redesenho.baixo) { clearTimeout(Redesenho.t); Redesenho.t = setTimeout(() => { if (Redesenho.pendente && !Redesenho.baixo) render(); }, 0); }
+    return;
+  }
+  Redesenho.pendente = false; clearTimeout(Redesenho.t);
+  if (typeof Dica !== 'undefined') Dica.esconder();
+  const app = $('#app'), antes = guardarEstadoTela(app);
+  try { renderTopo(); pintarSync(); } catch (e) { console.error(e); window.__erros && window.__erros.push('Topo: ' + (e.stack || e.message)); }
+  document.body.dataset.pronto = '1';
+  queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
+  try {
+    const r = renderTela(app);
+    if (r && r.then) return r.then(v => { restaurarEstadoTela(app, antes); return v; }, e => mostrarErroTela(app, e));
+    restaurarEstadoTela(app, antes);
+    return r;
+  } catch (e) { mostrarErroTela(app, e); }
+}
+/* uma tela que falha mostra o erro (e como sair dele) em vez de ficar em branco */
+function mostrarErroTela(app, e) {
+  console.error(e);
+  const det = `${e && e.stack || e}\n\nVersão ${VERSAO} · ${navigator.userAgent}`;
+  app.innerHTML = `<div class="card"><div class="card-h"><h2>${ic('alert')} Esta tela não abriu</h2></div>
+    <p>Algo nos dados desta tela causou um erro. Você pode voltar ao início ou descartar o atendimento aberto (ele continua registrado como em andamento). Envie os detalhes ao suporte.</p>
+    <pre class="original" style="max-height:220px">${esc(det)}</pre>
+    <div class="acoes"><button class="btn" data-act="erroInicio">${ic('left')}Ir para o início</button><button class="btn line" data-act="erroCopiar">${ic('copy', 'sm')}Copiar detalhes</button>${S ? `<button class="btn dng" data-act="erroSemAtend">${ic('trash', 'sm')}Fechar o atendimento aberto</button>` : ''}</div></div>`;
+  window.__ultimoErro = det;
+}
+function renderTela(app) {
+  if (aba === 'lista') return Lista.render(app);
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
   if (aba === 'config') return renderConfig(app);
@@ -714,7 +772,7 @@ function renderFinal(alvo, g) {
         ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
         <div class="acoes"><button class="btn pri" data-act="copiarResp" ${guiaOk ? '' : 'disabled'} title="${guiaOk ? 'Copia texto formatado, para colar no e-mail' : 'Informe o número da guia'}">${ic('copy')}Copiar com formatação</button>
           <button class="btn line" data-act="copiarRespSimples" ${guiaOk ? '' : 'disabled'}>${ic('copy')}Copiar texto simples</button>
-          ${extInstalada() ? `<button class="btn line" data-act="responderWebmail" ${guiaOk ? '' : 'disabled'} title="Leva a resposta para o webmail: lá ela é colada no corpo da resposta com um clique. O envio continua sendo feito por você no webmail.">${ic('send')}Responder no webmail</button>` : ''}
+          ${btnWebmail('editor', !guiaOk)}
           ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}
           ${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div>`}
       </div>
@@ -741,13 +799,15 @@ function renderFinalSemGuia(alvo, g) {
       <button class="btn cp ${emailOk ? 'copiado' : ''}" data-act="copiarEmail" style="align-self:flex-end" aria-label="Copiar somente o e-mail da clínica">${emailOk ? ic('check', 'sm') : ic('copy', 'sm')}</button></div>
     ${resp && resp.faltando.length ? `<div class="aviso" style="margin-bottom:10px">${ic('alert')}<div>Campos sem valor, destacados no texto: <b>${resp.faltando.map(k => esc((CAMPO[k] || {}).nome || k)).join(', ')}</b>. Edite o texto antes de copiar.</div></div>` : ''}
     ${htmlEditor({ id: 'edResp', valor: html, minAltura: 240 })}
-    <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>
+    <div class="acoes"><button class="btn pri" data-act="copiarResp">${ic('copy')}Copiar com formatação</button><button class="btn line" data-act="copiarRespSimples">${ic('copy')}Copiar texto simples</button>${btnWebmail('editor')}
       ${(g.respEdit != null || g.respExtras.length) ? `<button class="btn sm ghost" data-act="resetResp">${ic('undo', 'sm')}Refazer do modelo</button>` : ''}${g.copiados.resp ? `<span class="tag ok">${ic('check', 'sm')}Resposta copiada</span>` : ''}</div></div>` : ''}
   </div>
   ${pend.length > 1 ? `<ul class="dica" style="margin:0;padding-left:20px">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
   ${htmlBarraAcao({ voltar: `<button class="btn" data-act="desfazerSemGuia">${ic('left')}Voltar ao pedido</button>`, status: statusBarra(g, { bloqueios: [], A: [] }, pend),
     seguir: `<button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>` })}`;
 }
+/* "Responder no webmail": aparece sempre; sem a extensão, o clique explica como instalar */
+const btnWebmail = (fonte = 'editor', desativado = false) => `<button class="btn line" data-act="responderWebmail" data-fonte="${fonte}" ${desativado ? 'disabled' : ''} title="${extInstalada() ? 'Leva a resposta ao webmail: lá, clique em Responder, no corpo do texto e em Colar resposta. O envio continua sendo feito por você.' : 'Com a extensão do Chrome, a resposta vai direto para o webmail. Clique para ver como instalar.'}">${ic('send')}Responder no webmail</button>`;
 function renderConcluida(alvo, g) {
   const r = g.resultado, resp = respostaDaGuia(g, false), a = autorizadosDe(g), n = negadosDe(g);
   const prox = S.guias.findIndex(x => !guiaTerminal(x)), todas = S.guias.every(guiaTerminal);
@@ -762,7 +822,7 @@ function renderConcluida(alvo, g) {
         ${todas ? `<button class="btn pri" data-act="encerrar">${ic('check')}Encerrar atendimento</button>` : ''}</div></div>${g.semGuia ? '' : htmlCardObs(g)}</div>
     ${usaConsolidada() && !todas ? '' : `<div class="card"><div class="card-h"><h2>Resposta à clínica${usaConsolidada() ? ' (todas as guias)' : ''}</h2></div>
       <div class="previa"><div class="previa-c">${resp.html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1')}</div></div>
-      <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button></div></div>`}</div>`;
+      <div class="acoes"><button class="btn line" data-act="copiarRespConcluida">${ic('copy')}Copiar com formatação</button>${btnWebmail('concluida')}</div></div>`}</div>`;
 }
 
 /* ====================================================================
