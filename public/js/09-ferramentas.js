@@ -626,6 +626,7 @@ Object.assign(acoes, {
   async ignorarPrint(b) {
     const g = guiaAtiva(), av = avaliarPrints(g); if (!av) return;
     const x = [...av.checks, ...av.linhas].find(y => y.chave === b.dataset.key); if (!x) return;
+    if (x.chave === 'c:profissional') { confirmarIgnorar(g, x, { tipo: 'direto', texto: 'Médico solicitante aceito como está (sem confirmação)' }); return; }   // médico: ignora direto, sem releitura nem modal
     const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; };
     b.disabled = true;
     let rr = null; try { rr = await relerDivergencia(g, x, msg); } catch (e) { console.error(e); }
