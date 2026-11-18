@@ -1091,6 +1091,8 @@ async function renderPainel(app) {
   </div>`}`;
   if (mesma) window.scrollTo(0, y);
 }
+/* botão só com ícone na tabela de guias: o nome aparece na dica (passar o mouse ou focar com Tab) e é lido pelo leitor de tela */
+const btnIcone = (act, id, icone, nome, dica, cls = 'line') => `<button class="btn sm ico ${cls}" data-act="${act}" data-id="${esc(id)}" title="${esc(nome + ': ' + dica)}" aria-label="${esc(nome)}">${ic(icone, 'sm')}</button>`;
 const tituloGuiasPainel = (per, lista, regs) => `Guias do ${per} (${lista.length}${lista.length !== regs.length ? ' de ' + regs.length : ''})`;
 function htmlLinhasGuiasPainel(lista, regs, longo) {
   return lista.map(r => {
@@ -1101,7 +1103,7 @@ function htmlLinhasGuiasPainel(lista, regs, longo) {
       <td>${tagStatus(r.status)}${r.status === 'em_andamento' ? `<div class="proximo">${esc(proximoPasso(r))}</div>` : ''}</td>
       <td>${tagResultado(resultadoDe(r))}</td>
       <td>${obsCelula(r)}</td>
-      <td class="c"><div class="linha-flex" style="justify-content:center;flex-wrap:wrap;gap:4px">${podeReabrir(r) ? `<button class="btn sm line" data-act="reabrirRegistro" data-id="${esc(r.id)}" title="Abre a guia de novo na etapa 4 para corrigir número, situação, observação ou resposta (o registro só muda ao concluir)">${ic('edit', 'sm')}Reabrir</button>` : ''}${r.status === 'concluido' ? `<button class="btn sm line" data-act="corrigirGuia" data-id="${esc(r.id)}" title="Troca só a carteira e os serviços, sem reabrir">Corrigir guia</button><button class="btn sm line" data-act="cancelarGuia" data-id="${esc(r.id)}">Cancelar guia</button>` : ''}<button class="btn sm line" data-act="verGuia" data-id="${esc(r.id)}" title="Prints enviados, o que foi lido, ignorado, copiado e respondido">${ic('eye', 'sm')}Ver histórico</button><button class="btn sm dng" data-act="excluirGuia" data-id="${esc(r.id)}">Excluir guia</button></div></td></tr>`;
+      <td class="c"><div class="acoes-ic">${podeReabrir(r) ? btnIcone('reabrirRegistro', r.id, 'undo', 'Reabrir', 'abre a guia de novo na etapa 4 para corrigir número, situação, observação ou resposta (o registro só muda ao concluir)') : ''}${r.status === 'concluido' ? btnIcone('corrigirGuia', r.id, 'edit', 'Corrigir guia', 'troca só a carteira e os serviços, sem reabrir') + btnIcone('cancelarGuia', r.id, 'ban', 'Cancelar guia', 'marca a guia como cancelada (com motivo)') : ''}${btnIcone('verGuia', r.id, 'eye', 'Ver histórico', 'prints enviados, o que foi lido, ignorado, copiado e respondido')}${btnIcone('excluirGuia', r.id, 'trash', 'Excluir guia', 'apaga o registro (não dá para desfazer)', 'dng')}</div></td></tr>`;
     }).join('') || `<tr><td colspan="10" class="muted">${regs.length ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhum registro neste período.'}</td></tr>`;
 }
 /* filtros e busca: repinta só a tabela com os registros já carregados (sem reler a pasta, sem tirar o foco da busca, sem mexer na rolagem) */

@@ -282,6 +282,7 @@ body.densa .al{padding:5px 9px}
 .btn.sm{min-height:var(--h-sm);padding:0 10px;font-size:var(--fs-xs)}
 .btn.ico{padding:0;width:var(--h-ctl)}
 .btn.sm.ico{width:var(--h-sm)}
+.acoes-ic{display:flex;gap:4px;justify-content:center;flex-wrap:nowrap}
 .btn.carregando{position:relative;pointer-events:none;color:transparent!important}
 .btn.carregando::after{content:"";position:absolute;width:15px;height:15px;border:2px solid var(--text-2);border-top-color:transparent;border-radius:50%;animation:giro .7s linear infinite}
 .btn.pri.carregando::after{border-color:var(--on-primary);border-top-color:transparent}
