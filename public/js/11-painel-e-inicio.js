@@ -189,32 +189,86 @@ document.addEventListener('click', e => {
   if (b.dataset.mact === 'capturar') capturarJanela(); else if (b.dataset.mact === 'colar') acoes.colarPrint();
 });
 
-/* ---------- Quem está com o Conferidor aberto agora (batimento na pasta a cada minuto) ---------- */
+/* ---------- Quem está com o Conferidor aberto agora (batimento na pasta a cada 30 s) ----------
+   Cada navegador grava o próprio arquivo (presenca/<operador>--<sessão>.json): o mesmo operador em dois computadores
+   não apaga o retrato do outro, e na leitura os arquivos do mesmo operador são somados.
+   Os arquivos vêm da pasta compartilhada: cada campo é conferido (tipo, tamanho, faixa) antes de ir para a tela. */
+const PRES_VIVO_MS = 3 * 60000;
+const presTxt = (v, n = 120) => (typeof v === 'string' ? v.slice(0, n) : '');
+const presInt = (v, min, max, padrao) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : padrao; };
+const presData = v => (typeof v === 'string' && !isNaN(new Date(v)) ? v : null);
+function limparPresenca(d) {
+  if (!d || typeof d !== 'object') return null;
+  const em = presData(d.em); if (!em) return null;
+  const guias = (Array.isArray(d.guias) ? d.guias : []).slice(0, 30).filter(x => x && typeof x === 'object' && typeof x.id === 'string' && x.id).map(x => ({
+    id: x.id.slice(0, 120), paciente: presTxt(x.paciente), carteira: presTxt(x.carteira, 40), clinica: presTxt(x.clinica), clinicaId: presTxt(x.clinicaId, 80),
+    vista: presInt(x.vista, 1, 4, 2), ativa: x.ativa === true, itens: presInt(x.itens, 0, 99, 0), idx: presInt(x.idx, 0, 98, 0), total: presInt(x.total, 1, 99, 1), desde: presData(x.desde) }));
+  return { operador: presTxt(d.operador, 80), operadorId: presTxt(d.operadorId, 80), em, aba: presTxt(d.aba, 20), visivel: d.visivel !== false, lista: presInt(d.lista, 0, 9999, 0), guias };
+}
+/* o mesmo operador em mais de um computador: um registro só, com as guias de todos (a mais recente vale) */
+function juntarPresenca(docs) {
+  const por = new Map();
+  docs.sort((a, b) => new Date(a.em) - new Date(b.em)).forEach(d => {
+    const k = d.operadorId || d.operador, a = por.get(k);
+    const guias = new Map(a ? a.guias.map(x => [x.id, x]) : []); d.guias.forEach(x => guias.set(x.id, x));
+    por.set(k, a ? { ...d, visivel: a.visivel || d.visivel, lista: Math.max(a.lista, d.lista), guias: [...guias.values()] } : d);
+  });
+  return [...por.values()];
+}
+/* início da etapa atual: zera quando muda a etapa (mudarVista) ou a guia ativa, para a guia nova não herdar o tempo da anterior */
+function inicioEtapa() {
+  if (!S) return null;
+  const g = guiaAtiva(), id = g ? g.id : '';
+  if (S.vistaGuia === undefined) S.vistaGuia = id;   // atendimento salvo antes desta versão: mantém o tempo que já tinha
+  if (S.vistaGuia !== id) { S.vistaGuia = id; S.vistaDesde = agora(); S.avisoParado = null; persistir(); }
+  return S.vistaDesde || null;
+}
 const Presenca = {
-  lista: [],
+  lista: [], erro: null, lidoEm: null,
+  sessao() { let s = LS.get('presencaSessao', ''); if (!/^[a-z0-9]{6,16}$/.test(s)) { s = Math.random().toString(36).slice(2, 10) || 'sessao'; LS.set('presencaSessao', s); } return s; },
   async bater() {
-    const op = operadorObj(); if (!Pasta.ok || !op || Abas.pausada) return;
-    const g = S ? guiaAtiva() : null, cl = S ? clinicaDe(S) : null;
-    const guias = S ? S.guias.filter(x => !guiaTerminal(x)).map(x => ({ id: x.id, paciente: x.pedido.beneficiario || '', carteira: x.carteiraUsada || x.pedido.carteira || '', clinica: cl ? cl.nome : ((S.email.remetente || {}).email || ''), clinicaId: cl ? cl.id : '', vista: x === g ? S.vista : (x.vista || x.etapa || 2), ativa: x === g, itens: x.pedido.itens.length, idx: x.idx, total: S.guias.length, desde: x === g ? (S.vistaDesde || null) : null })) : [];
-    try { await Pasta.gravar(['presenca'], slug(op.id || op.nome) + '.json', { operador: op.nome, operadorId: op.id, em: agora(), aba, etapa: S ? S.vista : 0, atendendo: !!S, visivel: !document.hidden, guias, lista: typeof Lista !== 'undefined' ? Lista.pendentesMeus() : 0 }); } catch (e) { }
+    if (!Pasta.ok || Abas.pausada) return;
+    const op = operadorObj(), nome = op ? `${slug(op.id || op.nome)}--${this.sessao()}.json` : null, ant = LS.get('presencaArquivo', '');
+    if (ant && ant !== nome) { await Pasta.apagar(['presenca'], ant); LS.set('presencaArquivo', ''); }   // trocou de operador (ou saiu): o anterior deixa de aparecer ao vivo
+    if (!op) return;
+    const g = S ? guiaAtiva() : null, cl = S ? clinicaDe(S) : null, desde = inicioEtapa();
+    const guias = S ? S.guias.filter(x => !guiaTerminal(x)).map(x => ({ id: x.id, paciente: x.pedido.beneficiario || '', carteira: x.carteiraUsada || x.pedido.carteira || '', clinica: cl ? cl.nome : ((S.email.remetente || {}).email || ''), clinicaId: cl ? cl.id : '', vista: x === g ? S.vista : (x.vista || x.etapa || 2), ativa: x === g, itens: x.pedido.itens.length, idx: x.idx, total: S.guias.length, desde: x === g ? desde : null })) : [];
+    try { await Pasta.gravar(['presenca'], nome, { operador: op.nome, operadorId: op.id, em: agora(), aba, etapa: S ? S.vista : 0, atendendo: !!S, visivel: !document.hidden, guias, lista: typeof Lista !== 'undefined' ? Lista.pendentesMeus() : 0 }); LS.set('presencaArquivo', nome); } catch (e) { }
   },
   agendar() { clearTimeout(this.t); this.t = setTimeout(() => this.bater(), 1500); },
+  /* falha ao ler a pasta: fica o último retrato (sem quem já passou do prazo) e o aviso na tela, em vez de uma lista vazia */
   async ler() {
-    if (!Pasta.ok) { this.lista = []; return []; }
-    const out = [];
-    for (const [n, h] of await Pasta.listar(['presenca'])) { if (!n.endsWith('.json')) continue; try { const d = JSON.parse(await (await h.getFile()).text()); if (Date.now() - new Date(d.em) < 3 * 60000) out.push(d); } catch (e) { } }
-    this.lista = out.sort((a, b) => (a.operador || '').localeCompare(b.operador || '')); return this.lista;
+    if (!Pasta.ok) { this.lista = []; this.erro = null; return []; }
+    const vivo = d => Date.now() - new Date(d.em) < PRES_VIVO_MS;
+    let ents;
+    try { ents = await Pasta.listarSeguro(['presenca']); }
+    catch (e) { this.erro = { msg: (e && e.message) || 'falha ao ler a pasta', em: agora() }; this.lista = this.lista.filter(vivo); return this.lista; }
+    const docs = []; let falhas = 0;
+    for (const [n, h] of ents) {
+      if (!n.endsWith('.json')) continue;
+      let txt; try { txt = await (await h.getFile()).text(); } catch (e) { falhas++; continue; }
+      let d = null; try { d = limparPresenca(JSON.parse(txt)); } catch (e) { d = null; }   // arquivo gravado pela metade: o próximo batimento corrige
+      if (d && vivo(d)) docs.push(d);
+    }
+    this.erro = falhas ? { msg: pl(falhas, 'arquivo de presença não pôde ser lido', 'arquivos de presença não puderam ser lidos'), em: agora() } : null;
+    this.lidoEm = agora();
+    this.lista = juntarPresenca(docs).sort((a, b) => a.operador.localeCompare(b.operador)); return this.lista;
   }
 };
-setInterval(() => Presenca.bater(), 30000);
+setInterval(async () => {
+  await Presenca.bater();
+  if (document.hidden || Abas.pausada) return;
+  if (aba === 'quadro') { try { await Reg.carregar(); await Presenca.ler(); repintarQuadro(); } catch (e) { } }   // quadro aberto acompanha os outros computadores sem clicar em Atualizar
+}, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) Presenca.bater(); });
 function htmlPresenca() {
-  if (!Pasta.ok) return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2></div><p class="muted" style="margin:0">Conecte a pasta compartilhada para ver quem está on-line.</p></div>`;
-  const L = Presenca.lista;
-  return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2><span class="tag ${L.length ? 'ok' : ''}">${pl(L.length, 'pessoa', 'pessoas')}</span></div>
+  if (!Pasta.ok) return `<div class="card" id="cardPresenca"><div class="card-h"><h2>Com o Conferidor aberto agora</h2></div><p class="muted" style="margin:0">Conecte a pasta compartilhada para ver quem está on-line.</p></div>`;
+  const L = Presenca.lista, er = Presenca.erro;
+  const aviso = er ? `<div class="aviso" role="status" style="margin:0 0 8px">${ic('alert')}<div>Não consegui ler a presença na pasta às ${fmtHora(er.em)} (${esc(er.msg)}). ${Presenca.lidoEm ? `Mostrando o último retrato, de ${fmtHora(Presenca.lidoEm)}: pode faltar gente.` : 'A lista abaixo pode estar incompleta.'}</div></div>` : '';
+  return `<div class="card" id="cardPresenca"><div class="card-h"><h2>Com o Conferidor aberto agora</h2><span class="tag ${er ? 'warn' : L.length ? 'ok' : ''}">${pl(L.length, 'pessoa', 'pessoas')}${er ? ' (incompleto)' : ''}</span></div>${aviso}
     <div class="presenca">${L.map(d => { const o = cfg.operadores.find(x => x.id === d.operadorId); const min = Math.max(0, Math.round((Date.now() - new Date(d.em)) / 60000));
-      const ga = (d.guias || []).find(x => x.ativa) || (d.guias || [])[0], ETP = { 1: 'E-mail', 2: 'Pedido e alertas', 3: 'Guia e conferência', 4: 'Finalizar' };
-      const ondeTxt = ga ? `<b>${esc(nomeCurto(ga.paciente) || 'beneficiário')}</b> × ${esc(ga.clinica || 'clínica')} · ${ETP[ga.vista] || 'etapa ' + ga.vista}${ga.desde ? ` há ${Math.max(0, Math.round((Date.now() - new Date(ga.desde)) / 60000))} min` : ''}${(d.guias || []).length > 1 ? ` · ${d.guias.length} guias abertas` : ''}` : d.aba === 'lista' ? `na lista do dia${d.lista ? ` · ${d.lista} pendentes` : ''}` : 'sem atendimento aberto';
+      const ga = d.guias.find(x => x.ativa) || d.guias[0], ETP = { 1: 'E-mail', 2: 'Pedido e alertas', 3: 'Guia e conferência', 4: 'Finalizar' };
+      const ondeTxt = ga ? `<b>${esc(nomeCurto(ga.paciente) || 'beneficiário')}</b> × ${esc(ga.clinica || 'clínica')} · ${esc(ETP[ga.vista] || 'etapa ' + ga.vista)}${ga.desde ? ` há ${Math.max(0, Math.round((Date.now() - new Date(ga.desde)) / 60000))} min` : ''}${d.guias.length > 1 ? ` · ${d.guias.length} guias abertas` : ''}` : d.aba === 'lista' ? `na lista do dia${d.lista ? ` · ${d.lista} pendentes` : ''}` : 'sem atendimento aberto';
       return `<div class="pres-op">${htmlAvatar(o)}<div><b>${esc(d.operador)}</b><small>${ondeTxt}${d.lista && d.aba !== 'lista' ? ` · lista: ${d.lista} pendentes` : ''}${d.visivel === false ? ' · em outra janela' : ''}${min >= 1 ? ` · sinal há ${min} min` : ''}</small></div></div>`; }).join('') || '<p class="muted" style="margin:0">Ninguém além de você, no momento.</p>'}</div></div>`;
 }
 
@@ -251,8 +305,8 @@ function htmlAvisoParado() {
 }
 setInterval(() => {
   const lim = Number(cfg.preferencias.minutosParado ?? 10); if (!S || !lim || Abas.pausada || document.hidden) return;
-  if (!S.vistaDesde) { S.vistaDesde = agora(); return; }
-  const min = Math.floor((Date.now() - new Date(S.vistaDesde)) / 60000);
+  const desde = inicioEtapa(); if (!desde) { S.vistaDesde = agora(); return; }
+  const min = Math.floor((Date.now() - new Date(desde)) / 60000);
   if (min >= lim && S.avisoParado !== min && (!S.avisoParado || min - S.avisoParado >= lim)) { S.avisoParado = min; if (aba === 'atend' && !M) render(); }
 }, 30000);
 

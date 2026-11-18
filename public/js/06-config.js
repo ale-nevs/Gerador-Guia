@@ -61,7 +61,7 @@ function prepararSalvar(c) {
 
 async function renderConfig(app) {
   if (!cfgEdit) iniciarCfgEdit();
-  if (cfgSecao === 'param') await Param.carregar();
+  if (cfgSecao === 'param') { const gen = Redesenho.gen; await Param.carregar(); if (gen !== Redesenho.gen) return; }   // outra tela foi aberta enquanto carregava
   const nErr = cfgErros.length;
   // redesenhar não pode mover a tela: guarda rolagem da página, da lista de clínicas e dos filtros, e devolve depois
   const ant = $('.cfg') ? { y: scrollY, secao: renderConfig.secao, clin: renderConfig.clin, lista: ($('#listaCl') || {}).scrollTop || 0, cod: ($('#tabCod') && $('#tabCod').closest('.tabela-scroll') || {}).scrollTop || 0, nav: ($('.cfg-nav') || {}).scrollLeft || 0, bCl: ($('#buscaCl') || {}).value || '', bCod: ($('#buscaCod') || {}).value || '' } : null;

@@ -732,8 +732,11 @@ const Captura = {
     if (bmp) { c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); if (bmp.close) bmp.close(); }
     else {
       const v = this.video;
-      await Promise.race([new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok()) : ok())), new Promise(ok => setTimeout(ok, 700))]);
+      const novo = await Promise.race([new Promise(ok => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => ok(true)) : ok(false))), new Promise(ok => setTimeout(() => ok(false), 700))]);
       if (!v.videoWidth) throw new Error('a captura não mandou imagem. A janela do sistema está minimizada?');
+      /* sem quadro novo, a imagem do vídeo só vale se ele está tocando com a aba visível (janela parada não manda quadro novo);
+         com a aba do Conferidor em segundo plano o Chrome pausa o vídeo, e a imagem seria a de antes: melhor avisar que conferir um print velho */
+      if (!novo && (document.hidden || v.paused || v.ended)) throw new Error('o Chrome não mandou a imagem atual porque a aba do Conferidor está em segundo plano. Clique na aba do Conferidor e capture de novo, ou tire o print e cole com Ctrl+V no painel.');
       c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
     }
     const url = c.toDataURL('image/png'), bin = atob(url.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);

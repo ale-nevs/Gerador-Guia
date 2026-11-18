@@ -42,6 +42,11 @@ const Pasta = {
     try { this.ok = (await this.handle.queryPermission({ mode: 'readwrite' })) === 'granted'; } catch (e) { this.ok = false; }
   },
   async listar(partes) { try { const d = await this.dir(partes, false); const out = []; for await (const [n, h] of d.entries()) out.push([n, h]); return out; } catch (e) { return []; } },
+  /* como listar, mas uma falha de leitura lança (pasta que ainda não existe = lista vazia) */
+  async listarSeguro(partes) {
+    let d; try { d = await this.dir(partes, false); } catch (e) { if (e && e.name === 'NotFoundError') return []; throw e; }
+    const out = []; for await (const [n, h] of d.entries()) out.push([n, h]); return out;
+  },
   async apagar(partes, nome) { try { const d = await this.dir(partes, false); await d.removeEntry(nome); return true; } catch (e) { return false; } }
 };
 

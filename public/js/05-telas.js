@@ -59,7 +59,7 @@ function guiasEmAndamento() {
   Reg.doDia(hoje).filter(r => !r.tipo && r.status === 'em_andamento').forEach(r => { mapa.set(r.id, { ...r, aoVivo: false, parado: Math.round(idade(r)) }); });
   (Presenca.lista || []).forEach(d => (d.guias || []).forEach(x => { const r = mapa.get(x.id) || {};
     mapa.set(x.id, { ...r, id: x.id, paciente: x.paciente || r.paciente, carteira: x.carteira || r.carteira, clinica: x.clinica || r.clinica, clinicaId: x.clinicaId || r.clinicaId, vista: x.vista, idxGuia: x.idx, totalGuias: x.total, itens: r.itens || Array(x.itens || 0).fill({}), operador: d.operador, operadorId: d.operadorId, aoVivo: true, ativa: x.ativa, desde: x.desde, sinal: d.em, visivel: d.visivel }); }));
-  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => { const r = montarRegistro(g, 'em_andamento'); mapa.set(g.id, { ...r, vista: g === guiaAtiva() ? S.vista : (g.vista || g.etapa || 2), aoVivo: true, ativa: g === guiaAtiva(), desde: g === guiaAtiva() ? S.vistaDesde : null, visivel: !document.hidden }); });
+  if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => { const r = montarRegistro(g, 'em_andamento'); mapa.set(g.id, { ...r, vista: g === guiaAtiva() ? S.vista : (g.vista || g.etapa || 2), aoVivo: true, ativa: g === guiaAtiva(), desde: g === guiaAtiva() ? inicioEtapa() : null, visivel: !document.hidden }); });
   return [...mapa.values()].filter(r => r.aoVivo || !lim || r.parado <= lim).sort((a, b) => (b.aoVivo - a.aoVivo) || ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
 }
 function listaProgresso() {
@@ -78,7 +78,7 @@ function pintarProgresso() {
   el.innerHTML = L.length ? L.map(x => `<span class="prog" role="img" style="--p:${x.p};${x.o ? estiloOp(x.o) : ''}" title="${esc(x.tip)}" aria-label="${esc(x.tip)}"><span class="pe">${x.o ? glifo(x.o.icone) : ic('user', 'sm')}</span></span>`).join('')
     : `<span class="prog" role="img" style="--p:0" title="Nenhum atendimento em andamento" aria-label="Nenhum atendimento em andamento"><span class="pe">${ic('user', 'sm')}</span></span>`;
 }
-setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); pintarProgresso(); } catch (e) { } }, 20000);
+setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); await Presenca.ler(); pintarProgresso(); } catch (e) { } }, 20000);   // relê a presença: os outros computadores mudam de guia e de etapa
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
 const EXT_VERSAO = '1.2.0';   // versão da extensão publicada junto com o site
 const extDesatualizada = () => { const v = extInstalada(); if (!v) return false; const a = v.split('.').map(Number), b = EXT_VERSAO.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); } return false; };
@@ -249,7 +249,7 @@ function htmlPassos(g) {
    - durante um clique (botão do mouse apertado) a tela não é trocada: se trocasse, o botão sob o mouse sumiria e o clique se perderia;
    - logo depois de editar um campo (evento change), espera o foco ir para o próximo campo;
    - depois de redesenhar, devolve o foco, o cursor e a rolagem das listas internas, se a tela for a mesma. */
-const Redesenho = { baixo: false, pendente: false, t: 0 };
+const Redesenho = { baixo: false, pendente: false, t: 0, gen: 0 };   // gen: conta os redesenhos; tela que carrega algo antes de pintar só pinta se ainda for a última
 document.addEventListener('pointerdown', e => { if (e.button === 0 && e.isPrimary !== false) Redesenho.baixo = true; }, true);
 document.addEventListener('click', () => { Redesenho.baixo = false; }, true);
 ['pointerup', 'pointercancel'].forEach(tp => document.addEventListener(tp, () => setTimeout(() => { Redesenho.baixo = false; if (Redesenho.pendente) render(); }, 0), true));
@@ -279,7 +279,8 @@ function render() {
     if (!Redesenho.baixo) { clearTimeout(Redesenho.t); Redesenho.t = setTimeout(() => { if (Redesenho.pendente && !Redesenho.baixo) render(); }, 0); }
     return;
   }
-  Redesenho.pendente = false; clearTimeout(Redesenho.t);
+  Redesenho.pendente = false; clearTimeout(Redesenho.t); Redesenho.gen++;
+  try { if (typeof inicioEtapa === 'function') inicioEtapa(); } catch (e) { }   // trocou de guia: o tempo da etapa começa de novo (atendimento com defeito vai para a tela de erro abaixo)
   if (typeof Dica !== 'undefined') Dica.esconder();
   const app = $('#app'), antes = guardarEstadoTela(app);
   try { renderTopo(); pintarSync(); } catch (e) { console.error(e); window.__erros && window.__erros.push('Topo: ' + (e.stack || e.message)); }
@@ -1007,10 +1008,12 @@ function htmlTempoQualidade(concl) {
     <p class="dica" style="margin:8px 0 0">“E-mail lido sem correção”: guias em que ninguém precisou corrigir à mão nome, médico, CID, data, local ou serviços (conta só os atendimentos registrados a partir desta versão). Abaixo de 70%, vale criar uma regra de leitura para a clínica.</p></div>`;
 }
 async function renderPainel(app) {
+  const gen = Redesenho.gen;
   app.innerHTML = htmlEsqueleto(8, 3);
   const mes = painelModo === 'mes', sem = painelModo === 'semana', longo = mes || sem;
   if (longo) await Reg.carregarTudo(); else { const dif = Math.round((new Date() - new Date(painelDia + 'T12:00')) / 864e5); await Reg.carregar(Math.max(0, dif - HIST_DIAS) + 1); }
   await Param.carregar();
+  if (gen !== Redesenho.gen) return;   // outra tela foi aberta enquanto carregava
   const base = regsDoPeriodo();
   const todos = base.filter(r => !r.tipo).sort((a, b) => (a.abertoEm < b.abertoEm ? 1 : -1));
   const regs = todos.filter(r => r.status !== 'descartado' && r.status !== 'devolvido');
@@ -1135,10 +1138,21 @@ function conciliarGuias() {
    Aba Ações: onde está cada guia (lendo o pedido, gerando guia, anexando e-mail)
    ==================================================================== */
 async function renderQuadro(app) {
+  const gen = Redesenho.gen;
   app.innerHTML = htmlEsqueleto(5);
   await Reg.carregar();
-  const lim = cfg.preferencias.acoesMinutos, hoje = isoDia(new Date());
   await Presenca.bater(); await Presenca.ler();
+  if (gen !== Redesenho.gen) return;   // outra tela foi aberta enquanto a pasta respondia: não pinta por cima dela
+  app.innerHTML = htmlPresenca() + htmlAuditar() + htmlQuadroGuias();
+}
+/* repinta só a presença e o quadro (a busca do Auditar fica como está); chamado a cada 30 s com a aba aberta */
+function repintarQuadro() {
+  if (aba !== 'quadro' || Redesenho.baixo) return;
+  const pres = $('#cardPresenca'), cab = $('#cardQuadro'), cols = $('#quadroCols'); if (!pres || !cab || !cols) return;
+  pres.outerHTML = htmlPresenca(); cols.remove(); cab.outerHTML = htmlQuadroGuias();
+}
+function htmlQuadroGuias() {
+  const lim = Number(cfg.preferencias.acoesMinutos) || 0, hoje = isoDia(new Date());
   const lista = guiasEmAndamento();
   const cols = [
     [2, 'Lendo o pedido', 'search', 'Pedido e alertas (etapas 1 e 2)'],
@@ -1146,13 +1160,14 @@ async function renderQuadro(app) {
     [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
-  app.innerHTML = htmlPresenca() + htmlAuditar() + `<div class="card"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
+  return `<div class="card" id="cardQuadro"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
     <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está. <b>Ao vivo</b>: alguém está com ela aberta agora (atualiza a cada 30 s). ${lim ? `Guia parada (ninguém com ela aberta) some depois de ${lim} min sem movimento.` : ''}</p></div>
-  <div class="quadro">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
+  <div class="quadro" id="quadroCols">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
-    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), min = r.desde ? Math.max(0, Math.round((Date.now() - new Date(r.desde)) / 60000)) : null;
-      const estado = r.aoVivo ? `<span class="tag ok">${ic('activity', 'sm')}ao vivo</span>${r.ativa ? '' : ' <span class="tag">aberta, em outra guia do e-mail</span>'}${r.visivel === false ? ' <span class="tag">em outra janela</span>' : ''}` : `<span class="tag warn">${ic('pause', 'sm')}parada há ${pl(r.parado, 'min', 'min')}</span>`;
+    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), ms = Date.now() - new Date(r.desde), min = r.desde && Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : null;
+      const tot = presInt(r.totalGuias, 1, 99, 1), idx = presInt(r.idxGuia, 0, 98, 0), par = presInt(r.parado, 0, 99999, 0), nIt = presInt((r.itens || []).length, 0, 999, 0);   // números vindos de arquivos da pasta
+      const estado = r.aoVivo ? `<span class="tag ok">${ic('activity', 'sm')}ao vivo</span>${r.ativa ? '' : ' <span class="tag">aberta, em outra guia do e-mail</span>'}${r.visivel === false ? ' <span class="tag">em outra janela</span>' : ''}` : `<span class="tag warn">${ic('pause', 'sm')}parada há ${pl(par, 'min', 'min')}</span>`;
       return `<div class="card-q ${r.aoVivo ? '' : 'parada'}"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
-      <div class="proximo">${(r.totalGuias || 1) > 1 ? `Guia ${(r.idxGuia || 0) + 1} de ${r.totalGuias} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl((r.itens || []).length, 'item', 'itens')}${min != null ? ` · nesta etapa há ${min < 1 ? 'menos de 1 min' : min + ' min'}` : ''}</div>
+      <div class="proximo">${tot > 1 ? `Guia ${idx + 1} de ${tot} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl(nIt, 'item', 'itens')}${min != null ? ` · nesta etapa há ${min < 1 ? 'menos de 1 min' : min + ' min'}` : ''}</div>
       <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}${estado}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
 }

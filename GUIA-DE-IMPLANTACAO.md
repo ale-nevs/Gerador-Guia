@@ -155,6 +155,16 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Acompanhamento mais confiável (versão 2.2.2)
+- **Mesmo operador em dois computadores:** cada navegador grava a própria presença (`presenca/<operador>--<código do navegador>.json`) e o quadro soma as guias dos dois; antes, o último a gravar apagava as guias do outro.
+- **Troca de operador:** a presença do operador anterior é apagada na hora, e as guias passam a aparecer com o novo operador (antes, o anterior continuava "ao vivo" por até 3 min).
+- **Quadro e topo compacto se atualizam sozinhos:** o Acompanhamento relê a pasta a cada 30 s e o topo compacto a cada 20 s, sem clicar em Atualizar (a busca do Auditar fica como está).
+- **Falha ao ler a pasta:** o cartão "Com o Conferidor aberto agora" avisa que não conseguiu ler e mostra o último retrato, marcado como incompleto, em vez de parecer que ninguém está on-line.
+- **Tempo na etapa por guia:** ao passar para a próxima guia do e-mail, o "nesta etapa há N min" começa do zero (antes herdava o tempo da guia anterior).
+- **Prints em fila:** dois prints colados ou capturados em seguida na mesma guia são lidos um depois do outro; o mais novo é sempre o que vale.
+- **Captura com a aba em segundo plano:** se o Chrome não mandar a imagem atual, a captura avisa (clique na aba do Conferidor ou cole o print com Ctrl+V) em vez de conferir uma imagem antiga.
+- **Segurança:** os arquivos de presença vindos da pasta são conferidos campo a campo (tipo, tamanho e faixa) antes de ir para a tela, e uma tela que demora para carregar não pinta mais por cima da tela aberta depois.
+
 ### Topo, quadro ao vivo e painel flutuante (versão 2.2.1)
 - **Sistema: Novo | Antigo** fica no topo, entre o botão do tema (só o ícone da lua/sol) e a Visualização. Vale para colar, capturar e testar prints; o cartão dos prints só mostra qual está escolhido.
 - **Guias em andamento hoje (Acompanhamento):** cada computador avisa a cada 30 s (e logo depois de cada mudança de etapa) o beneficiário, a clínica e a etapa que está atendendo. A guia de quem está trabalhando aparece sempre como **ao vivo**, com há quanto tempo está na etapa; antes, quem ficava mais de 10 min na mesma etapa sumia do quadro. Guia que ninguém tem aberta aparece como **parada há N min** e some depois do tempo das Preferências. O cartão de presença diz onde cada um está (ex.: "JANY G. × MRA · Guia e conferência há 4 min").
