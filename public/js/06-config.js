@@ -186,6 +186,7 @@ function cfgClinicaDetalhe(cl, i) {
       <div><label class="lbl" for="cl-cidade">Cidade</label><input type="text" id="cl-cidade" data-cfg="${P}.cidade" value="${esc(cl.cidade)}"></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-exec">Credenciado executante no sistema</label><input type="text" id="cl-exec" data-cfg="${P}.executante" value="${esc(cl.executante)}" placeholder="Não informado"></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-apel">Apelidos usados no assunto</label><input type="text" id="cl-apel" data-cfg="${P}.apelidos" value="${esc(cl.apelidos)}" placeholder="Ex.: Criar, MRA"></div>
+      <div style="grid-column:1/-1"><label class="chk"><input type="checkbox" data-cfg="${P}.lista" ${cl.lista ? 'checked' : ''}><span><b>Manda a agenda do dia em lista</b> (como a Erasmo Neto): o e-mail vira uma lista dividida entre os operadores, cada um registra o nº da guia ou o motivo, e no fim sai o e-mail de entrega com a tabela.</span></label></div>
       <div style="grid-column:1/-1"><label class="lbl" for="cl-nota">Nota fixa da clínica (aparece em todo atendimento dela)</label><textarea id="cl-nota" rows="2" data-cfg="${P}.nota" placeholder="Ex.: sempre manda o CID sem ponto; confirmar quantidade por telefone">${esc(cl.nota || '')}</textarea></div>
     </div>
     <h3>E-mails do remetente</h3>

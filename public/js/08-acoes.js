@@ -25,6 +25,8 @@ async function abrirDoWebmail(m) {
   let email; try { email = webmailParaEmail(m); } catch (e) { console.error(e); toast('Não consegui ler o e-mail enviado pelo webmail. Abra o e-mail de novo no webmail e clique em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Não consegui ler este e-mail.' }; }
   if (!operador()) { toast('Escolha o operador no topo da página e clique de novo em "Abrir no conferidor".', 'bad'); return { ok: false, motivo: 'Escolha o operador no Conferidor.' }; }
   if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
+  const clL = ehEmailLista(email);
+  if (clL) { await Lista.abrirEmail(email, clL); return { ok: true, nomes: ['lista do dia · ' + clL.nome] }; }
   if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return { ok: false, motivo: 'O atendimento aberto foi mantido.' };
   aba = 'atend';
   try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); return { ok: false, motivo: e.message }; }
@@ -51,6 +53,12 @@ window.addEventListener('message', ev => {
   if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
 });
 async function iniciar(email) {
+  const clL = ehEmailLista(email);
+  if (clL) { await Lista.abrirEmail(email, clL); return 'lista'; }
+  const nBlocos = lerListaTexto(email.textoCompleto || email.textoPrincipal).length;
+  if (nBlocos > MAX_BENEFICIARIOS && confirm(`Este e-mail tem ${nBlocos} blocos de beneficiário (o atendimento normal vai até ${MAX_BENEFICIARIOS}). Abrir como lista do dia, dividida entre os operadores?`)) {
+    const ac = acharClinica(email); await Lista.abrirEmail(email, (ac && ac.cl) || { id: '', nome: email.remetente.nome || email.remetente.email || 'Lista' }); return 'lista';
+  }
   await Reg.carregarTudo(); await Param.carregar();
   const aviso = avisoEmailJaAtendido(email);
   if (aviso && !confirm(aviso)) return;

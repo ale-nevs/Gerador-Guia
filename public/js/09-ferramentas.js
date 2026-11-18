@@ -377,7 +377,7 @@ function htmlHistoricoGuia(r, a) {
   const ign = x => x ? `<div class="dica" style="margin:4px 0 0">${x.como === 'leitura' ? 'Erro de leitura do print' : x.como === 'menor' ? 'Autorizado a menor' : 'Ignorado'}${x.motivo ? ` · motivo: ${esc(x.motivo.texto)}${x.motivo.detalhe ? ' — ' + esc(x.motivo.detalhe) : ''}` : ''}${x.obs && x.como !== 'leitura' ? ` · observação ${x.incluida ? 'incluída' : 'não incluída'}: “${esc(x.obs)}”` : ''}</div>` : '';
   const P = a && a.prints;
   return `<dl class="email-meta">
-      ${linha('Paciente', esc((a && a.paciente) || r.paciente || r.pacienteIni || '—'))}
+      ${linha('Beneficiário', esc((a && a.paciente) || r.paciente || r.pacienteIni || '—'))}${r.listaNome ? linha('Lista', esc(r.listaNome)) : ''}
       ${linha('Carteira', `<span class="num">${esc((a && a.carteiraUsada) || r.carteira || '—')}</span>${a && a.carteiraInformada && normCart(a.carteiraInformada) !== a.carteiraUsada ? ` <span class="muted">(no e-mail: ${esc(a.carteiraInformada)})</span>` : ''}`)}
       ${linha('Nº da guia', r.guia ? `<b class="num">${esc(r.guia)}</b>${a && a.numeroOrigem ? ` <span class="muted">(${a.numeroOrigem === 'print' ? 'lido do print' : 'digitado'})</span>` : ''}` : '—')}
       ${linha('Clínica', esc(r.clinica || r.remetente || '—'))}

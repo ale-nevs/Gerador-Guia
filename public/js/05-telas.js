@@ -105,8 +105,10 @@ function renderTopo() {
     ${extDesatualizada() ? `<button class="chip pasta alerta" data-act="baixarExtensao" title="A extensão instalada (v${esc(extInstalada())}) é mais antiga que a do site (v${EXT_VERSAO}). Baixe a nova e recarregue em chrome://extensions." aria-label="Atualizar extensão">${ic('download', 'sm')}<span class="txt-fino">Atualizar extensão</span></button>` : extInstalada() ? `<span class="chip pasta ok" title="Extensão do Chrome instalada (v${esc(extInstalada())}): use o botão flutuante no webmail" aria-label="Extensão instalada">${ic('check', 'sm')}${ic('mail', 'sm')}</span>` : `<button class="chip" data-act="baixarExtensao" title="Baixar a extensão do Chrome (abre o e-mail do webmail aqui com um clique)" aria-label="Baixar extensão">${ic('download', 'sm')}</button>`}
     <button class="chip tema" data-act="alternarTema" title="${escuro ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}" aria-label="Alternar tema">${ic(escuro ? 'sun' : 'moon', 'sm')}<span class="txt-fino">${escuro ? 'Claro' : 'Escuro'}</span></button>
     ${htmlSeletorVis(false)}`;
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
-    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span></button>`).join('');
+  const temLista = Lista.listas.length || cfg.clinicas.some(c => c.lista || /erasmo/i.test(c.nome)), pendL = Lista.pendentesMeus();
+  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ...(temLista ? [['lista', 'rows', Lista.nomeCurto()]] : []), ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+    .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span>${k === 'lista' && pendL ? ` <span class="tag warn">${pendL}</span>` : ''}</button>`).join('')
+    + (pendL && aba !== 'lista' ? `<span class="esp" style="flex:1"></span><button class="btn sm lst-continuar" data-act="irLista" title="Suas guias pendentes da lista do dia">${ic('right', 'sm')}Continuar ${esc(Lista.nomeCurto())} (${pendL})</button>` : '');
   $('#verRodape').textContent = 'v' + VERSAO;
   document.title = 'Conferidor de Guias · Promédica';
 }
@@ -270,6 +272,7 @@ function render() {
     return;
   }
   Redesenho.pendente = false; clearTimeout(Redesenho.t);
+  if (typeof Dica !== 'undefined') Dica.esconder();
   const app = $('#app'), antes = guardarEstadoTela(app);
   try { renderTopo(); pintarSync(); } catch (e) { console.error(e); window.__erros && window.__erros.push('Topo: ' + (e.stack || e.message)); }
   document.body.dataset.pronto = '1';
@@ -292,6 +295,7 @@ function mostrarErroTela(app, e) {
   window.__ultimoErro = det;
 }
 function renderTela(app) {
+  if (aba === 'lista') return Lista.render(app);
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
   if (aba === 'config') return renderConfig(app);
