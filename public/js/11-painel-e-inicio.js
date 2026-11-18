@@ -4,29 +4,70 @@
    ==================================================================== */
 const MINI_CAMPOS = [['executante', 'Credenciado executante'], ['carteira', 'Carteira'], ['benef', 'Beneficiário'], ['medico_nome', 'Médico'], ['medico_crm', 'CRM'], ['data', 'Data do pedido'], ['local', 'Local do pedido'], ['cid', 'CID']];
 let miniMsg = '';
+/* sequência de lançamento da guia: campos na ordem do sistema e, depois, código e quantidade de cada serviço */
+function sequenciaGuia(g) {
+  const s = MINI_CAMPOS.map(([k, r], n) => ({ k, rot: `${n + 1}. ${r}`, v: valorCopia(g, k).trim() }));
+  g.pedido.itens.forEach(it => { s.push({ k: 'c:' + it.codigo, rot: 'Código', v: it.codigo, it }); s.push({ k: 'q:' + it.codigo, rot: 'Qtd. de ' + it.codigo, v: it.qtd == null ? '' : String(it.qtd), it }); });
+  s.forEach(x => { x.ok = x.v !== '' && g.copiados[x.k] === x.v; });
+  return s;
+}
 function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
-  if (!g || !S) return `<div class="mini"><p class="muted">Nenhum atendimento aberto no conferidor.</p></div>`;
+  const modo = flutuante ? Mini.modoAtual() : 'guia';
+  const abas = flutuante && (S || Lista.listas.length) ? `<div class="mini-abas" role="tablist"><button type="button" role="tab" class="${modo === 'guia' ? 'on' : ''}" data-mact="modo" data-v="guia">${ic('filecheck', 'sm')}Guia atual</button><button type="button" role="tab" class="${modo === 'lista' ? 'on' : ''}" data-mact="modo" data-v="lista">${ic('rows', 'sm')}${esc(Lista.nomeCurto())}${Lista.pendentesMeus() ? ` <span class="tag warn">${Lista.pendentesMeus()}</span>` : ''}</button></div>` : '';
+  if (modo === 'lista') return `<div class="mini">${abas}${htmlMiniLista()}</div>`;
+  if (!g || !S) return `<div class="mini">${abas}<div class="mini-vazio">${ic('mail', 'lg')}<b>Nenhum atendimento aberto</b><span class="muted">Abra um e-mail no conferidor (ou pelo botão do webmail) e os campos aparecem aqui.</span></div></div>`;
   const p = g.pedido, st = situacaoGuia(g), av = prontoPrints(g) ? avaliarPrints(g) : null, cl = clinicaDe(S);
-  const linha = (chave, rot, v) => { const ok = v !== '' && g.copiados[chave] === v; return `<button type="button" class="mini-row ${ok ? 'ok' : ''} ${v ? '' : 'vazio'}" data-mcopy="${esc(chave)}" ${v ? '' : 'disabled'} title="${v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(rot)}</span><span class="v num">${esc(v || '—')}</span>${ic(ok ? 'check' : 'copy', 'sm')}</button>`; };
-  const nCopiar = MINI_CAMPOS.filter(([k]) => valorCopia(g, k).trim()).length + p.itens.length * 2, nFeito = MINI_CAMPOS.filter(([k]) => { const v = valorCopia(g, k).trim(); return v && g.copiados[k] === v; }).length + p.itens.filter(it => g.copiados['c:' + it.codigo] === it.codigo).length + p.itens.filter(it => g.copiados['q:' + it.codigo] === String(it.qtd)).length;
+  const seq = sequenciaGuia(g), comValor = seq.filter(x => x.v), feitos = comValor.filter(x => x.ok).length, prox = comValor.find(x => !x.ok);
+  const linha = x => `<button type="button" class="mini-row ${x.ok ? 'ok' : ''} ${x.v ? '' : 'vazio'} ${prox && x.k === prox.k ? 'prox' : ''}" data-mcopy="${esc(x.k)}" ${x.v ? '' : 'disabled'} title="${x.v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(x.rot.replace(/^Qtd\. de \d+$/, 'Qtd.'))}</span><span class="v num">${esc(x.v || '—')}</span>${x.ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
   const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
-  return `<div class="mini">
-    <div class="mini-h"><div><b>${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''}</div></div><span class="tag ${nFeito >= nCopiar ? 'ok' : ''}">${nFeito}/${nCopiar} copiados</span></div>
-    ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}: resolva no conferidor antes de gerar a guia.</div>` : ''}
-    <div class="mini-sec">Para lançar no sistema (clique para copiar)</div>
-    <div class="mini-lista">${MINI_CAMPOS.map(([k, r]) => linha(k, r, valorCopia(g, k).trim())).join('')}
-      ${p.itens.map(it => `<div class="mini-item">${linha('c:' + it.codigo, 'Código', it.codigo)}${linha('q:' + it.codigo, 'Qtd.', it.qtd == null ? '' : String(it.qtd))}</div>`).join('') || '<p class="muted">Sem serviços.</p>'}</div>
+  const pc = comValor.length ? Math.round(100 * feitos / comValor.length) : 0;
+  return `<div class="mini">${abas}
+    <div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''} · etapa ${S.vista}</div></div><span class="tag ${pc === 100 ? 'ok' : ''}">${feitos}/${comValor.length}</span></div>
+    <div class="lst-barra"><i style="width:${pc}%"></i></div>
+    ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}<span><b>${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}:</b> ${esc(curtoTxt(st.bloqueios[0].texto, 90))}</span></div>` : ''}
+    ${prox ? `<button type="button" class="mini-prox" data-mcopy="${esc(prox.k)}" title="Copia o próximo campo (atalho: barra de espaço)"><small>Copiar próximo</small><b>${esc(prox.rot)}</b><span class="num">${esc(prox.v)}</span></button>` : `<div class="mini-al ok">${ic('check', 'sm')}Todos os campos foram copiados.</div>`}
+    <div class="mini-lista">${seq.slice(0, MINI_CAMPOS.length).map(linha).join('')}
+      <div class="mini-sec">Serviços</div>
+      ${p.itens.map(it => { const sc = seq.find(x => x.k === 'c:' + it.codigo), sq = seq.find(x => x.k === 'q:' + it.codigo); return `<div class="mini-item ${(it.qtd || 1) > 1 ? 'qtd-alta' : ''}">${linha(sc)}${linha(sq)}</div>`; }).join('') || '<p class="muted">Sem serviços.</p>'}</div>
     ${semPrints ? '' : `<div class="mini-sec">Conferência pelos prints</div>
     <div class="mini-prints">
-      ${av ? `<div class="mini-al ${av.ok ? 'ok' : prob.length ? 'warn' : ''}">${ic(av.ok ? 'check' : 'alert', 'sm')}${av.ok ? 'Conferido pelos prints' + (av.ressalvas ? ' (com ressalva)' : '') : prob.length ? prob.length + ' ponto(s) para conferir' : av.avisos[0] || 'Faltam prints'}</div>
-        ${prob.slice(0, 4).map(x => `<div class="mini-div">${x.sit === 'bad' ? '✕' : '!'} ${esc(x.rot || 'Item ' + x.codigo)}: ${esc(String(x.lido ?? x.qSis ?? '—'))} <span class="muted">(pedido ${esc(String(x.ped ?? x.qPed ?? '—'))})</span></div>`).join('')}
+      ${av ? `<div class="mini-al ${av.ok ? 'ok' : prob.length ? 'warn' : ''}">${ic(av.ok ? 'check' : 'alert', 'sm')}${av.ok ? 'Conferido pelos prints' + (av.ressalvas ? ' (com ressalva)' : '') : prob.length ? pl(prob.length, 'ponto para conferir', 'pontos para conferir') : av.avisos[0] || 'Faltam prints'}</div>
+        ${prob.slice(0, 4).map(x => `<div class="mini-div">${x.sit === 'bad' ? '✕' : '!'} ${esc(x.rot || 'Item ' + x.codigo)}: <b>${esc(String(x.lido ?? x.qSis ?? '—'))}</b> <span class="muted">(pedido ${esc(String(x.ped ?? x.qPed ?? '—'))})</span></div>`).join('')}
         ${av.avisos.filter(a => /Falta/.test(a)).map(a => `<div class="mini-div">• ${esc(a)}</div>`).join('')}` : '<p class="muted" style="margin:0 0 6px">Nenhum print lido ainda.</p>'}
-      <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('eye', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
+      <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('monitor', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
       ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
-      <div class="mini-num">Nº da guia: <b class="num">${esc(g.numero || '—')}</b>${g.numero ? ` <span class="muted">(${g.numeroOrigem === 'print' ? 'do print' : 'digitado'})</span>` : ''}</div>
+      <div class="mini-num"><label for="miniGuia">Nº da guia</label><input type="text" id="miniGuia" class="num" value="${esc(g.numero || '')}" maxlength="10" placeholder="T00000000" autocomplete="off">${g.numero ? `<span class="muted">${g.numeroOrigem === 'print' ? 'do print' : 'digitado'}</span>` : ''}</div>
     </div>`}
-    <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button>` : `<button type="button" class="btn sm line" data-act="modoSimples">${ic('layers', 'sm')}Voltar ao modo completo</button>`}</div>
+    <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button><span class="dica" style="margin:0">Espaço = copiar próximo</span>` : `<button type="button" class="btn sm line" data-act="visualizacao" data-v="completa">${ic('monitor', 'sm')}Voltar à visualização completa</button>`}</div>
   </div>`;
+}
+/* painel flutuante, modo lista do dia: a próxima guia da minha fila, para gerar sem sair do sistema */
+function itemMiniLista() {
+  const eu = operadorObj(); if (!eu) return {};
+  const Ls = Lista.listas.filter(l => !l.finalizadaEm && l.itens.some(i => i.resp === eu.id && !i.r)); const L = Ls.find(l => l.id === Lista.sel) || Ls[0];
+  if (!L) return {};
+  const pend = Lista.linhasEmail({ itens: Lista.meus(L) }).filter(i => !i.r);
+  return { L, pend, it: pend.find(i => i.id === Lista.foco) || pend[0] };
+}
+function camposMiniLista(it) { const q = it.qtd ?? 1; return [['benef', 'Beneficiário', it.benef], ['carteira', 'Carteira', it.carteira || it.carteiraBruta], ['codigo', 'Serviço', it.codigo], ['qtd', 'Quantidade', String(q)], ['cid', 'CID', it.cid], ['emissao', 'Emissão', it.emissao], ['local', 'Local', it.local], ['crm', 'CRM', it.crm], ['medico', 'Médico', it.medico]]; }
+function htmlMiniLista() {
+  const { L, pend, it } = itemMiniLista();
+  if (!L || !it) return `<div class="mini-vazio">${ic('check', 'lg')}<b>Nada pendente na sua fila</b><span class="muted">Quando uma lista do dia for dividida com você, as guias aparecem aqui.</span></div>`;
+  const cps = Mini.lstCopiados[it.id] || {}, campos = camposMiniLista(it), prox = campos.find(([k, , v]) => v && !cps[k]);
+  const meus = Lista.meus(L), feitos = meus.filter(i => i.r).length, pc = meus.length ? Math.round(100 * feitos / meus.length) : 0, q = it.qtd ?? 1;
+  const ja = Lista.jaAutorizada(it);
+  return `<div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(it.benef)}</b><div class="muted">${esc(L.clinica)} · ${esc(L.nome)} · faltam ${pend.length}</div></div><span class="tag">${feitos}/${meus.length}</span></div>
+    <div class="lst-barra"><i style="width:${pc}%"></i></div>
+    ${q > 1 ? `<div class="mini-al warn">${ic('alert', 'sm')}<b>Quantidade ${q}</b> neste serviço.</div>` : ''}
+    ${it.obs ? `<div class="mini-al">${ic('message', 'sm')}<span><b>Obs.:</b> ${esc(it.obs)}</span></div>` : ''}
+    ${ja ? `<div class="mini-al warn">${ic('alert', 'sm')}<span>Já autorizada: <b>${esc(ja.guia)}</b> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</span></div>` : ''}
+    ${prox ? `<button type="button" class="mini-prox" data-mact="lstCopiar" data-k="${prox[0]}" title="Copia o próximo campo (atalho: barra de espaço)"><small>Copiar próximo</small><b>${esc(prox[1])}</b><span class="num">${esc(prox[2])}</span></button>` : `<div class="mini-al ok">${ic('check', 'sm')}Campos copiados. Registre o nº da guia.</div>`}
+    <div class="mini-lista">${campos.map(([k, r, v]) => `<button type="button" class="mini-row ${cps[k] ? 'ok' : ''} ${v ? '' : 'vazio'} ${prox && prox[0] === k ? 'prox' : ''} ${k === 'qtd' && q > 1 ? 'qtd-alta' : ''}" data-mact="lstCopiar" data-k="${k}" ${v ? '' : 'disabled'}><span class="r">${esc(r)}</span><span class="v num">${esc(v || '—')}</span>${cps[k] ? ic('check', 'sm') : ic('copy', 'sm')}</button>`).join('')}
+      <div class="mini-div muted">${esc(it.servico || '')}</div></div>
+    <div class="mini-num"><label for="miniLstGuia">Nº da guia</label><input type="text" id="miniLstGuia" class="num" value="${esc(Lista.rascunho[it.id] || '')}" maxlength="10" placeholder="T00000000" autocomplete="off"><button type="button" class="btn sm pri" data-mact="lstRegistrar">${ic('check', 'sm')}Registrar</button></div>
+    <div class="mini-btns"><button type="button" class="btn sm line" data-mact="lstSem" data-v="Paciente excluso">Paciente excluso</button><button type="button" class="btn sm line" data-mact="lstSem" data-v="Guia já liberada em">Já liberada em…</button><button type="button" class="btn sm line" data-mact="lstSem" data-v="">Outro motivo…</button>${pend.length > 1 ? `<button type="button" class="btn sm ghost" data-mact="lstPular">${ic('right', 'sm')}Pular</button>` : ''}</div>
+    ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
+    <div class="mini-btns" style="margin-top:8px"><button type="button" class="btn sm line" data-mact="abrirLista">${ic('right', 'sm')}Ver a lista no conferidor</button><span class="dica" style="margin:0">Espaço = copiar próximo · Enter = registrar</span></div>`;
 }
 /* copia um valor do painel (no painel flutuante a área de transferência é a da janelinha) */
 async function miniCopiar(chave, win) {
@@ -41,8 +82,9 @@ async function miniCopiar(chave, win) {
   g.copiados[chave] = v; miniMsg = 'Copiado: ' + v; persistir(); render();
 }
 const Mini = {
-  win: null,
+  win: null, modo: null, lstCopiados: {}, pendente: false, semPend: null,
   aberto() { return !!(this.win && !this.win.closed); },
+  modoAtual() { return this.modo || (!S && Lista.pendentesMeus() ? 'lista' : 'guia'); },
   async abrir() {
     if (this.aberto()) { this.win.focus(); return; }
     try {
@@ -55,15 +97,68 @@ const Mini = {
     d.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || 'light');
     d.body.innerHTML = '<div id="miniApp" class="mini-janela"></div>';
     d.addEventListener('click', e => this.clique(e));
+    d.addEventListener('keydown', e => this.tecla(e));
+    d.addEventListener('input', e => { const it = itemMiniLista().it; if (e.target.id === 'miniLstGuia' && it) Lista.rascunho[it.id] = e.target.value; });
+    d.addEventListener('change', e => { if (e.target.id === 'miniGuia') this.salvarGuia(e.target.value); });
+    d.addEventListener('focusout', () => setTimeout(() => { if (this.pendente && this.aberto() && !/INPUT/.test((this.win.document.activeElement || {}).tagName || '')) { this.pendente = false; this.atualizar(); } }, 50));
     d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (fs.length && S) { e.preventDefault(); miniMsg = 'Lendo o print…'; this.atualizar(); processarPrints(fs).then(() => { miniMsg = ''; this.atualizar(); }); } });
     this.win.addEventListener('pagehide', () => { this.win = null; if (Vis.get() === 'flutuante') Vis.set('completa'); render(); });
     this.atualizar(); render();
   },
-  atualizar() { if (!this.aberto()) { this.win = null; return; } const el = this.win.document.getElementById('miniApp'); if (el) el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }); },
+  atualizar() {
+    if (!this.aberto()) { this.win = null; return; }
+    const d = this.win.document, el = d.getElementById('miniApp'); if (!el) return;
+    const ae = d.activeElement; if (ae && ae.tagName === 'INPUT' && el.contains(ae)) { this.pendente = true; return; }   // não apaga o que está sendo digitado
+    el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }) + (this.semPend ? this.htmlSemGuia() : '');
+    if (this.semPend) { const i = d.getElementById('miniMot'); if (i) i.focus(); }
+  },
+  htmlSemGuia() { return `<div class="mini-sem"><label for="miniMot">${esc(this.semPend.v ? this.semPend.v + '… (data ou nº da guia)' : 'Motivo (vai para o e-mail de entrega)')}</label><input type="text" id="miniMot" autocomplete="off"><div class="mini-btns"><button type="button" class="btn sm pri" data-mact="lstSemOk">Registrar sem guia</button><button type="button" class="btn sm ghost" data-mact="lstSemCancela">Cancelar</button></div></div>`; },
+  salvarGuia(v) {
+    const g = guiaAtiva(); if (!g) return; v = String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (v && !/^[TS]\d{7,8}$/.test(v)) { miniMsg = 'Nº da guia: T ou S + 7 ou 8 dígitos.'; this.pendente = false; this.atualizar(); return; }
+    if (v === (g.numero || '')) return;
+    g.numero = v; g.numeroOrigem = 'digitado'; evento(g, 'numero', `Nº da guia digitado no painel flutuante: ${v || '(apagado)'}`); miniMsg = v ? 'Nº da guia salvo: ' + v : '';
+    persistir(); render();
+  },
+  tecla(e) {
+    const d = this.win.document, t = e.target, emCampo = t && /INPUT|TEXTAREA|SELECT/.test(t.tagName);
+    if (e.key === 'Enter' && t.id === 'miniLstGuia') { e.preventDefault(); this.acao('lstRegistrar'); return; }
+    if (e.key === 'Enter' && t.id === 'miniMot') { e.preventDefault(); this.acao('lstSemOk'); return; }
+    if (e.key === 'Enter' && t.id === 'miniGuia') { e.preventDefault(); t.blur(); return; }
+    if (e.key === 'Escape' && this.semPend) { this.semPend = null; this.atualizar(); return; }
+    if ((e.key === ' ' || e.code === 'Space') && !emCampo) { const b = d.querySelector('.mini-prox'); if (b) { e.preventDefault(); b.click(); } }
+  },
+  async acao(a, b) {
+    const d = this.win.document;
+    if (a === 'modo') { this.modo = b.dataset.v; if (this.modo === 'lista') await Lista.carregar(isoDia(new Date())).catch(() => { }); this.atualizar(); return; }
+    if (a === 'abrirLista') { window.focus(); aba = 'lista'; Lista.sub = 'continuar'; render(); return; }
+    const { L, pend, it } = itemMiniLista();
+    if (a === 'lstCopiar' && it) {
+      const v = (camposMiniLista(it).find(([k]) => k === b.dataset.k) || [])[2]; if (!v) return;
+      try { await this.win.navigator.clipboard.writeText(v); } catch (er) { miniMsg = 'Não consegui copiar: clique de novo.'; this.atualizar(); return; }
+      (this.lstCopiados[it.id] = this.lstCopiados[it.id] || {})[b.dataset.k] = true; miniMsg = 'Copiado: ' + v; this.atualizar(); return;
+    }
+    if (a === 'lstPular' && it) { const i = pend.indexOf(it); Lista.foco = (pend[i + 1] || pend[0]).id; miniMsg = ''; this.atualizar(); return; }
+    if (a === 'lstRegistrar' && it) {
+      const inp = d.getElementById('miniLstGuia'), v = String((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g, '');
+      if (inp) inp.blur(); this.pendente = false;
+      if (!/^[TS]\d{7,8}$/.test(v)) { miniMsg = 'Nº da guia: T ou S + 7 ou 8 dígitos.'; this.atualizar(); return; }
+      await Lista.registrar(L, it, { st: 'gerada', guia: v }); Lista.foco = null; miniMsg = `Guia ${v} registrada (${it.benef.split(' ')[0]}).`;
+      render(); this.atualizar(); const n = d.getElementById('miniLstGuia'); if (n) n.focus(); return;
+    }
+    if (a === 'lstSem' && it) { if (b.dataset.v && !/em$/.test(b.dataset.v)) { await Lista.registrar(L, it, { st: 'semguia', obs: b.dataset.v }); Lista.foco = null; miniMsg = `${it.benef.split(' ')[0]}: ${b.dataset.v}.`; render(); this.atualizar(); } else { this.semPend = { v: b.dataset.v, item: it.id }; this.atualizar(); } return; }
+    if (a === 'lstSemCancela') { this.semPend = null; this.atualizar(); return; }
+    if (a === 'lstSemOk' && it && this.semPend) {
+      const extra = (d.getElementById('miniMot') || {}).value || ''; if (!extra.trim() && !this.semPend.v) { miniMsg = 'Escreva o motivo.'; return; }
+      const obs = `${this.semPend.v} ${extra}`.trim(), alvo = L.itens.find(x => x.id === this.semPend.item) || it; this.semPend = null;
+      await Lista.registrar(L, alvo, { st: 'semguia', obs }); Lista.foco = null; miniMsg = `${alvo.benef.split(' ')[0]}: ${obs}.`; render(); this.atualizar(); return;
+    }
+  },
   async clique(e) {
     const c = e.target.closest('[data-mcopy]'); if (c) { await miniCopiar(c.dataset.mcopy, this.win); return; }
     const b = e.target.closest('[data-mact]'); if (!b) return;
     const a = b.dataset.mact;
+    if (/^(modo|abrirLista|lst)/.test(a)) { await this.acao(a, b); return; }
     if (a === 'abrir') { window.focus(); return; }
     if (a === 'capturar') { miniMsg = Captura.ativa() ? 'Capturando…' : ''; this.atualizar(); await capturarJanela(this.win.navigator); miniMsg = ''; this.atualizar(); return; }
     if (a === 'colar') {
@@ -77,6 +172,7 @@ const Mini = {
     }
   }
 };
+setInterval(async () => { if (!Mini.aberto() || Mini.modoAtual() !== 'lista') return; await Lista.carregar(isoDia(new Date())).catch(() => { }); Mini.atualizar(); }, 15000);
 Object.assign(acoes, {
   capturarJanela() { return capturarJanela(); },
   async trocarJanela() { Captura.parar(); await capturarJanela(); },

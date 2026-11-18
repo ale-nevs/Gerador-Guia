@@ -752,3 +752,23 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .lst-item.compacto{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:6px 12px}
 .lst-item.compacto b{font-size:var(--fs-sm)}
 .lst-item.compacto .esp{flex:1}
+/* ===== Painel flutuante ===== */
+.mini-abas{display:flex;gap:4px;margin-bottom:4px}
+.mini-abas button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-2);border-radius:var(--r-sm);padding:6px 8px;font:600 var(--fs-xs)/1.2 var(--font-sans);cursor:pointer}
+.mini-abas button.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.mini-nome{display:block;font-size:var(--fs-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-prox{display:grid;grid-template-columns:1fr auto;gap:0 10px;align-items:center;width:100%;text-align:left;border:2px solid var(--primary);background:var(--soft);color:var(--soft-fg);border-radius:var(--r);padding:8px 12px;cursor:pointer;font:inherit}
+.mini-prox small{grid-column:1/-1;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2)}
+.mini-prox b{font-size:var(--fs-sm)}
+.mini-prox .num{font-size:var(--fs-lg);font-weight:750;justify-self:end;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.mini-prox:hover{background:var(--soft-2)}
+.mini-row.prox{border-color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+.mini-item.qtd-alta .mini-row:last-child,.mini-row.qtd-alta{border-color:var(--warn-solid);background:var(--warn-bg);color:var(--warn-fg)}
+.mini-num{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mini-num label{font-weight:650;font-size:var(--fs-sm)}
+.mini-num input{width:150px;flex:1;font-size:var(--fs-md);font-weight:650;letter-spacing:.05em;text-transform:uppercase}
+.mini-vazio{display:grid;gap:6px;justify-items:center;text-align:center;padding:24px 8px;color:var(--text-2)}
+.mini-vazio .ic{color:var(--text-3)}
+.mini-al{gap:8px}
+.mini-sem{margin-top:8px;padding:10px;border:1px solid var(--warn-br);background:var(--warn-bg);border-radius:var(--r-sm);display:grid;gap:6px}
+.mini-sem label{font-weight:650;font-size:var(--fs-sm);color:var(--warn-fg)}

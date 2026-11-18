@@ -139,6 +139,28 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 - O histórico é gravado ao concluir, cancelar, devolver ou descartar a guia, em `auditoria/AAAA-MM/<id>.json` na pasta compartilhada (sem a pasta, só no navegador deste computador). Os prints vão reduzidos (JPEG). Para não guardar prints, desmarque em Configurações › Preferências operacionais.
 - **Acompanhamento › Auditar:** busca em todos os dias pelo nome do paciente, pela carteira ou pelo número da guia e abre o histórico. O nome completo do paciente passou a ficar no registro a partir desta versão; nos registros antigos só há as iniciais (a busca por carteira e guia funciona em todos).
 
+### Listas do dia (Erasmo Neto)
+A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("Beneficiário:", "Carteira:", "Serviço:", "Quantidade:", "Médico:", "CID:", "Emissão:", "Local de emissão:", "Obs:"). Esse e-mail **não** abre como atendimento normal: vira uma **lista do dia**.
+- **Como o app reconhece:** clínica marcada em Configurações › Clínicas com **"Manda a agenda do dia em lista"**, ou e-mail do domínio `clinicaserasmoneto.com.br` / assunto "Erasmo Neto". Qualquer e-mail com mais de 5 beneficiários também oferece abrir como lista. Vale para .eml, texto colado e o botão da extensão no webmail.
+- **Dividir:** escolha os operadores (os que estão on-line vêm marcados). Cada beneficiário fica inteiro com um operador (todos os serviços dele), em blocos por ordem alfabética, com quantidades parecidas. A prévia mostra quantas guias e de qual nome a qual nome cada um recebe.
+- **Aba Erasmo › Continuar Erasmo:** a fila de cada operador. A guia atual mostra beneficiário, carteira, serviço, quantidade (maior que 1 em destaque), CID, emissão, local, CRM e médico, cada um copiável com um clique, a observação da clínica e um aviso se a mesma carteira e serviço já tiveram guia na semana. Digite o nº da guia e **Enter** (ou **Registrar guia**); sem guia, use **Sem guia ▾** (Paciente excluso, Guia já liberada em…, Carteira não localizada, Sem cobertura, Carência, Aguardando documentação ou outro motivo). **Passar para…** envia uma guia a outro operador; **Passar todas as pendentes para…**, a fila inteira. No topo, o atalho **Continuar Erasmo (N)** aparece em qualquer aba enquanto houver guias suas pendentes.
+- **Acompanhar:** em tempo real (a cada 10 s): totais, progresso de cada operador e a tabela de todas as guias com operador, situação, quem passou para quem, filtros e **Passar para**.
+- **E-mail de entrega:** a tabela **Nº da Guia | Beneficiário | Carteira | Serviço**, formatada para o e-mail (pendentes em vermelho, sem guia em laranja com o motivo), com texto de abertura editável, **Copiar com formatação**, **Copiar texto simples**, **Responder no webmail** e **Marcar lista como entregue**.
+- **Outro e-mail da Erasmo no mesmo dia:** o app pergunta se as guias entram na **lista do dia** (só as novas; repetidas ficam de fora) ou viram uma **lista separada** (Lista 2).
+- **Registro:** cada guia registrada vai para o Painel, o Auditar e o Histórico com o nome do operador que gerou, a lista, quem distribuiu e quem passou para quem. Na pasta, `listas/AAAA-MM-DD/<lista>/` guarda o cabeçalho e um arquivo por operador (cada um grava só o seu: dois operadores ao mesmo tempo não apagam o trabalho um do outro).
+- **No painel flutuante:** a aba **Erasmo** mostra a próxima guia da sua fila para gerar sem sair do sistema (copiar próximo com a barra de espaço, nº da guia + Enter, sem guia com o motivo ali mesmo, pular).
+
+### Painel flutuante
+- **Copiar próximo:** botão grande com o próximo campo na ordem do sistema (atalho: barra de espaço com o painel selecionado); a linha do próximo fica marcada e há barra de progresso.
+- Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
+- Abas **Guia atual** e **Erasmo** (quando há lista do dia).
+
+### Ajustes de uso (versão 2.2)
+- **Botões com texto:** antes, vários botões secundários (Corrigir guia, Excluir guia, Adicionar…, Remover…) mostravam só o ícone. Agora todos têm texto; só os de copiar seguem só com ícone (com dica).
+- **Cliques que não “pegavam”:** ao editar um campo e clicar logo num botão, a tela era redesenhada no meio do clique e o clique se perdia; ao sair de um campo com Tab, o foco sumia. Agora o redesenho espera o clique terminar e o foco ir para o próximo campo, e devolve o foco, o cursor e a rolagem das listas.
+- **Responder no webmail** aparece também na resposta sem gerar guia, na guia concluída e no e-mail de entrega da lista; sem a extensão instalada, o botão mostra como instalar.
+- **Abertura à prova de falhas:** se uma parte não carregar (pasta lenta, dado com defeito), a página abre assim mesmo; se não abrir, mostra o erro com **Copiar detalhes**.
+
 ### Novidades da versão 2.1 (organização e prevenção de erros)
 - **Barra fixa no rodapé** em cada etapa: Voltar, o primeiro bloqueio ou pendência (com **ver**, que leva aos alertas) e Seguir/Concluir.
 - **Etapas** com nome fixo e o estado num selo (Agora, Concluída, Pendente, N bloqueios). O **Conferi** dos avisos virou botão.
