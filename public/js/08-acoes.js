@@ -322,11 +322,18 @@ const acoes = {
     if (!r) { toast('Não foi possível copiar: clique em qualquer lugar da página e tente de novo.', 'bad'); return; }
     g.copiados.resp = true; persistir(); render(); toast(r === 'rico' ? 'Resposta copiada com formatação.' : 'O navegador só permitiu copiar texto simples (sem formatação).', r === 'rico' ? '' : 'bad');
   },
-  responderWebmail() {
-    const g = guiaAtiva(), html = serializarEditor($('#edResp')), texto = htmlPlano(html);
+  responderWebmail(b) {
+    if (!extInstalada()) { toast('Para levar a resposta direto ao webmail, instale a extensão do Chrome (passo a passo abaixo).'); acoes.baixarExtensao(); return; }
+    const fonte = (b && b.dataset.fonte) || 'editor';
+    if (fonte === 'lista') { Lista.responderWebmail(b.dataset.lista); return; }
+    const g = guiaAtiva(); if (!g) return;
+    let html;
+    if (fonte === 'concluida') html = htmlParaEmail(respostaDaGuia(g, false).html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1'));
+    else { const ed = $('#edResp'); if (!ed) { toast('Abra a resposta na etapa 4 para levá-la ao webmail.', 'bad'); return; } html = htmlParaEmail(serializarEditor(ed)); }
+    const texto = htmlPlano(html);
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    const quem = nomesAtend(); 
-    window.postMessage({ __conferidorPagina: 'responderWebmail', resposta: { html: htmlParaEmail(html), texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' } }, location.origin);
+    const quem = nomesAtend();
+    enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' });
     g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
   },
   async copiarRespSimples() {
@@ -786,7 +793,13 @@ document.addEventListener('visibilitychange', async () => {
 
 // Botões secundários viram só ícone (o texto vai para dica e leitor de tela)
 const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corrigir guia|Cancelar guia|Excluir guia|Incluir observação|Exportar CSV.*|Baixar config\.json|Limpar filtros|Ver ou editar|Descartar.*|Remover.*|Adicionar.*)$/;
+/* Antes, esta função tirava o texto de vários botões secundários (Corrigir guia, Excluir guia, Adicionar…, Remover…),
+   obrigando a decorar ícones. Agora os botões mantêm o texto; só os botões feitos para ser só ícone (classe "so", como os de
+   copiar) ficam sem texto, sempre com dica e nome acessível. */
+const enviarAoWebmail = resposta => window.postMessage({ __conferidorPagina: 'responderWebmail', resposta }, location.origin);
 function soIcone(raiz) {
+  raiz.querySelectorAll('.btn.so').forEach(b => { const t = b.getAttribute('aria-label') || b.dataset.dica || ''; if (t && !b.title && !b.dataset.dica) b.title = t; });
+  return;
   raiz.querySelectorAll('.btn:not(.so):not(.pri)').forEach(b => {
     if (!b.querySelector('svg.ic')) return;
     const t = b.textContent.replace(/\s+/g, ' ').trim();
