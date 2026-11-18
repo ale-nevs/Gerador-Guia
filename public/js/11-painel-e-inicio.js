@@ -32,7 +32,8 @@ function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
     ${semPrints ? '' : `<div class="mini-sec">Conferência pelos prints</div>
     <div class="mini-prints">
       ${av ? `<div class="mini-al ${av.ok ? 'ok' : prob.length ? 'warn' : ''}">${ic(av.ok ? 'check' : 'alert', 'sm')}${av.ok ? 'Conferido pelos prints' + (av.ressalvas ? ' (com ressalva)' : '') : prob.length ? pl(prob.length, 'ponto para conferir', 'pontos para conferir') : av.avisos[0] || 'Faltam prints'}</div>
-        ${prob.slice(0, 4).map(x => `<div class="mini-div">${x.sit === 'bad' ? '✕' : '!'} ${esc(x.rot || 'Item ' + x.codigo)}: <b>${esc(String(x.lido ?? x.qSis ?? '—'))}</b> <span class="muted">(pedido ${esc(String(x.ped ?? x.qPed ?? '—'))})</span></div>`).join('')}
+        <div class="mini-conf">${[...av.checks, ...av.linhas.map(l => ({ ...l, rot: 'Item ' + l.codigo, lido: l.qSis, ped: l.qPed }))].map(x => { const s = x.ign ? 'ign' : x.sit; return `<div class="mc ${s}"><span class="mc-i">${s === 'ok' ? '✓' : s === 'bad' ? '✕' : s === 'ign' ? '–' : s === 'info' ? 'i' : '!'}</span><span class="mc-r">${esc(x.rot)}</span><span class="mc-v num">${esc(String(x.lido ?? '—'))}${s === 'bad' || s === 'warn' ? ` <span class="muted">pedido ${esc(String(x.ped ?? '—'))}</span>` : ''}</span></div>`; }).join('')}</div>
+        ${prob.length ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Resolver divergências no conferidor</button>` : ''}
         ${av.avisos.filter(a => /Falta/.test(a)).map(a => `<div class="mini-div">• ${esc(a)}</div>`).join('')}` : '<p class="muted" style="margin:0 0 6px">Nenhum print lido ainda.</p>'}
       <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('monitor', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
       ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
@@ -85,6 +86,7 @@ const Mini = {
   win: null, modo: null, lstCopiados: {}, pendente: false, semPend: null,
   aberto() { return !!(this.win && !this.win.closed); },
   modoAtual() { return this.modo || (!S && Lista.pendentesMeus() ? 'lista' : 'guia'); },
+  avisar(t) { miniMsg = t || ''; this.pendente = false; this.atualizar(); },
   async abrir() {
     if (this.aberto()) { this.win.focus(); return; }
     try {
@@ -101,7 +103,7 @@ const Mini = {
     d.addEventListener('input', e => { const it = itemMiniLista().it; if (e.target.id === 'miniLstGuia' && it) Lista.rascunho[it.id] = e.target.value; });
     d.addEventListener('change', e => { if (e.target.id === 'miniGuia') this.salvarGuia(e.target.value); });
     d.addEventListener('focusout', () => setTimeout(() => { if (this.pendente && this.aberto() && !/INPUT/.test((this.win.document.activeElement || {}).tagName || '')) { this.pendente = false; this.atualizar(); } }, 50));
-    d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (fs.length && S) { e.preventDefault(); miniMsg = 'Lendo o print…'; this.atualizar(); processarPrints(fs).then(() => { miniMsg = ''; this.atualizar(); }); } });
+    d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (!fs.length) return; e.preventDefault(); if (!S) { this.avisar('Nenhum atendimento aberto para receber o print.'); return; } this.avisar('Lendo o print…'); processarPrints(fs, t => this.avisar(t)); });
     this.win.addEventListener('pagehide', () => { this.win = null; if (Vis.get() === 'flutuante') Vis.set('completa'); render(); });
     this.atualizar(); render();
   },
@@ -160,15 +162,15 @@ const Mini = {
     const a = b.dataset.mact;
     if (/^(modo|abrirLista|lst)/.test(a)) { await this.acao(a, b); return; }
     if (a === 'abrir') { window.focus(); return; }
-    if (a === 'capturar') { miniMsg = Captura.ativa() ? 'Capturando…' : ''; this.atualizar(); await capturarJanela(this.win.navigator); miniMsg = ''; this.atualizar(); return; }
+    if (a === 'capturar') { this.avisar(Captura.ativa() ? 'Capturando a janela do sistema…' : 'Escolha a janela do sistema na lista do Chrome…'); await capturarJanela(this.win.navigator, t => this.avisar(t)); return; }
     if (a === 'colar') {
+      let fs = [];
       try {
-        const itens = await this.win.navigator.clipboard.read(), fs = [];
+        const itens = await this.win.navigator.clipboard.read();
         for (const it of itens) for (const t of it.types) if (/^image\//.test(t)) fs.push(new File([await it.getType(t)], 'print-colado.png', { type: t }));
-        if (!fs.length) { miniMsg = 'Não há imagem copiada. Copie o print e clique de novo (ou Ctrl+V aqui).'; this.atualizar(); return; }
-        miniMsg = 'Lendo o print…'; this.atualizar(); await processarPrints(fs); miniMsg = '';
-      } catch (er) { miniMsg = 'Use Ctrl+V com o painel selecionado.'; }
-      this.atualizar();
+      } catch (er) { this.avisar('O Chrome não liberou a área de transferência aqui: clique no painel e use Ctrl+V.'); return; }
+      if (!fs.length) { this.avisar('Não há imagem copiada. Copie o print e clique de novo (ou Ctrl+V aqui).'); return; }
+      this.avisar('Lendo o print…'); await processarPrints(fs, t => this.avisar(t));
     }
   }
 };
@@ -192,8 +194,11 @@ const Presenca = {
   lista: [],
   async bater() {
     const op = operadorObj(); if (!Pasta.ok || !op || Abas.pausada) return;
-    try { await Pasta.gravar(['presenca'], slug(op.id || op.nome) + '.json', { operador: op.nome, operadorId: op.id, em: agora(), etapa: S ? S.vista : 0, atendendo: !!S, visivel: !document.hidden }); } catch (e) { }
+    const g = S ? guiaAtiva() : null, cl = S ? clinicaDe(S) : null;
+    const guias = S ? S.guias.filter(x => !guiaTerminal(x)).map(x => ({ id: x.id, paciente: x.pedido.beneficiario || '', carteira: x.carteiraUsada || x.pedido.carteira || '', clinica: cl ? cl.nome : ((S.email.remetente || {}).email || ''), clinicaId: cl ? cl.id : '', vista: x === g ? S.vista : (x.vista || x.etapa || 2), ativa: x === g, itens: x.pedido.itens.length, idx: x.idx, total: S.guias.length, desde: x === g ? (S.vistaDesde || null) : null })) : [];
+    try { await Pasta.gravar(['presenca'], slug(op.id || op.nome) + '.json', { operador: op.nome, operadorId: op.id, em: agora(), aba, etapa: S ? S.vista : 0, atendendo: !!S, visivel: !document.hidden, guias, lista: typeof Lista !== 'undefined' ? Lista.pendentesMeus() : 0 }); } catch (e) { }
   },
+  agendar() { clearTimeout(this.t); this.t = setTimeout(() => this.bater(), 1500); },
   async ler() {
     if (!Pasta.ok) { this.lista = []; return []; }
     const out = [];
@@ -201,14 +206,16 @@ const Presenca = {
     this.lista = out.sort((a, b) => (a.operador || '').localeCompare(b.operador || '')); return this.lista;
   }
 };
-setInterval(() => Presenca.bater(), 60000);
+setInterval(() => Presenca.bater(), 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) Presenca.bater(); });
 function htmlPresenca() {
   if (!Pasta.ok) return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2></div><p class="muted" style="margin:0">Conecte a pasta compartilhada para ver quem está on-line.</p></div>`;
   const L = Presenca.lista;
   return `<div class="card"><div class="card-h"><h2>Com o Conferidor aberto agora</h2><span class="tag ${L.length ? 'ok' : ''}">${pl(L.length, 'pessoa', 'pessoas')}</span></div>
     <div class="presenca">${L.map(d => { const o = cfg.operadores.find(x => x.id === d.operadorId); const min = Math.max(0, Math.round((Date.now() - new Date(d.em)) / 60000));
-      return `<div class="pres-op">${htmlAvatar(o)}<div><b>${esc(d.operador)}</b><small>${d.atendendo ? `em atendimento · etapa ${d.etapa}` : 'sem atendimento aberto'}${d.visivel === false ? ' · em outra janela' : ''} · ${min < 1 ? 'agora' : 'há ' + min + ' min'}</small></div></div>`; }).join('') || '<p class="muted" style="margin:0">Ninguém além de você, no momento.</p>'}</div></div>`;
+      const ga = (d.guias || []).find(x => x.ativa) || (d.guias || [])[0], ETP = { 1: 'E-mail', 2: 'Pedido e alertas', 3: 'Guia e conferência', 4: 'Finalizar' };
+      const ondeTxt = ga ? `<b>${esc(nomeCurto(ga.paciente) || 'beneficiário')}</b> × ${esc(ga.clinica || 'clínica')} · ${ETP[ga.vista] || 'etapa ' + ga.vista}${ga.desde ? ` há ${Math.max(0, Math.round((Date.now() - new Date(ga.desde)) / 60000))} min` : ''}${(d.guias || []).length > 1 ? ` · ${d.guias.length} guias abertas` : ''}` : d.aba === 'lista' ? `na lista do dia${d.lista ? ` · ${d.lista} pendentes` : ''}` : 'sem atendimento aberto';
+      return `<div class="pres-op">${htmlAvatar(o)}<div><b>${esc(d.operador)}</b><small>${ondeTxt}${d.lista && d.aba !== 'lista' ? ` · lista: ${d.lista} pendentes` : ''}${d.visivel === false ? ' · em outra janela' : ''}${min >= 1 ? ` · sinal há ${min} min` : ''}</small></div></div>`; }).join('') || '<p class="muted" style="margin:0">Ninguém além de você, no momento.</p>'}</div></div>`;
 }
 
 /* ---------- Notas fixas do beneficiário (por carteira), na pasta "notas" ---------- */

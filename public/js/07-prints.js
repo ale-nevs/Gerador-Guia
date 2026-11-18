@@ -352,6 +352,11 @@ function palavraNaCaixa(ws, an, caixa, norm, valida) {
 const SISTEMAS_PRINT = { largo: 'Sistema novo (PS Web, tela larga)', compacto: 'Sistema antigo (janela Liberação de Senhas)' };
 const sistemaPrint = () => { const v = LS.get('printSistema', 'largo'); return SISTEMAS_PRINT[v] ? v : 'largo'; };
 /* escolha do sistema dos prints (fica lembrada neste computador) */
+/* seletor do topo: Sistema: Novo | Antigo (vale para colar, capturar e testar prints) */
+function htmlSistemaTopo(compacto) {
+  const v = sistemaPrint(), ROT = { largo: 'Novo', compacto: 'Antigo' };
+  return `<div class="seg seg-vis seg-sis-topo" role="radiogroup" aria-label="Sistema dos prints"><span class="seg-rot">Sistema</span>${Object.keys(SISTEMAS_PRINT).map(k => `<button type="button" role="radio" aria-checked="${k === v}" class="${k === v ? 'on' : ''}" data-act="sistemaPrint" data-v="${k}" title="Prints do ${esc(SISTEMAS_PRINT[k].replace(/^S/, 's'))}">${ROT[k] || k}</button>`).join('')}</div>`;
+}
 function htmlSeletorSistema() {
   const v = sistemaPrint();
   return `<div class="seg-sis"><span class="lbl" style="margin:0">Os prints são de qual sistema?</span><div class="seg" role="radiogroup" aria-label="Sistema dos prints">
@@ -611,9 +616,9 @@ function aplicarPrints(g) {
   return av;
 }
 
-async function processarPrints(files) {
-  const g = guiaAtiva(); if (!g) return;
-  const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; };
+async function processarPrints(files, aviso) {
+  const g = guiaAtiva(); if (!g) { if (aviso) aviso('Nenhum atendimento aberto para receber o print.'); return; }
+  const msg = t => { const el = $('#printsEstado'); if (el) el.innerHTML = t ? `<span class="tag info">${ic('refresh', 'sm')}${esc(t)}</span>` : ''; if (aviso && t) aviso(t); };
   const erros = [];
   const mem = PRINTS_MEM.get(g.id) || { leituras: [] }; PRINTS_MEM.set(g.id, mem);
   for (const f of files) {
@@ -634,6 +639,7 @@ async function processarPrints(files) {
   aplicarPrints(g);
   persistir(); render();
   if (erros.length) toast(erros[0], 'bad');
+  if (aviso) { const lidas = (PRINTS_MEM.get(g.id) || { leituras: [] }).leituras.map(l => l.tipo === 'guia' ? 'Dados da Guia' : 'Procedimentos'); aviso(erros.length ? erros[0] : `Print lido. Já lidos: ${unicos(lidas).join(' e ') || '—'}.`); }
 }
 const prontoPrints = g => !!PRINTS_MEM.get(g.id);
 
@@ -664,7 +670,7 @@ function htmlCartaoPrints(g) {
   return `<div class="card" id="cartaoPrints">
     <div class="card-h"><h2>Conferência pelos prints do sistema</h2>${tag}<span class="esp"></span><span id="printsEstado"></span></div>
     ${htmlComoFazer('prints', 'Capture ou cole os prints das abas <b>Dados da Guia</b> e <b>Procedimentos</b>.', `<ol><li>No sistema, abra a guia na tela "Liberação de Senhas", aba <b>Dados da Guia</b>.</li><li>Clique em <b>Capturar a janela do sistema</b> (ou tire o print e use <b>Ctrl+V</b> aqui).</li><li>Abra a aba <b>Procedimentos</b> e capture de novo. Se a grade não couber na tela, role até o fim e capture mais uma vez.</li></ol><p>A leitura é feita neste navegador; ${cfg.preferencias.guardarPrints !== false ? 'os prints ficam no histórico da guia (pasta compartilhada).' : 'as imagens não são guardadas.'} O número da guia vai sozinho para a etapa 4.</p>`)}
-    ${htmlSeletorSistema()}
+    <p class="dica" style="margin:0 0 8px">${ic('monitor', 'sm')} Prints do <b>${esc(SISTEMAS_PRINT[sistemaPrint()].replace(/^S/, 's'))}</b>. Para trocar, use <b>Sistema: Novo | Antigo</b> no topo.</p>
     <div class="acoes" style="margin-top:0">
       ${htmlBotoesCaptura()}
       <button class="btn ${Captura.ativa() ? 'line' : 'pri'}" data-act="colarPrint" title="Cola o print que está na área de transferência (o mesmo que Ctrl+V)">${ic('clip')}Colar print</button>
