@@ -476,6 +476,9 @@ const acoes = {
     if (await Notas.salvar(cart, t)) { evento(g, 'regra', t.trim() ? 'Nota fixa do beneficiário: ' + t.trim() : 'Nota fixa do beneficiário removida'); fecharModal(true); persistir(); render(); toast(t.trim() ? 'Nota salva.' : 'Nota removida.'); }
   },
   okParado() { if (S) { S.vistaDesde = agora(); S.avisoParado = null; persistir(); render(); } },
+  erroInicio() { aba = 'atend'; if (S) { S.vista = 1; } render(); },
+  async erroCopiar() { if (await copiar(window.__ultimoErro || '')) toast('Detalhes copiados.'); },
+  erroSemAtend() { try { LS.set('atual.copia', S); } catch (e) { } S = null; persistir(); aba = 'atend'; render(); toast('Atendimento fechado. Uma cópia ficou guardada neste computador.'); },
   verAlertas() { const el = $('.painel-al'); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.remove('piscar'); void el.offsetWidth; el.classList.add('piscar'); },
   sortear() {
     const c = Reg.doDia(painelDia).filter(r => !r.tipo && r.status === 'concluido');

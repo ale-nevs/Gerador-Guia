@@ -187,25 +187,27 @@ const Abas = {
 };
 window.addEventListener('beforeunload', e => { if (S && !Abas.pausada) { e.preventDefault(); e.returnValue = ''; } });
 
+/* Abertura: cada etapa é isolada e tem prazo. Se uma falhar ou travar (ex.: pasta compartilhada lenta), as outras seguem e a página abre. */
+const ERROS_INICIO = [];
+async function passoInicio(nome, fn, prazo = 15000) {
+  try { await Promise.race([Promise.resolve().then(fn), new Promise((_, rej) => setTimeout(() => rej(new Error(`demorou mais de ${prazo / 1000} s`)), prazo))]); }
+  catch (e) { console.error(nome, e); ERROS_INICIO.push(`${nome}: ${e && e.message || e}`); }
+}
 async function init() {
-  Abas.iniciar();
-  Dica.iniciar();
-  iniciarSoIcone();
-  Tema.aplicar();
+  for (const [n, f] of [['abas', () => Abas.iniciar()], ['dicas', () => Dica.iniciar()], ['ícones', () => iniciarSoIcone()], ['tema', () => Tema.aplicar()]]) { try { f(); } catch (e) { ERROS_INICIO.push(n + ': ' + e.message); } }
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { }
   const hoje = new Date();
-  $('#printData').textContent = 'Emitido em ' + fmtData(hoje) + ', ' + fmtHora(hoje) + ' · Criado por Alexandre Neves';
-  $('#anoRodape').textContent = hoje.getFullYear();
-  await Pasta.init();
-  await carregarConfig();
-  await Param.carregar();
-  await Reg.carregar();
+  try { $('#printData').textContent = 'Emitido em ' + fmtData(hoje) + ', ' + fmtHora(hoje) + ' · Criado por Alexandre Neves'; $('#anoRodape').textContent = hoje.getFullYear(); } catch (e) { }
+  await passoInicio('Pasta compartilhada', () => Pasta.init(), 10000);
+  await passoInicio('Configurações', () => carregarConfig());
+  await passoInicio('Parametrizações', () => Param.carregar());
+  await passoInicio('Registros', () => Reg.carregar(), 20000);
   Reg.conferirLocais().catch(() => { });
-  Presenca.bater();
-  await Apr.carregar();
-  await Notas.carregar();
-  S = LS.get('atual', null);
-  if (S && S.v !== 2) S = null;
+  Presenca.bater().catch(() => { });
+  await passoInicio('Aprendizado', () => Apr.carregar());
+  await passoInicio('Notas', () => Notas.carregar());
+  try { S = LS.get('atual', null); if (S && (S.v !== 2 || !Array.isArray(S.guias) || !S.guias.length)) S = null; } catch (e) { S = null; }
   render();
+  if (ERROS_INICIO.length) toast('Parte dos dados não carregou: ' + ERROS_INICIO.join(' · '), 'bad');
 }
-init();
+init().catch(e => { (window.__erros || []).push('Abertura: ' + (e && e.stack || e)); try { render(); } catch (er) { if (window.__falhaAbrir) window.__falhaAbrir(); } });

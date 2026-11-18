@@ -236,8 +236,27 @@ function htmlPassos(g) {
 
 /* ---------- Tela principal do atendimento ---------- */
 function render() {
-  renderTopo(); pintarSync(); queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
   const app = $('#app');
+  try { renderTopo(); pintarSync(); } catch (e) { console.error(e); window.__erros && window.__erros.push('Topo: ' + (e.stack || e.message)); }
+  document.body.dataset.pronto = '1';
+  queueMicrotask(() => Mini.atualizar());   // painel flutuante acompanha o atendimento
+  try {
+    const r = renderTela(app);
+    if (r && r.catch) r.catch(e => mostrarErroTela(app, e));
+    return r;
+  } catch (e) { mostrarErroTela(app, e); }
+}
+/* uma tela que falha mostra o erro (e como sair dele) em vez de ficar em branco */
+function mostrarErroTela(app, e) {
+  console.error(e);
+  const det = `${e && e.stack || e}\n\nVersão ${VERSAO} · ${navigator.userAgent}`;
+  app.innerHTML = `<div class="card"><div class="card-h"><h2>${ic('alert')} Esta tela não abriu</h2></div>
+    <p>Algo nos dados desta tela causou um erro. Você pode voltar ao início ou descartar o atendimento aberto (ele continua registrado como em andamento). Envie os detalhes ao suporte.</p>
+    <pre class="original" style="max-height:220px">${esc(det)}</pre>
+    <div class="acoes"><button class="btn" data-act="erroInicio">${ic('left')}Ir para o início</button><button class="btn line" data-act="erroCopiar">${ic('copy', 'sm')}Copiar detalhes</button>${S ? `<button class="btn dng" data-act="erroSemAtend">${ic('trash', 'sm')}Fechar o atendimento aberto</button>` : ''}</div></div>`;
+  window.__ultimoErro = det;
+}
+function renderTela(app) {
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
   if (aba === 'config') return renderConfig(app);

@@ -19,6 +19,28 @@
     document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
   } catch (e) { }
 })();
+/* Se algo impedir a página de abrir, mostra o erro na tela (em vez de ficar em branco) para poder ser enviado ao suporte. */
+window.__erros = [];
+window.addEventListener('error', function (e) {
+  var t = e.target;
+  if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) window.__erros.push('Arquivo não carregou: ' + (t.src || t.href));
+  else window.__erros.push((e.message || 'erro') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ':' + e.colno + ')' : '') + (e.error && e.error.stack ? '\n' + String(e.error.stack).split('\n').slice(1, 4).join('\n') : ''));
+}, true);
+window.addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__erros.push('Erro assíncrono: ' + (r && (r.stack || r.message) || r)); });
+window.__falhaAbrir = function () {
+  if (document.body.dataset.pronto) return;
+  var app = document.getElementById('app'); if (!app) return;
+  var txt = (window.__erros.length ? window.__erros.join('\n\n') : 'Nenhum erro registrado: a página ficou esperando (pasta compartilhada ou navegador lento).') + '\n\nNavegador: ' + navigator.userAgent;
+  app.innerHTML = '<div style="max-width:760px;margin:24px auto;padding:20px;border:1px solid #fca5a5;background:#fef2f2;color:#7f1d1d;border-radius:12px;font:14px/1.5 system-ui,sans-serif">'
+    + '<b style="font-size:16px">O Conferidor não terminou de abrir.</b><p>Recarregue a página (Ctrl+F5). Se continuar, clique em <b>Copiar detalhes</b> e envie ao suporte. Se houver um atendimento aberto que esteja impedindo a abertura, use <b>Abrir sem o atendimento salvo</b> (ele fica guardado como cópia neste computador e continua registrado como em andamento).</p>'
+    + '<pre id="errTxt" style="white-space:pre-wrap;background:#fff;color:#1c2431;border:1px solid #fecaca;border-radius:8px;padding:10px;max-height:260px;overflow:auto;font-size:12.5px"></pre>'
+    + '<p style="display:flex;gap:8px;flex-wrap:wrap"><button id="errRec">Recarregar</button><button id="errCop">Copiar detalhes</button><button id="errSem">Abrir sem o atendimento salvo</button></p></div>';
+  document.getElementById('errTxt').textContent = txt;
+  document.getElementById('errRec').onclick = function () { location.reload(); };
+  document.getElementById('errCop').onclick = function () { try { navigator.clipboard.writeText(txt); this.textContent = 'Copiado'; } catch (e) { } };
+  document.getElementById('errSem').onclick = function () { try { var a = localStorage.getItem('conferidor.atual'); if (a) localStorage.setItem('conferidor.atual.copia', a); localStorage.removeItem('conferidor.atual'); } catch (e) { } location.reload(); };
+};
+document.addEventListener('DOMContentLoaded', function () { setTimeout(window.__falhaAbrir, 12000); });
 </script>
 <link rel="stylesheet" href="css/app.css">
 </head>
