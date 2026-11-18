@@ -297,9 +297,9 @@ function montarRegistro(g, status, extra = {}) {
   const p = g.pedido, cl = clinicaDe(S), A = avaliar(g), op = operadorObj();
   const neg = negadosDe(g).map(x => x.it.codigo);
   return {
-    id: g.id, atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.guias.length, versao: VERSAO,
+    id: g.id, atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.totalGuias || S.guias.length, versao: VERSAO,
     messageId: S.email.messageId, recebidoEm: S.email.data, assunto: S.email.assunto, remetente: S.email.remetente.email,
-    clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: op ? op.nome : '', operadorId: op ? op.id : null, abertoPor: g.abertoPor || (op ? op.nome : ''), dia: S.dia,
+    clinica: cl ? cl.nome : null, clinicaId: cl ? cl.id : null, operador: g.reaberta && g.reaberta.operador ? g.reaberta.operador : op ? op.nome : '', operadorId: g.reaberta && g.reaberta.operador ? g.reaberta.operadorId : op ? op.id : null, abertoPor: g.abertoPor || (op ? op.nome : ''), dia: S.dia,
     abertoEm: g.abertoEm, vista: g.vista, leituraCorrigida: leituraCorrigida(g), pacienteIni: iniciais(g.pedido.beneficiario || ''), paciente: g.pedido.beneficiario || '', atualizadoEm: agora(), concluidoEm: status === 'concluido' ? agora() : null, status, etapa: g.etapa,
     carteira: g.carteiraUsada || p.carteira || null,
     itens: p.itens.map(i => ({ c: i.codigo, q: i.qtd, d: i.desc, dc: descCadastro(cl, i.codigo) ?? null, aut: status === 'concluido' && !g.semGuia ? !neg.includes(i.codigo) : null })),
@@ -309,12 +309,55 @@ function montarRegistro(g, status, extra = {}) {
     bloqueios: A.filter(a => a.modo === 'bloqueio').map(a => a.texto),
     conferencia: { tentativas: g.cega.tentativas, divergencias: g.cega.historico, ...(g.prints ? { prints: { ok: g.prints.ok, em: g.prints.em, divergencias: g.prints.divergencias } } : {}) },
     correcoes: (g.eventos || []).filter(e => EV_CORRECAO.includes(e.tipo)).length, ignorados: g.prints && g.prints.ign ? Object.keys(g.prints.ign).length : 0,
-    editadoAMao: g.itensEditados, obsIncluidas: g.obsInc.length + g.respInc.length, duracaoSeg: Math.round((Date.now() - new Date(g.abertoEm)) / 1000), ...extra
+    editadoAMao: g.itensEditados, obsIncluidas: g.obsInc.length + g.respInc.length,
+    duracaoSeg: g.reaberta ? (g.reaberta.duracaoAntes || 0) + Math.round((Date.now() - new Date(g.reaberta.em)) / 1000) : Math.round((Date.now() - new Date(g.abertoEm)) / 1000),   // reaberta: soma só o tempo da correção
+    ...(g.reaberta ? { reaberta: { em: g.reaberta.em, por: g.reaberta.por, antes: g.reaberta.antes }, ...(g.reaberta.corrigida ? { corrigida: g.reaberta.corrigida } : {}) } : {}), ...extra
   };
 }
 async function gravarGuia(g, status, extra) {
+  if (g.reaberta && status !== 'concluido') { g.status = status; return; }   // guia reaberta: o registro concluído só muda quando ela for concluída de novo
   g.status = status; await Reg.salvar(montarRegistro(g, status, extra));
   if (status !== 'em_andamento') await Aud.salvar(g, status);   // histórico detalhado da guia (prints, ignorados, copiados)
+}
+/* ---------- Reabrir uma guia concluída para corrigir (Painel, histórico da guia ou o próprio atendimento) ----------
+   Reabrir não mexe no registro: ele continua como estava até a guia ser concluída de novo.
+   Descartar o atendimento (ou Desistir da correção) deixa a guia como estava registrada. */
+const podeReabrir = r => !!r && !r.tipo && r.status === 'concluido' && r.origem !== 'lista';
+function marcarReaberta(g, r, de) {
+  const copia = de === 'atendimento' ? clonar({ ...g, reaberta: null }) : null;   // para Desistir da correção no mesmo atendimento
+  g.reaberta = { em: agora(), por: operador(), de, copia, operador: (r && r.operador) || '', operadorId: (r && r.operadorId) || null,
+    duracaoAntes: (r && r.duracaoSeg) || 0, corrigida: (r && r.corrigida) || null,
+    antes: { guia: (r ? r.guia : g.numero) || '', situacao: (r && r.resultado && r.resultado.situacao) || g.resultado.situacao || '', concluidoEm: (r && r.concluidoEm) || '' } };
+  g.status = 'em_andamento'; g.vista = 4; g.etapa = Math.max(g.etapa || 0, 4);
+  evento(g, 'reaberta', `Guia reaberta para correção${g.reaberta.antes.guia ? ' (nº ' + g.reaberta.antes.guia + ')' : ''}`);
+}
+/* monta o atendimento de novo a partir do e-mail guardado no histórico (auditoria) e do registro (que vale mais: tem as correções do Painel) */
+function estadoReaberto(r, a) {
+  const email = emailDeTexto(a.email.texto, a.email.remetente || r.remetente || '');
+  Object.assign(email, { messageId: r.messageId || email.messageId, assunto: r.assunto || a.email.assunto || email.assunto, data: r.recebidoEm || a.email.recebidoEm || email.data, origem: 'reaberto' });
+  const st = novoEstado(email); if (!st.guias.length) return null;
+  const nc = normCart(r.carteira || ''), mesma = x => nc && normCart(x.pedido.carteira || x.carteiraUsada || '') === nc, porIdx = st.guias[r.idxGuia || 0];
+  const g = (porIdx && mesma(porIdx) ? porIdx : st.guias.find(mesma)) || porIdx || st.guias[0];
+  const p = g.pedido, ap = a.pedido || {}, res = r.resultado || {};
+  Object.assign(g, { id: r.id, idx: r.idxGuia || 0, abertoEm: r.abertoEm || g.abertoEm, abertoPor: r.abertoPor || r.operador || g.abertoPor, carteiraUsada: r.carteira || a.carteiraUsada || g.carteiraUsada, itensEditados: !!r.editadoAMao,
+    numero: r.guia || '', numeroOrigem: a.numeroOrigem || (r.guia ? 'digitado' : ''), semGuia: res.situacao === 'sem_guia' ? (res.modelo || null) : null, eventos: Array.isArray(a.eventos) ? a.eventos.slice() : [] });
+  if (a.paciente || r.paciente) { p.beneficiario = a.paciente || r.paciente; p.beneficiarios = [p.beneficiario]; }
+  if (ap.medico || ap.crm) { const nome = ap.medico || p.medico.nome || '', crm = ap.crm || p.medico.crm || ''; p.medico = { ...p.medico, nome, crm, bruto: [nome, crm ? `${p.medico.conselho || 'CRM'} ${crm}` : ''].filter(Boolean).join(' ') }; }
+  if (ap.cid) p.cid = ap.cid; if (ap.local) p.local = ap.local; if (ap.emissao) p.emissao = lerEmissao(ap.emissao, email.data);
+  if ((r.itens || []).length) p.itens = r.itens.map(i => { const x = p.itens.find(y => y.codigo === i.c); return { ...(x || { origemQtd: '' }), codigo: i.c, qtd: i.q ?? (x ? x.qtd : null), desc: (x && x.desc) || i.d || '' }; });
+  Object.assign(g.resultado, { situacao: res.situacao && res.situacao !== 'sem_guia' ? res.situacao : null, motivoId: res.motivoId || '', motivoTxt: res.motivoTxt || '', naoAut: { ...(res.naoAut || {}) },
+    obsAdicionais: (a.resultado && a.resultado.obsAdicionais) || '', glosa: { resp: res.glosaResp || null, itens: Object.fromEntries((res.glosas || []).map(x => [x.c, { glosa: x.g || '', motivo: x.m || '' }])) } });
+  const cf = r.conferencia || {}; Object.assign(g.cega, { ok: true, via: 'reaberta', tentativas: cf.tentativas || 0, historico: cf.divergencias || [] });   // a grade já foi conferida quando a guia foi concluída
+  if (r.parametrizado) g.param = { id: r.parametrizado.id, origem: r.parametrizado.origem };
+  Object.assign(st, { atendId: r.atendimentoId || st.atendId, dia: r.dia || st.dia, totalGuias: r.totalGuias || 1, guias: [g], ativa: 0, vista: 4 });
+  if (r.clinicaId && cfg.clinicas.some(c => c.id === r.clinicaId)) { st.clinicaId = r.clinicaId; st.clinicaSugerida = null; }
+  marcarReaberta(g, r, 'painel');
+  return st;
+}
+function htmlAvisoReaberta(g) {
+  if (!g || !g.reaberta || g.status === 'concluido') return '';
+  const an = g.reaberta.antes;
+  return `<div class="aviso" role="status">${ic('edit')}<div class="esp"><b>Guia reaberta para correção</b> por ${esc(g.reaberta.por || '—')} às ${fmtHora(g.reaberta.em)}. O registro anterior${an.guia ? ` (nº <span class="num">${esc(an.guia)}</span>${an.situacao ? ', ' + esc(SIT_ROTULO[an.situacao] || an.situacao) : ''})` : ''} continua valendo até você clicar em <b>Concluir guia</b>.</div><button class="btn sm line" data-act="desistirReabertura">${ic('undo', 'sm')}Desistir da correção</button></div>`;
 }
 async function gravarTodas(status, soPendentes) { for (const g of S.guias) { if (soPendentes && guiaTerminal(g)) continue; await gravarGuia(g, status === 'descartado' ? 'descartado' : g.status); } }
 const STATUS = { em_andamento: 'Em andamento', concluido: 'Concluída', cancelado: 'Cancelada', aguardando_clinica: 'Aguardando clínica', devolvido: 'Devolvido (legado)', descartado: 'Descartada' };

@@ -155,6 +155,18 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Reabrir guia e Guias do dia (versão 2.2.3)
+- **Reabrir guia concluída:** no Painel (Guias do dia) e no **Histórico da guia** (também pelo Auditar), o botão **Reabrir** abre a guia de novo na etapa 4. Ela é montada com o e-mail guardado no histórico e os dados registrados: número, situação, itens não autorizados, glosa, observação e as correções feitas à mão. Dá para corrigir o número, a situação, a observação ou a resposta e concluir de novo.
+  - O registro continua como estava até você clicar em **Concluir guia**. **Desistir da correção** (ou descartar o atendimento) deixa a guia exatamente como estava registrada.
+  - Ao concluir de novo, o registro é atualizado no mesmo dia e com o mesmo operador que gerou a guia. Ele fica marcado como **Reaberta** (com o número e a situação anteriores), os prints da primeira vez continuam no histórico e o tempo médio conta só o tempo da correção.
+  - **Reabrir para correção** dentro do atendimento passou a seguir a mesma regra: antes, descartar o e-mail com a guia reaberta marcava como descartada uma guia que já tinha sido gerada.
+  - Precisa do e-mail no histórico (guias concluídas com a pasta da auditoria). Guias da lista do dia continuam com **Desfazer** na aba da lista, e **Corrigir guia** segue para trocar só a carteira e os serviços.
+- **Busca e filtros de Guias do dia:**
+  - Filtrar e buscar não relê mais a pasta nem redesenha a página: a tabela muda na hora, a página não volta para o topo e as letras digitadas não se perdem.
+  - A busca procura também o nome do beneficiário e o operador, aceita as palavras em qualquer ordem e acha carteira ou número da guia digitados com espaços ou pontos.
+  - Status ganhou **Cancelada**; Clínica ganhou **Clínica não identificada**; o filtro de clínica escolhido continua aparecendo no seletor ao trocar de dia.
+  - Atualizar o Painel (ou cancelar e corrigir uma guia) mantém a posição da página.
+
 ### Acompanhamento mais confiável (versão 2.2.2)
 - **Mesmo operador em dois computadores:** cada navegador grava a própria presença (`presenca/<operador>--<código do navegador>.json`) e o quadro soma as guias dos dois; antes, o último a gravar apagava as guias do outro.
 - **Troca de operador:** a presença do operador anterior é apagada na hora, e as guias passam a aparecer com o novo operador (antes, o anterior continuava "ao vivo" por até 3 min).

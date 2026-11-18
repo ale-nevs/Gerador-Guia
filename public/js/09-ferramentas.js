@@ -341,7 +341,7 @@ const Aud = {
     const st = situacaoGuia(g), em = p.emissao;
     return {
       id: g.id, dia: S.dia, status, versao: VERSAO, salvoEm: agora(), operador: op ? op.nome : '', abertoEm: g.abertoEm,
-      atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.guias.length,
+      atendimentoId: S.atendId, idxGuia: g.idx, totalGuias: S.totalGuias || S.guias.length, ...(g.reaberta ? { reaberta: { em: g.reaberta.em, por: g.reaberta.por, antes: g.reaberta.antes } } : {}),
       email: { remetente: S.email.remetente.email, assunto: S.email.assunto, recebidoEm: S.email.data, texto: (S.email.textoPrincipal || '').slice(0, 20000) },
       clinica: cl ? cl.nome : '', paciente: p.beneficiario || '', carteiraInformada: p.carteiraBruta || '', carteiraUsada: g.carteiraUsada || '',
       pedido: { medico: p.medico.nome || '', crm: p.medico.crm || '', cid: p.cid || '', emissao: em.estado === 'valida' ? fmtData(em.data) : (em.estado === 'sem_data' ? 'SEM DATA' : (em.bruto || '')), local: p.local || '',
@@ -362,6 +362,7 @@ const Aud = {
   },
   async salvar(g, status) {
     let a; try { a = this.montar(g, status); } catch (e) { console.error(e); return; }
+    if (g.reaberta && !PRINTS_MEM.get(g.id)) { try { const ant = await this.ler(a); if (ant) { if (!a.prints && ant.prints) a.prints = ant.prints; if (!a.cega && ant.cega) a.cega = ant.cega; } } catch (e) { } }   // reaberta sem prints novos: ficam os prints da primeira vez
     if (Pasta.ok) { try { await Pasta.gravar(this.partes(a.dia), a.id + '.json', a); return; } catch (e) { } }
     try { await idbSet('aud:' + a.id, a); } catch (e) { }
   },
@@ -434,10 +435,10 @@ function abrirRelato(alvo) {
     rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="relatoOk">${ic('download', 'sm')}Baixar arquivo</button>` });
 }
 async function abrirHistoricoGuia(id) {
-  const r = Reg.todos[id] || Reg.cache.find(x => x.id === id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }
+  const r = regPorId(id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }
   const a = await Aud.ler(r);
   abrirModal({ lateral: true, titulo: 'Histórico da guia', sub: `${r.paciente || r.pacienteIni || 'Beneficiário'} · ${r.guia || 'sem número'}`, icone: 'eye', tamanho: 'g', corpo: htmlHistoricoGuia(r, a),
-    rodape: `<button class="btn line" data-act="relatarHist" data-id="${esc(r.id)}">${ic('help', 'sm')}Relatar problema</button><span style="flex:1"></span><button class="btn" data-act="fecharModal">Fechar</button>` });
+    rodape: `<button class="btn line" data-act="relatarHist" data-id="${esc(r.id)}">${ic('help', 'sm')}Relatar problema</button><span style="flex:1"></span>${podeReabrir(r) ? `<button class="btn line" data-act="reabrirRegistro" data-id="${esc(r.id)}" title="Abre a guia de novo na etapa 4 para corrigir número, situação, observação ou resposta">${ic('edit', 'sm')}Reabrir guia</button>` : ''}<button class="btn" data-act="fecharModal">Fechar</button>` });
 }
 /* ---------- Auditar (aba Ações): busca em todos os registros ---------- */
 let AUD_BUSCA = { q: '', res: null, buscando: false };
@@ -482,7 +483,7 @@ function evento(g, tipo, texto, dados) {
   g.eventos = g.eventos || [];
   g.eventos.push({ em: agora(), op: operador(), tipo, texto, ...(dados ? { dados } : {}) });
 }
-const EV_ROT = { 'edicao-email': 'Leitura do e-mail corrigida', 'edicao-campo': 'Campo editado', carteira: 'Carteira usada', print: 'Print lido', 'print-erro': 'Print recusado', numero: 'Nº da guia', releitura: 'Releitura do print', ignorado: 'Divergência aceita', desfeito: 'Ignorar desfeito', conferido: 'Alerta conferido', aprendido: 'Correção aprendida aplicada', regra: 'Regra da clínica' };
+const EV_ROT = { 'edicao-email': 'Leitura do e-mail corrigida', 'edicao-campo': 'Campo editado', carteira: 'Carteira usada', print: 'Print lido', 'print-erro': 'Print recusado', numero: 'Nº da guia', reaberta: 'Guia reaberta', releitura: 'Releitura do print', ignorado: 'Divergência aceita', desfeito: 'Ignorar desfeito', conferido: 'Alerta conferido', aprendido: 'Correção aprendida aplicada', regra: 'Regra da clínica' };
 const EV_CORRECAO = ['edicao-email', 'edicao-campo', 'carteira', 'releitura', 'ignorado', 'aprendido'];
 
 /* ====================================================================
