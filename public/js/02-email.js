@@ -73,6 +73,13 @@ function coletarPartes(p, out) {
   if (p.tipo === 'text/plain' && out.plain == null) out.plain = corpoTexto(p);
   else if (p.tipo === 'text/html' && out.html == null) out.html = corpoTexto(p);
 }
+/* texto do e-mail: o texto simples; mas, se o HTML traz a planilha do dia colada (tabela com Beneficiário, Carteira
+   e Serviço), vale o texto do HTML, que mantém as colunas (no texto simples as células se misturam) */
+function textoDoCorpo(plain, html) {
+  const p = plain != null && plain.trim() ? plain : null;
+  if (html && /<t[dh][\s>]/i.test(html) && !(p && p.includes('\t'))) { const th = htmlParaTexto(html); if (temPlanilhaDoDia(limparTexto(th))) return th; }
+  return p != null ? p : (html ? htmlParaTexto(html) : (plain || ''));
+}
 function htmlParaTexto(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script,style,head,title').forEach(n => n.remove());
@@ -125,7 +132,7 @@ function lerEml(buf) {
   const out = { plain: null, html: null, anexos: [] };
   coletarPartes(raiz, out);
   const H = n => decodificarPalavras(talvezUtf8((raiz.h[n] || [''])[0])).trim();
-  let texto = out.plain != null && out.plain.trim() ? out.plain : (out.html != null ? htmlParaTexto(out.html) : (out.plain || ''));
+  let texto = textoDoCorpo(out.plain, out.html);
   texto = limparTexto(texto);
   const remetente = endereco(H('from'));
   const responderPara = H('reply-to') ? endereco(H('reply-to')) : null;
@@ -152,7 +159,7 @@ function emailDeTexto(texto, remetenteTxt) {
 /* E-mail aberto no webmail (extensão do Chrome): mesmo formato devolvido por lerEml */
 function emailDeWebmail(m) {
   const html = m.html || '';
-  let texto = (m.plain && m.plain.trim()) ? m.plain : (html ? htmlParaTexto(html) : '');
+  let texto = textoDoCorpo(m.plain, html);
   texto = limparTexto(texto);
   const corte = cortarHistorico(texto);
   const remetente = endereco(m.fromEmail ? `${m.fromNome || ''} <${m.fromEmail}>` : (m.fromNome || ''));
@@ -492,13 +499,20 @@ function dividirPor(linhas, ks, tipos, cabecalhoCompartilhado) {
   return { cab, blocos: inicios.map((ini, j) => linhas.slice(ini, j + 1 < inicios.length ? inicios[j + 1] : linhas.length)) };
 }
 /* ---------- Tabelas (e-mail em HTML): as células chegam separadas por tabulação ---------- */
-const ROT_CANON = { beneficiario: 'Beneficiário', carteira: 'Carteira', servico: 'Serviço', quantidade: 'Quantidade', medico: 'Médico', cid: 'CID', emissao: 'Emissão', local: 'Local', obs: 'Obs' };
+const ROT_CANON = { beneficiario: 'Beneficiário', carteira: 'Carteira', servico: 'Serviço', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', emissao: 'Emissão', local: 'Local', obs: 'Obs' };
 function rotuloDeCelula(cel) {
   const n = normUnidades(cel.replace(/[*_]/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/^[^\p{L}\p{N}]*/u, '').trim());
   if (/^especialidades?\b|^terapias?\b/.test(n)) return 'servico';
   if (/^sess(oes|ao)(\s+por\s+semana)?\b|^quant|^qtd|^qtde/.test(n)) return 'quantidade';
+  if (/^(crm|registro)(\s+d[oa]\s+medic[oa])?$/.test(n)) return 'crm';   // coluna própria do CRM (planilha do dia)
   for (const [k, re] of ROTULOS) if (re.test(n)) return k;
   return null;
+}
+/* o CRM (coluna própria) vai logo depois do médico, em qualquer ordem de colunas: é lido junto com ele */
+function crmDepoisDoMedico(b) {
+  const iC = b.findIndex(x => /^CRM: /.test(x)); if (iC < 0) return b;
+  const c = b.splice(iC, 1), iM = b.findIndex(x => /^Médico: /.test(x));
+  b.splice(iM >= 0 ? iM + 1 : iC, 0, ...c); return b;
 }
 function converterTabelas(texto) {
   const L = texto.split('\n'); if (!L.some(l => l.includes('\t'))) return texto;
@@ -517,7 +531,7 @@ function converterTabelas(texto) {
       const cab = tab[0].map(rotuloDeCelula);
       if (cab.filter(Boolean).length < 2 && !cab.some(k => k === 'carteira' || k === 'beneficiario')) { tab.forEach(r => out.push(r.filter(Boolean).join('   '))); continue; }
       const temPac = cab.includes('beneficiario') || cab.includes('carteira');
-      const blocos = tab.slice(1).filter(r => r.some(Boolean)).map(r => r.map((c, k) => c ? (cab[k] ? `${ROT_CANON[cab[k]]}: ${c}` : c) : '').filter(Boolean));
+      const blocos = tab.slice(1).filter(r => r.some(Boolean)).map(r => r.map((c, k) => c ? (cab[k] ? `${ROT_CANON[cab[k]]}: ${c}` : c) : '').filter(Boolean)).map(crmDepoisDoMedico);
       if (temPac) { haPacientes = true; blocos.forEach(b => { out.push(...b); out.push('-----'); }); }
       else blocos.forEach(b => compartilhados.push(...b));
     }

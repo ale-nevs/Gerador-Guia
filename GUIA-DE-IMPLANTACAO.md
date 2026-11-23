@@ -155,6 +155,14 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Planilha do dia colada no e-mail (versão 2.2.12)
+A clínica com muitos pacientes no dia pode mandar uma planilha só, colada no corpo do e-mail: uma linha por paciente e serviço, com as colunas Beneficiário, Carteira, Serviço, Quantidade, Médico, CRM, CID, Emissão, Local de emissão e Observações. O Conferidor abre como **lista do dia**, igual à da Erasmo Neto: divisão entre operadores, Continuar, Acompanhar e e-mail de entrega.
+- **Reconhecida sozinha, de qualquer clínica:** tabela com as colunas Beneficiário, Carteira e Serviço e pelo menos 2 linhas. Não precisa marcar a clínica como "Manda a agenda do dia em lista". Uma tabela com uma linha só segue como atendimento normal.
+- **Os três caminhos funcionam:** botão do webmail, arquivo .eml e texto colado (copiado do Excel). Quando o e-mail traz a tabela em HTML, a leitura usa essa versão, que mantém as colunas; no texto simples as células se misturam.
+- **Nomes de coluna flexíveis:** Paciente, Nº da carteira, Código do serviço, Qtd, Data do pedido, Local e Obs também valem. O CRM pode estar em coluna própria, em qualquer posição.
+- A planilha só anexada (sem a tabela colada no corpo do e-mail) não é lida.
+- O modelo para as clínicas (arquivo .xlsx com as abas Planilha do dia, Como preencher e Exemplo) e o e-mail de orientação estão no guia para as clínicas.
+
 ### Modelo "Dados não identificados no pedido" (versão 2.2.11)
 Novo modelo em **Responder sem gerar guia**. Ele lista para a clínica tudo o que não foi identificado no pedido, um por linha:
 - nome do beneficiário;

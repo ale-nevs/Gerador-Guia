@@ -13,21 +13,22 @@ const SEM_GUIA_LISTA = ['Paciente excluso', 'Guia já liberada em', 'Carteira n�
 
 /* ---------- leitura do e-mail da lista ---------- */
 function lerListaTexto(texto) {
-  const t = String(texto || '').replace(/\r/g, '').replace(/ /g, ' ');
+  const t = converterTabelas(String(texto || '').replace(/\r/g, '').replace(/ /g, ' '));   // planilha colada: cada linha vira um bloco com Beneficiário, Carteira etc.
   const linhas = t.split('\n');
   const ini = []; linhas.forEach((l, i) => { if (/^\s*benefici[aá]ri[oa]s?\s*:/i.test(l)) ini.push(i); });
-  const ROT = [['carteira', /^cart(eira|eirinha|ão|ao|\.)?\b/i], ['servico', /^(servi[cç]o|procedimento|terapia)/i], ['qtd', /^(quantidade|qtde?|qnt)/i],
+  const ROT = [['crm', /^crm\b/i], ['carteira', /^cart(eira|eirinha|ão|ao|\.)?\b/i], ['servico', /^(servi[cç]o|procedimento|terapia)/i], ['qtd', /^(quantidade|qtde?|qnt)/i],
     ['medico', /^(m[eé]dico|solicitante|profissional)/i], ['cid', /^cid/i], ['emissao', /^(emiss[aã]o|data)/i], ['local', /^local/i], ['obs', /^obs/i]];
   return ini.map((a, k) => {
     const bloco = linhas.slice(a, k + 1 < ini.length ? ini[k + 1] : linhas.length);
-    const it = { benef: bloco[0].replace(/^\s*benefici[aá]ri[oa]s?\s*:/i, '').replace(/\t/g, ' ').trim(), carteiraBruta: '', servicoBruto: '', qtd: null, medicoBruto: '', cid: '', emissao: '', local: '', obs: '' };
+    const it = { benef: bloco[0].replace(/^\s*benefici[aá]ri[oa]s?\s*:/i, '').replace(/\t/g, ' ').trim(), carteiraBruta: '', servicoBruto: '', qtd: null, medicoBruto: '', crmBruto: '', cid: '', emissao: '', local: '', obs: '' };
     let ultimo = null;
     bloco.slice(1).forEach(l0 => {
       const l = l0.replace(/\t/g, ' ').trim(); if (!l) return;
+      if (/^-{3,}$/.test(l)) { ultimo = null; return; }   // separador entre as linhas da planilha
       const m = l.match(/^([A-Za-zÀ-ÿ .]{2,30}?)\s*:\s*(.*)$/);
       if (m) { const r = ROT.find(([, re]) => re.test(m[1].trim())); if (r) { ultimo = r[0]; const v = m[2].trim();
         if (r[0] === 'carteira') it.carteiraBruta = v; else if (r[0] === 'servico') it.servicoBruto = v; else if (r[0] === 'qtd') { const q = v.match(/\d{1,3}/); it.qtd = q ? Number(q[0]) : null; }
-        else if (r[0] === 'medico') it.medicoBruto = v; else if (r[0] === 'cid') it.cid = v.replace(/\s+/g, '').toUpperCase(); else if (r[0] === 'emissao') it.emissao = v; else if (r[0] === 'local') it.local = v; else if (r[0] === 'obs') it.obs = v;
+        else if (r[0] === 'medico') it.medicoBruto = v; else if (r[0] === 'crm') it.crmBruto = v; else if (r[0] === 'cid') it.cid = v.replace(/\s+/g, '').toUpperCase(); else if (r[0] === 'emissao') it.emissao = v; else if (r[0] === 'local') it.local = v; else if (r[0] === 'obs') it.obs = v;
         return; } }
       if (ultimo === 'obs' && !/^(atenciosamente|att|obrigad)/i.test(l)) it.obs = (it.obs ? it.obs + ' ' : '') + l;   // observação em mais de uma linha
     });
@@ -36,6 +37,8 @@ function lerListaTexto(texto) {
     it.servico = it.servicoBruto.replace(/(?<!\d)\d{8}(?!\d)/, '').replace(/^[\s\-–—:]+/, '').trim();
     const md = it.medicoBruto.match(/^(?:crm\s*)?(\d{3,7})\s*[-–—:]?\s*(.*)$/i);
     it.crm = md ? md[1] : ''; it.medico = (md ? md[2] : it.medicoBruto).replace(/^[\s\-–—]+/, '').trim();
+    if (!it.crm) { const c = (it.crmBruto || '').match(/\d{3,7}/) || it.medico.match(/\bcrm\b\s*[:\-nº°.]*\s*(\d{3,7})(?:\s*[-\/]?\s*[A-Z]{2}\b)?/i);   // CRM em coluna própria, ou depois do nome
+      if (c) { it.crm = c[1] || c[0]; if (!it.crmBruto) it.medico = it.medico.replace(c[0], '').replace(/[\s\-–—,]+$/, '').trim(); } }
     it.carteira = normCart(it.carteiraBruta);
     if (/^[\s\-–—.]*$/.test(it.obs)) it.obs = '';
     it.bloco = bloco.join('\n').trim();
@@ -48,7 +51,14 @@ function clinicaListaDe(email) {
   if (cl && cl.lista) return cl;
   const rem = (email.remetente && email.remetente.email || '').toLowerCase();
   if (/@clinicaserasmoneto\.com\.br$/.test(rem) || /erasmo\s*neto/i.test(email.assunto || '')) return cl || cfg.clinicas.find(c => /erasmo/i.test(c.nome)) || { id: 'erasmo-neto', nome: 'Erasmo Neto', emails: [] };
+  if (temPlanilhaDoDia(email.textoCompleto || email.textoPrincipal)) return cl || { id: '', nome: (email.remetente && (email.remetente.nome || email.remetente.email)) || 'Planilha do dia', emails: [] };   // planilha do dia de qualquer clínica
   return null;
+}
+/* planilha do dia colada no corpo do e-mail: cabeçalho com Beneficiário, Carteira e Serviço e ao menos 2 linhas de pacientes */
+function temPlanilhaDoDia(texto) {
+  const L = String(texto || '').split('\n');
+  const i = L.findIndex(l => l.includes('\t') && (ks => ['beneficiario', 'carteira', 'servico'].every(k => ks.includes(k)))(l.split('\t').map(c => rotuloDeCelula(c.trim()))));
+  return i >= 0 && L.slice(i + 1).filter(l => l.includes('\t') && l.replace(/\t/g, '').trim()).length >= 2;
 }
 const ehEmailLista = email => { const cl = clinicaListaDe(email); return cl && lerListaTexto(email.textoCompleto || email.textoPrincipal).length >= 2 ? cl : null; };
 const normNomeLista = s => norm(String(s || '')).replace(/\s+/g, ' ').trim();
