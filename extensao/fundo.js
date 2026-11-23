@@ -1,6 +1,11 @@
 /* Service worker: leva o e-mail do webmail para a aba do Conferidor de Guias (abre uma aba se necessário),
-   pergunta ao Conferidor se o e-mail já está em atendimento e leva a resposta pronta de volta ao webmail. */
-const REG = 'conferidores';
+   pergunta ao Conferidor se o e-mail já está em atendimento e leva a resposta pronta de volta ao webmail.
+   A resposta fica só na memória da sessão do navegador (storage.session) até ser colada ou descartada. */
+const REG = 'conferidores', PEND = 'cfResp';
+/* os scripts do webmail (todas as janelas e quadros) leem e acompanham a resposta pendente */
+const liberarSessao = () => { try { return chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }).catch(() => { }); } catch (e) { return Promise.resolve(); } };
+liberarSessao();
+chrome.storage.session.remove('resposta').catch(() => { });   // formato da versão 1.2
 const lerReg = async () => (await chrome.storage.session.get(REG))[REG] || {};
 const gravarReg = r => chrome.storage.session.set({ [REG]: r });
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -33,14 +38,20 @@ async function statusDoEmail(msg) {
   const r = await comPrazo(chrome.tabs.sendMessage(aba.id, { tipo: 'status', msg }).catch(() => null), 7000, null);
   return { info: (r && r.info) || null };
 }
+const txt = (v, n) => String(v == null ? '' : v).slice(0, n);
+/* o e-mail que deve receber a resposta (a ponte só abre o Responder a todos sozinha se for ele o aberto) */
+const limparAlvo = a => ({ messageIds: (a && Array.isArray(a.messageIds) ? a.messageIds : []).map(x => txt(x, 300)).filter(Boolean).slice(0, 20), assunto: txt(a && a.assunto, 300), de: txt(a && a.de, 200) });
 async function levarResposta(resposta) {
-  await chrome.storage.session.set({ resposta });
+  await liberarSessao();
   const { webmailAba } = await chrome.storage.session.get('webmailAba');
   let aba = null;
   if (webmailAba) { try { aba = await chrome.tabs.get(webmailAba); } catch (e) { aba = null; } }
-  if (!aba) { const l = await chrome.tabs.query({ url: 'https://mail.promedica.com.br/*' }); aba = l[0] || null; }
+  if (!aba) { const l = await chrome.tabs.query({ url: 'https://mail.promedica.com.br/*' }); aba = l.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0] || null; }
   if (!aba) return { ok: false, motivo: 'Abra o webmail numa aba.' };
-  try { await chrome.tabs.sendMessage(aba.id, { tipo: 'resposta', resposta }); } catch (e) { return { ok: false, motivo: 'Aperte F5 no webmail e tente de novo.' }; }
+  const pend = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), html: txt(resposta.html, 400000), texto: txt(resposta.texto, 200000), quem: txt(resposta.quem, 160), assunto: txt(resposta.assunto, 300), alvo: limparAlvo(resposta.alvo), aba: aba.id, estado: 'novo', criado: Date.now() };
+  await chrome.storage.session.set({ [PEND]: pend });
+  try { await chrome.tabs.sendMessage(aba.id, { tipo: 'resposta', id: pend.id }, { frameId: 0 }); }
+  catch (e) { await chrome.storage.session.remove(PEND); return { ok: false, motivo: 'Aperte F5 no webmail e tente de novo.' }; }
   await focar(aba);
   return { ok: true };
 }
@@ -59,9 +70,12 @@ chrome.runtime.onMessage.addListener((m, sender, responder) => {
   }
   if (m.tipo === 'status' && m.msg) { statusDoEmail(m.msg).then(responder).catch(() => responder({ info: null })); return true; }
   if (m.tipo === 'guardarResposta' && m.resposta) { levarResposta(m.resposta).then(responder).catch(e => responder({ ok: false, motivo: String(e && e.message || e) })); return true; }
-  if (m.tipo === 'pegarResposta') { chrome.storage.session.get('resposta').then(r => responder({ resposta: r.resposta || null })); return true; }
-  if (m.tipo === 'respostaUsada') { chrome.storage.session.remove('resposta'); return; }
+  if (m.tipo === 'meuTab') { responder({ tabId: sender.tab ? sender.tab.id : -1, frameId: sender.frameId || 0 }); return; }
+  if (m.tipo === 'acesso') { liberarSessao().then(() => responder({ ok: true })); return true; }
+  if (m.tipo === 'respostaUsada') { chrome.storage.session.remove(PEND); return; }
 });
+chrome.runtime.onStartup.addListener(liberarSessao);
+chrome.runtime.onInstalled.addListener(liberarSessao);
 chrome.action.onClicked.addListener(async () => {
   const aba = await abaDoConferidor();
   if (aba) { await focar(aba); return; }

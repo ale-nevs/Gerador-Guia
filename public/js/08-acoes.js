@@ -50,7 +50,12 @@ window.addEventListener('message', ev => {
   const responder = r => { if (d.pid) window.postMessage({ __conferidorPagina: 'resposta', pid: d.pid, ...r }, location.origin); };
   if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg).then(responder, () => responder({ ok: false })); }
   if (d.__conferidorExt === 'status' && d.msg) statusWebmail(d.msg).then(responder, () => responder({ info: null }));
-  if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
+  if (d.__conferidorExt === 'respostaEntregue') {
+    const t = !d.ok ? 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.')
+      : extDesatualizada() ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta". (Atualize a extensão para abrir o "Responder a todos" sozinha.)'
+      : 'Resposta levada ao webmail: o "Responder a todos" abre com a resposta colada. Revise e envie por lá.';
+    toast(t, d.ok ? '' : 'bad'); if (Mini.aberto()) Mini.avisar(d.ok ? 'Resposta levada ao webmail.' : t);
+  }
 });
 async function iniciar(email) {
   const clL = ehEmailLista(email);
@@ -100,6 +105,13 @@ const alterarCampoGuia = (g, campo, v) => {
   }
 };
 /* Reavalia o botão Concluir enquanto se digita (sem redesenhar a tela e perder o foco) */
+/* Conferi num aviso: linha do tempo e aprendizado da clínica (o mesmo aviso, conferido de novo, vira informativo) */
+function marcarConferido(g, k, on) {
+  const al = situacaoGuia(g).A.find(a => a.key === k);
+  g.conf = g.conf || {}; g.conf[k] = on;
+  evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
+  if (al) Apr.marcarConferido(al, on).catch(() => { });
+}
 function atualizarConcluir(g) {
   const pend = pendenciasConclusao(g, situacaoGuia(g)), bt = $('[data-act=concluirGuia]'); if (bt) bt.disabled = pend.length > 0;
   const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
@@ -176,7 +188,7 @@ const acoes = {
   irVista(b) {
     const v = +b.dataset.v, g = guiaAtiva(), st = situacaoGuia(g);
     if (g.semGuia && g.status !== 'concluido' && v >= 2 && v !== 4) { acoes.desfazerSemGuia(); return; }
-    if (v === 3 && !st.pode) { toast('Há bloqueios na etapa 2: corrija os dados apontados nos alertas ou responda à clínica sem gerar a guia.', 'bad'); return; }
+    if (v === 3 && !st.pode) { toast(st.bloqueios.length ? 'Há bloqueios na etapa 2: corrija os dados apontados nos alertas ou responda à clínica sem gerar a guia.' : 'Possível pedido repetido: confira o aviso em vermelho e marque "Conferi: não é repetido" antes de seguir.', 'bad'); return; }
     if (v === 4 && g.status !== 'concluido' && !podeFinal(g, st)) { toast('Falta conferir a grade: cole os prints do sistema (ou faça a conferência sem prints) na etapa 3.', 'bad'); return; }
     if (v >= 3 && g.status !== 'concluido') gravarGuia(g, g.status);
     mudarVista(v);
@@ -221,6 +233,7 @@ const acoes = {
         const velhos = [...p.itens.map(i => i.codigo), ...p.invalidos], novos = it.map(x => x.codigo);
         const sairam = velhos.filter(c => !novos.includes(c)), entraram = novos.filter(c => !velhos.includes(c));
         if (sairam.length === 1 && entraram.length === 1) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'codigo', lido: sairam[0], correto: entraram[0] });
+        else if (sairam.length > 1 && sairam.length === entraram.length) sairam.forEach((c, i) => { if (distanciaTexto(c, entraram[i]) <= 2) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'codigo', lido: c, correto: entraram[i] }); });   // vários de uma vez: pares na ordem, só os parecidos (dígito trocado, a mais ou a menos)
         it.forEach(x => { const o = p.itens.find(i => i.codigo === x.codigo); if (o && String(o.qtd ?? '?') !== String(x.qtd || '?') && /^\d+$/.test(x.qtd)) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'quantidade', lido: o.qtd ?? '?', correto: x.qtd, ref: x.codigo }); });
       }
     }
@@ -335,14 +348,10 @@ const acoes = {
     const fonte = (b && b.dataset.fonte) || 'editor';
     if (fonte === 'lista') { Lista.responderWebmail(b.dataset.lista); return; }
     const g = guiaAtiva(); if (!g) return;
-    let html;
-    if (fonte === 'concluida') html = htmlParaEmail(respostaDaGuia(g, false).html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1'));
-    else { const ed = $('#edResp'); if (!ed) { toast('Abra a resposta na etapa 4 para levá-la ao webmail.', 'bad'); return; } html = htmlParaEmail(serializarEditor(ed)); }
-    const texto = htmlPlano(html);
+    const ed = fonte === 'concluida' ? null : $('#edResp');
+    const { html, texto } = ed ? (h => ({ html: htmlParaEmail(h), texto: htmlPlano(h) }))(serializarEditor(ed)) : respostaParaCopiar(g, fonte === 'concluida');
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    const quem = nomesAtend();
-    enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' });
-    g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
+    levarRespostaAoWebmail(g, html, texto); render();
   },
   async copiarRespSimples() {
     const g = guiaAtiva(), texto = htmlPlano(serializarEditor($('#edResp')));
@@ -464,11 +473,8 @@ const acoes = {
     await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
   async regSync() { const n = await Reg.sincronizar(); await Reg.carregar(); render(); toast(Reg.nPendentes() ? 'Ainda não consegui gravar na pasta. Confira a conexão e tente de novo.' : n ? `${n} ${n === 1 ? 'atendimento enviado' : 'atendimentos enviados'} para a pasta.` : 'Nada pendente.', Reg.nPendentes() ? 'bad' : ''); },
-  conferiAlerta(b) {
-    const g = guiaAtiva(); if (!g) return; const k = b.dataset.conf, on = !(g.conf && g.conf[k]);
-    g.conf = g.conf || {}; g.conf[k] = on; const al = situacaoGuia(g).A.find(a => a.key === k);
-    evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
-  },
+  conferiAlerta(b) { const g = guiaAtiva(); if (g) marcarConferido(g, b.dataset.conf, !(g.conf && g.conf[b.dataset.conf])); },
+  copiarValor: async b => { const v = b.dataset.v || ''; if (v && await copiar(v)) toast('Copiado: ' + v); else toast('Não foi possível copiar.', 'bad'); },
   async pinLiberar() { const v = ($('#pinIn') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); render(); toast('Liberado por 15 minutos.'); } else { toast('PIN incorreto.', 'bad'); const i = $('#pinIn'); if (i) i.select(); } },
   async pinModalOk() { const v = ($('#pinModal') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); fecharModal(true); const d = Pin.depois; Pin.depois = null; render(); toast('Liberado por 15 minutos.'); if (d) d(); } else { toast('PIN incorreto.', 'bad'); $('#pinModal').select(); } },
   pinPedir() { pedirPin(null); },
@@ -514,8 +520,8 @@ const acoes = {
     if (!extInstalada()) { toast('Para levar o e-mail direto ao webmail, instale a extensão do Chrome (passo a passo abaixo).'); acoes.baixarExtensao(); return; }
     const e = emailAjusteDe(r, M.apont, false);
     if (e.faltando.length && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    enviarAoWebmail({ html: htmlParaEmail(e.html), texto: e.texto, quem: r.paciente || r.pacienteIni || '', assunto: `Ajuste da guia ${r.guia}` });
-    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = 'Levado ao webmail: cole na resposta aberta e envie por lá.';
+    enviarAoWebmail({ html: htmlParaEmail(e.html), texto: e.texto, quem: r.paciente || r.pacienteIni || '', assunto: `Ajuste da guia ${r.guia}`, alvo: alvoEmail([r.messageId], r.assunto, r.remetente) });
+    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = extDesatualizada() ? 'Levado ao webmail: cole na resposta aberta e envie por lá.' : 'Levado ao webmail: com o e-mail original aberto, o Responder a todos abre com o texto colado. Revise e envie por lá.';
   },
   relatarGuia() { const g = guiaAtiva(); if (g) abrirRelato({ g }); },
   async relatarHist(b) { const r = regPorId(b.dataset.id); if (!r) { toast('Registro não encontrado: atualize a lista e tente de novo.', 'bad'); return; } const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
@@ -728,7 +734,7 @@ document.addEventListener('input', e => {
   if (M && M.tipo === 'obs' && t.dataset.obstxt) { M.txt = t.value; M.editado = true; return; }
   if (!S) return;
   const g = guiaAtiva();
-  if (t.dataset.glf) { const gl = glosaDe(g); if (gl.itens[t.dataset.c]) gl.itens[t.dataset.c][t.dataset.glf] = t.value; persistir(); atualizarConcluir(g); return; }
+  if (digitouFinal(t, g)) return;
   if (t.dataset.cega) {
     const i = +t.dataset.i; g.cega.entradas[i] = { ...(g.cega.entradas[i] || {}), [t.dataset.cega]: t.value.replace(/\D/g, '') };
     if (t.value !== t.value.replace(/\D/g, '')) t.value = t.value.replace(/\D/g, '');
@@ -750,7 +756,6 @@ document.addEventListener('input', e => {
   }
   if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && g.copiados.obs !== t.value) $$('[data-act=copiarObs].copiado').forEach(x => estadoCopiaBtn(x, false)); return; }
   if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); persistir(); return; }
-  if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return; }
 });
 document.addEventListener('change', async e => {
   const t = e.target;
@@ -786,7 +791,7 @@ document.addEventListener('change', async e => {
   }
   if (!S) return;
   const g = guiaAtiva();
-  if (t.dataset.conf) { g.conf = g.conf || {}; g.conf[t.dataset.conf] = t.checked; const al = situacaoGuia(g).A.find(a => a.key === t.dataset.conf); evento(g, 'conferido', `${t.checked ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : t.dataset.conf}`); persistir(); render(); return; }
+  if (t.dataset.conf) { marcarConferido(g, t.dataset.conf, t.checked); return; }
   if (t.dataset.campo) {
     const k = t.dataset.campo, v = t.value.trim(), p = g.pedido;
     const antes = k === 'medico' ? [p.medico.nome, p.medico.crm && 'CRM ' + p.medico.crm].filter(Boolean).join(' ') : k === 'emissao' ? (p.emissao.estado === 'valida' ? fmtData(p.emissao.data) : p.emissao.bruto || '') : k === 'beneficiario' ? p.beneficiario : (p[k] || '');
@@ -804,22 +809,32 @@ document.addEventListener('change', async e => {
     const k = t.dataset.cpcampo, de = t.dataset.orig ?? '', para = t.value.trim();
     if (de !== para) {
       evento(g, 'edicao-campo', `${ROT_COPIA[k] || k}: "${de || '—'}" → "${para || '—'}"`);
-      const cl = clinicaDe(S), campo = { medico_nome: 'medico', medico_crm: 'crm', cid: 'cid', local: 'local', data: 'emissao' }[k];
+      const cl = clinicaDe(S), campo = { medico_nome: 'medico', medico_crm: 'crm', cid: 'cid', local: 'local', data: 'emissao', executante: 'executante' }[k];
       if (cl && campo && de) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo, lido: de, correto: para });
       t.dataset.orig = para;
     }
     persistir(); return;
   }
-  if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
-  if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
-  if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return; }
+  mudouFinal(t, g);
+});
+/* campos da etapa 4 (situação, itens não autorizados, glosa): servem à tela e ao painel flutuante */
+function digitouFinal(t, g) {
+  if (t.dataset.glf) { const gl = glosaDe(g); if (gl.itens[t.dataset.c]) gl.itens[t.dataset.c][t.dataset.glf] = t.value; persistir(); atualizarConcluir(g); return true; }
+  if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return true; }
+  return false;
+}
+function mudouFinal(t, g) {
+  if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return true; }
+  if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return true; }
+  if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return true; }
   if (t.dataset.resf) {
     if (t.dataset.resf === 'usarCorrecao') { g.usarCorrecao = t.checked; g.respEdit = null; }
     else if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); }
     else { g.resultado[t.dataset.resf] = t.value; if (g.respEdit == null) { /* o texto gerado acompanha */ } }
-    persistir(); render(); return;
+    persistir(); render(); return true;
   }
-});
+  return false;
+}
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-cega], #cegaN')) {
     e.preventDefault();
@@ -859,6 +874,18 @@ const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corri
    obrigando a decorar ícones. Agora os botões mantêm o texto; só os botões feitos para ser só ícone (classe "so", como os de
    copiar) ficam sem texto, sempre com dica e nome acessível. */
 const enviarAoWebmail = resposta => window.postMessage({ __conferidorPagina: 'responderWebmail', resposta }, location.origin);
+/* o e-mail que deve receber a resposta: a extensão só abre "Responder a todos" sozinha quando é ele que está aberto no webmail */
+const alvoEmail = (ids, assunto, de) => ({ messageIds: [...new Set((ids || []).filter(Boolean))], assunto: assunto || '', de: de || '' });
+/* resposta pronta para colar no e-mail (o texto editado na etapa 4, se houver; senão, o do modelo) */
+function respostaParaCopiar(g, concluida) {
+  const h = (g.respEdit != null && !concluida ? g.respEdit : respostaDaGuia(g, !concluida).html).replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1');
+  return { html: htmlParaEmail(h), texto: htmlPlano(h) };
+}
+function levarRespostaAoWebmail(g, html, texto) {
+  const quem = nomesAtend();
+  enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '', alvo: alvoEmail([S.email.messageId], S.email.assunto, S.email.remetente.email) });
+  g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir();
+}
 function soIcone(raiz) {
   raiz.querySelectorAll('.btn.so').forEach(b => { const t = b.getAttribute('aria-label') || b.dataset.dica || ''; if (t && !b.title && !b.dataset.dica) b.title = t; });
   return;

@@ -1,6 +1,7 @@
 /* Roda dentro da página do webmail (mundo "MAIN"). Observa a resposta que o próprio SmarterMail recebe ao abrir
    um e-mail (POST /api/v1/mail/message) e repassa só os campos necessários para a ponte. Não envia nada para fora
-   do navegador e não altera a página. */
+   do navegador. A pedido da ponte (resposta vinda do Conferidor), aperta o atalho do SmarterMail "A" (Responder a
+   todos): o atalho só é reconhecido quando a tecla é disparada aqui, no mundo da página. */
 (function () {
   if (window.__conferidorCaptura) return; window.__conferidorCaptura = true;
   const ALVO = /\/api\/v1\/mail\/message$/i;
@@ -21,6 +22,22 @@
     if (this.__cfMetodo === 'POST' && ALVO.test(this.__cfUrl || '')) this.addEventListener('load', () => { try { if (this.status === 200) enviar(JSON.parse(this.responseText)); } catch (e) { } });
     return enviarXhr.apply(this, arguments);
   };
+  /* tecla de atalho com keyCode/which preenchidos (o SmarterMail lê esses campos) */
+  function tecla(k) {
+    const kc = k.toUpperCase().charCodeAt(0), ch = k.charCodeAt(0), ae = document.activeElement;
+    if (ae && (/INPUT|TEXTAREA|SELECT/.test(ae.tagName) || ae.isContentEditable)) ae.blur();   // atalho não vale dentro de um campo
+    const alvo = (document.activeElement && document.activeElement !== document.body ? document.activeElement : null) || document.body || document;
+    for (const tipo of ['keydown', 'keypress', 'keyup']) {
+      const ev = new KeyboardEvent(tipo, { key: k, code: 'Key' + k.toUpperCase(), bubbles: true, cancelable: true, composed: true, view: window });
+      const v = tipo === 'keypress' ? ch : kc;
+      Object.defineProperty(ev, 'keyCode', { get: () => v }); Object.defineProperty(ev, 'which', { get: () => v }); Object.defineProperty(ev, 'charCode', { get: () => (tipo === 'keypress' ? ch : 0) });
+      alvo.dispatchEvent(ev);
+    }
+  }
+  window.addEventListener('message', ev => {
+    if (ev.source !== window || ev.origin !== window.location.origin) return;
+    const d = ev.data; if (d && d.__conferidor === 'tecla' && typeof d.tecla === 'string' && /^[a-z]$/.test(d.tecla)) tecla(d.tecla);
+  });
   const f = window.fetch;
   if (f) window.fetch = function (u, o) {
     const p = f.apply(this, arguments);

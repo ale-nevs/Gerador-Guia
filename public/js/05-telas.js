@@ -80,7 +80,7 @@ function pintarProgresso() {
 }
 setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); await Presenca.ler(); pintarProgresso(); } catch (e) { } }, 20000);   // relê a presença: os outros computadores mudam de guia e de etapa
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
-const EXT_VERSAO = '1.2.0';   // versão da extensão publicada junto com o site
+const EXT_VERSAO = '1.3.0';   // versão da extensão publicada junto com o site
 const extDesatualizada = () => { const v = extInstalada(); if (!v) return false; const a = v.split('.').map(Number), b = EXT_VERSAO.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); } return false; };
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
@@ -172,13 +172,19 @@ function htmlUmAlerta(a, g) {
   if (a.aprendidoI != null) extra += `<button class="btn sm" data-act="aplicarAprendido" data-i="${a.aprendidoI}">${ic('check', 'sm')}Aplicar a mesma correção</button>`;
   if (a.cadastrarCodigo) extra += `<button class="btn sm" data-act="cadastrarCodigo" data-codigo="${a.cadastrarCodigo}">${ic('plus', 'sm')}Cadastrar código</button>`;
   const conferido = pedeConferi(a) && g.conf && g.conf[a.key];
-  if (pedeConferi(a)) extra += `<button type="button" class="btn sm conferi-btn ${conferido ? 'on' : ''}" data-act="conferiAlerta" data-conf="${esc(a.key)}" aria-pressed="${conferido ? 'true' : 'false'}">${ic('check', 'sm')}${conferido ? 'Conferido' : 'Conferi'}</button>`;
+  if (pedeConferi(a)) extra += btnConferi(a, conferido);
   if (a.modo === 'obs') extra += `<span class="muted" style="font-size:var(--fs-xs)">Texto em “Incluir observação” (observações adicionais da resposta).</span>`;
-  const ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
-  return `<div class="al ${a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico, 'sm')}</span><div class="tx"><b class="al-t">${a.modo === 'bloqueio' ? 'Bloqueio:' : a.modo === 'obs' ? 'Aviso com observação:' : a.nivel === 'info' ? 'Informativo:' : 'Atenção:'}</b> ${esc(a.texto)}</div>${extra ? `<div class="acoes-al">${extra}</div>` : ''}</div>`;
+  const crit = ehCritico(a), ico = a.modo === 'bloqueio' ? 'ban' : a.modo === 'obs' ? 'message' : a.nivel === 'info' ? 'info' : 'alert';
+  return `<div class="al ${crit ? 'critico' : a.modo === 'atencao' && a.nivel === 'info' ? 'info' : a.modo} ${conferido ? 'conferido' : ''}"><span>${ic(conferido ? 'check' : ico, 'sm')}</span><div class="tx"><b class="al-t">${a.modo === 'bloqueio' ? 'Bloqueio:' : crit ? 'Confirmação obrigatória:' : a.modo === 'obs' ? 'Aviso com observação:' : a.nivel === 'info' ? 'Informativo:' : 'Atenção:'}</b> ${esc(a.texto)}</div>${extra ? `<div class="acoes-al">${extra}</div>` : ''}</div>`;
+}
+const btnConferi = (a, on) => `<button type="button" class="btn sm conferi-btn ${on ? 'on' : ''} ${ehCritico(a) && !on ? 'critico' : ''}" data-act="conferiAlerta" data-conf="${esc(a.key)}" aria-pressed="${on ? 'true' : 'false'}">${ic('check', 'sm')}${on ? 'Conferido' : 'Conferi'}${a.conferiRot ? ': ' + esc(a.conferiRot) : ''}</button>`;
+/* possível pedido repetido (e outros avisos críticos): faixa vermelha no topo da etapa até o Conferi */
+function htmlCriticos(g, st) {
+  if (!st.criticos.length || guiaTerminal(g)) return '';
+  return st.criticos.map(a => `<div class="faixa-critica" role="alert">${ic('alert')}<div class="tx"><b>Confirmação obrigatória</b>${esc(a.texto)}</div><div class="acoes-al">${a.guiaAnterior ? `<button type="button" class="btn sm line" data-act="copiarValor" data-v="${esc(a.guiaAnterior)}" title="Copiar o nº da guia anterior">${ic('copy', 'sm')}${esc(a.guiaAnterior)}</button>` : ''}${btnConferi(a, false)}</div></div>`).join('');
 }
 function htmlAlertas(g, st) {
-  const ordem = a => ({ bloqueio: 0, obs: 1, atencao: 2 }[a.modo]);
+  const ordem = a => ehCritico(a) ? 0.5 : ({ bloqueio: 0, obs: 1, atencao: 2 }[a.modo]);
   const principais = st.A.filter(a => !(a.modo === 'atencao' && a.nivel === 'info')).sort((a, b) => ordem(a) - ordem(b));
   const infos = st.A.filter(a => a.modo === 'atencao' && a.nivel === 'info');
   const l1 = principais.map(a => htmlUmAlerta(a, g)).join('');
@@ -187,9 +193,10 @@ function htmlAlertas(g, st) {
 }
 function htmlPainelAlertas(g, st) {
   const tot = st.A.filter(pedeConferi).length, pend = atencaoPendente(g, st).length;
-  return `<section class="card painel-al compacto ${st.bloqueios.length ? 'tem-bloqueio' : ''}" aria-label="Alertas e ocorrências">
+  return `<section class="card painel-al compacto ${st.bloqueios.length || st.criticos.length ? 'tem-bloqueio' : ''}" aria-label="Alertas e ocorrências">
     <div class="al-h">${ic(st.bloqueios.length ? 'ban' : 'bell')}<h2>Alertas e ocorrências</h2>
       ${st.bloqueios.length ? `<span class="tag bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}</span>` : '<span class="tag ok">' + ic('check', 'sm') + 'Sem bloqueios</span>'}
+      ${st.criticos.length ? `<span class="tag bad">${ic('alert', 'sm')}${pl(st.criticos.length, 'confirmação obrigatória', 'confirmações obrigatórias')}</span>` : ''}
       ${st.obs.length ? `<span class="tag obs">${ic('message', 'sm')}${st.obs.length} com observação</span>` : ''}
       ${tot ? (pend ? `<span class="tag warn">${ic('alert', 'sm')}${pend} a conferir</span>` : `<span class="tag ok">${ic('check', 'sm')}Conferido</span>`) : ''}</div>
     <div class="al-corpo"><div class="alertas" id="alertas">${htmlAlertas(g, st)}</div></div></section>`;
@@ -209,6 +216,7 @@ const curtoTxt = (t, n = 110) => { t = String(t || '').replace(/\s+/g, ' ').trim
 function statusBarra(g, st, pend) {
   const ver = `<button class="btn link" data-act="verAlertas">ver</button>`;
   if (st.bloqueios.length) return `<span class="tag bad">${ic('ban', 'sm')}${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}</span><span class="barra-msg" title="${esc(st.bloqueios.map(b => b.texto).join('\n'))}">${esc(curtoTxt(st.bloqueios[0].texto))}</span>${ver}`;
+  if (st.criticos && st.criticos.length) return `<span class="tag bad">${ic('alert', 'sm')}Possível pedido repetido</span><span class="barra-msg" title="${esc(st.criticos.map(b => b.texto).join('\n'))}">Confira o aviso em vermelho e marque “Conferi: não é repetido”.</span>${ver}`;
   if (pend && pend.length) return `<span class="tag warn">${ic('alert', 'sm')}${pl(pend.length, 'pendência', 'pendências')}</span><span class="barra-msg" title="${esc(pend.join('\n'))}">${esc(curtoTxt(pend[0]))}</span>`;
   const conf = atencaoPendente(g, st).length;
   if (conf) return `<span class="tag warn">${ic('alert', 'sm')}${conf} a conferir</span><span class="barra-msg">Marque “Conferi” nos avisos depois de conferir.</span>${ver}`;
@@ -236,7 +244,7 @@ function htmlPassos(g) {
   const def = [
     { n: 1, t: 'E-mail', e: v === 1 ? 'atual' : 'feito', s: v === 1 ? 'Agora' : 'Concluída', c: v === 1 ? 'info' : 'ok', ok: true },
     { n: 2, t: 'Pedido e alertas', e: v === 2 && !nb ? 'atual' : nb ? (v === 2 ? 'atual atencao' : 'atencao') : (g.etapa > 2 || fin ? 'feito' : 'futuro'), s: nb ? pl(nb, 'bloqueio', 'bloqueios') : v === 2 ? 'Agora' : g.etapa > 2 || fin ? 'Concluída' : 'Pendente', c: nb ? 'bad' : v === 2 ? 'info' : g.etapa > 2 || fin ? 'ok' : '', ok: true },
-    { n: 3, t: 'Guia e conferência', e: v === 3 ? 'atual' : cegaPend ? 'atencao' : ((g.cega.ok || !cegaExigida()) && g.etapa > 3) || fin ? 'feito' : 'futuro', s: !st.pode ? 'Bloqueada' : cegaPend ? 'Divergente' : v === 3 ? 'Agora' : g.cega.ok || fin ? 'Conferida' : 'Pendente', c: !st.pode ? '' : cegaPend ? 'warn' : v === 3 ? 'info' : g.cega.ok || fin ? 'ok' : '', ok: st.pode },
+    { n: 3, t: 'Guia e conferência', e: v === 3 ? 'atual' : cegaPend ? 'atencao' : ((g.cega.ok || !cegaExigida()) && g.etapa > 3) || fin ? 'feito' : 'futuro', s: !st.pode ? (st.bloqueios.length ? 'Bloqueada' : 'Confirmar aviso') : cegaPend ? 'Divergente' : v === 3 ? 'Agora' : g.cega.ok || fin ? 'Conferida' : 'Pendente', c: !st.pode ? '' : cegaPend ? 'warn' : v === 3 ? 'info' : g.cega.ok || fin ? 'ok' : '', ok: st.pode },
     { n: 4, t: 'Finalizar', e: v === 4 ? 'atual' : fin ? 'feito' : 'futuro', s: fin ? 'Concluída' : v === 4 ? 'Agora' : !podeFinal(g, st) ? 'Falta conferir' : 'Pendente', c: fin ? 'ok' : v === 4 ? 'info' : '', ok: podeFinal(g, st) || fin }
   ];
   return `<nav class="passos" aria-label="Etapas do atendimento">${def.map(d => `<button class="passo ${d.e}" data-act="irVista" data-v="${d.n}" ${d.ok ? '' : 'disabled'} ${/atual/.test(d.e) ? 'aria-current="step"' : ''} title="${esc('Etapa ' + d.n + ': ' + d.t + ' — ' + d.s)}">
@@ -313,7 +321,7 @@ function renderTela(app) {
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
   const alvoId = 'etapa';
-  app.innerHTML = htmlAvisoParado() + htmlAvisoReaberta(g) + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g) + htmlNotasFixas(g)) + `<div id="${alvoId}"></div>`;
+  app.innerHTML = htmlAvisoParado() + htmlAvisoReaberta(g) + htmlBarraGuias() + (S.vista === 1 ? '' : htmlPassos(g) + htmlNotasFixas(g) + htmlCriticos(g, situacaoGuia(g))) + `<div id="${alvoId}"></div>`;
   const alvo = $('#' + alvoId);
   if (S.vista === 1) renderVisao(alvo); else if (g.status === 'concluido' && S.vista === 4) renderConcluida(alvo, g);
   else if (S.vista === 2) renderPedido(alvo, g); else if (S.vista === 3) renderGuia(alvo, g); else renderFinal(alvo, g);
@@ -385,7 +393,7 @@ function htmlUltimaGuia() {
     const cart = g.carteiraUsada || g.pedido.carteira; if (!cart || vistos.has(cart)) return; vistos.add(cart);
     const r = Reg.ultimaGuia(cart, S.atendId); if (!r) return;
     const outra = r.clinicaId && cl && r.clinicaId !== cl.id || (!cl && r.clinica);
-    linhas.push(`<div class="ult-linha">${S.guias.length > 1 ? `<span class="muted">${esc(nomeGuia(g))}:</span> ` : ''}<b class="num">${esc(r.guia)}</b> <span class="muted">· ${fmtData(r.concluidoEm)}</span>${outra ? ` <span class="tag obs">${ic('building', 'sm')}${esc(r.clinica)}</span>` : ''}</div>`);
+    linhas.push(`<div class="ult-linha">${S.guias.length > 1 ? `<span class="muted">${esc(nomeGuia(g))}:</span> ` : ''}<b class="num">${esc(r.guia)}</b> <span class="muted">· ${fmtData(r.concluidoEm)}</span>${outra ? ` <span class="tag obs">${ic('building', 'sm')}${esc(r.clinica)}</span>` : ''} <button type="button" class="btn sm ghost so" data-act="copiarValor" data-v="${esc(r.guia)}" aria-label="Copiar o nº da guia ${esc(r.guia)}" title="Copiar">${ic('copy', 'sm')}</button></div>`);
   });
   return linhas.length ? `<div class="ult-guia">${ic('clip')}<div><div class="eyebrow">Última guia gerada para ${vistos.size > 1 ? 'estes beneficiários' : 'este beneficiário'}</div>${linhas.join('')}</div></div>` : '';
 }
@@ -469,11 +477,12 @@ function maisUsadosSemGuia() {
   return { top: ord.slice(0, 3), n };
 }
 function htmlRespSemGuia() {
-  const { top, n } = maisUsadosSemGuia();
-  const btn = (k, cls) => `<button class="btn ${cls}" data-act="respSemGuia" data-modelo="${k}">${ic('mail', 'sm')}${esc(nomeModelo(k))}${n[k] ? ` <span class="muted">(${n[k]})</span>` : ''}</button>`;
-  return `<div class="linha-flex">${top.map(k => btn(k, 'line')).join('')}
+  const { top, n } = maisUsadosSemGuia(), g = S && guiaAtiva(), nf = g ? naoIdentificados(g).length : 0;
+  const vis = nf ? ['nao_identificado', ...top.filter(k => k !== 'nao_identificado')].slice(0, 3) : top;   // faltou dado: "Dados não identificados" vem primeiro
+  const btn = (k, cls) => `<button class="btn ${cls}" data-act="respSemGuia" data-modelo="${k}" ${k === 'nao_identificado' && nf ? `title="${esc(naoIdentificados(g).join('\n'))}"` : ''}>${ic('mail', 'sm')}${esc(nomeModelo(k))}${k === 'nao_identificado' && nf ? ` <span class="tag warn">${nf}</span>` : n[k] ? ` <span class="muted">(${n[k]})</span>` : ''}</button>`;
+  return `<div class="linha-flex">${vis.map(k => btn(k, 'line')).join('')}
     <details class="menu-resp"><summary class="btn line">${ic('list', 'sm')}Responder sem guia ▾</summary><div class="menu-lista" role="menu">${MODELOS_SEM_GUIA.map(k => btn(k, 'ghost menu-op')).join('')}</div></details></div>
-    <p class="dica" style="margin:6px 0 0">À vista, as 3 respostas mais usadas pela equipe nos últimos dias.</p>`;
+    <p class="dica" style="margin:6px 0 0">${nf ? `Faltam ${pl(nf, 'dado', 'dados')} no pedido: “${esc(nomeModelo('nao_identificado'))}” lista todos para a clínica. ` : ''}À vista, as respostas mais usadas pela equipe nos últimos dias.</p>`;
 }
 document.addEventListener('click', ev => { $$('details.menu-resp[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
 
@@ -534,7 +543,10 @@ function renderPedido(alvo, g) {
 /* ====================================================================
    Etapa 3: guia e conferência
    ==================================================================== */
+/* última guia gerada para a carteira desta guia, em outro atendimento */
+const ultimaDaGuia = g => { const c = normCart(g.carteiraUsada || g.pedido.carteira || ''); return c ? Reg.ultimaGuia(c, S.atendId) : null; };
 function valorCopia(g, campo) {
+  if (campo === 'ultima') { const r = ultimaDaGuia(g); return r ? r.guia : ''; }
   const p = g.pedido, cl = clinicaDe(S);
   return ({
     executante: g.executante ?? (cl ? cl.executante : '') ?? '', medico_nome: p.medico.nome || '', medico_crm: p.medico.crm || '',
@@ -569,7 +581,7 @@ function renderGuia(alvo, g) {
       <div class="cp-linha"><div class="rot">4. Data do pedido médico ${origemDe(g, 'emissao')}</div><div class="cp-campos">${campoCopia(g, { campo: 'data', rot: 'Data do pedido médico', ph: 'dd/mm/aaaa', curto: true, mono: true })}</div></div>
     </div>
     <div class="cp-grupo"><span class="eyebrow">Beneficiário</span>
-      <div class="cp-linha"><div class="rot">5. Carteira / beneficiário ${origemDe(g, 'carteira')}</div><div class="cp-campos">${campoCopia(g, { campo: 'carteira', rot: 'Carteira', sub: 'Carteira', mono: true, mid: true })}${campoCopia(g, { campo: 'benef', rot: 'Nome do beneficiário', sub: 'Beneficiário' })}</div></div>
+      <div class="cp-linha"><div class="rot">5. Carteira / beneficiário ${origemDe(g, 'carteira')}${(u => u ? `<small class="ult-cp">Última guia deste paciente: <b class="num">${esc(u.guia)}</b> · ${fmtData(u.concluidoEm)} <button type="button" class="btn sm ghost so" data-act="copiarValor" data-v="${esc(u.guia)}" aria-label="Copiar o nº da última guia" title="Copiar">${ic('copy', 'sm')}</button></small>` : '')(ultimaDaGuia(g))}</div><div class="cp-campos">${campoCopia(g, { campo: 'carteira', rot: 'Carteira', sub: 'Carteira', mono: true, mid: true })}${campoCopia(g, { campo: 'benef', rot: 'Nome do beneficiário', sub: 'Beneficiário' })}</div></div>
     </div>
     <div class="cp-grupo"><span class="eyebrow">Diagnóstico</span>
       <div class="cp-linha"><div class="rot">6. CID ${origemDe(g, 'cid')}</div><div class="cp-campos">${campoCopia(g, { campo: 'cid', rot: 'CID', curto: true, mono: true })}</div></div>
@@ -677,7 +689,8 @@ function pendenciasConclusao(g, st) {
     else if (n >= g.pedido.itens.length) P.push('Todos os itens estão marcados como não autorizados: use a situação “Não autorizada”.');
   }
   if (mostraResposta(g) && r.emailPrestador && !emailValido(r.emailPrestador)) P.push('O e-mail da clínica não parece válido.');
-  if (!st.pode) P.push('Há bloqueio nesta guia (veja Alertas e ocorrências).');
+  if (st.bloqueios.length) P.push('Há bloqueio nesta guia (veja Alertas e ocorrências).');
+  st.criticos.forEach(a => P.push(a.tipo === 'dup-semana' ? `Possível pedido repetido (${a.sub}): marque “Conferi: não é repetido” depois de conferir.` : 'Confirme o aviso em vermelho (Conferi).'));
   if (cegaExigida() && !g.cega.ok) P.push('Falta concluir a conferência da grade.');
   return P;
 }
@@ -818,7 +831,7 @@ function renderFinalSemGuia(alvo, g) {
     seguir: `<button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>` })}`;
 }
 /* "Responder no webmail": aparece sempre; sem a extensão, o clique explica como instalar */
-const btnWebmail = (fonte = 'editor', desativado = false) => `<button class="btn line" data-act="responderWebmail" data-fonte="${fonte}" ${desativado ? 'disabled' : ''} title="${extInstalada() ? 'Leva a resposta ao webmail: lá, clique em Responder, no corpo do texto e em Colar resposta. O envio continua sendo feito por você.' : 'Com a extensão do Chrome, a resposta vai direto para o webmail. Clique para ver como instalar.'}">${ic('send')}Responder no webmail</button>`;
+const btnWebmail = (fonte = 'editor', desativado = false) => `<button class="btn line" data-act="responderWebmail" data-fonte="${fonte}" ${desativado ? 'disabled' : ''} title="${extInstalada() ? (extDesatualizada() ? 'Leva a resposta ao webmail: lá, clique em Responder, no corpo do texto e em Colar resposta. Atualize a extensão para o Responder a todos abrir sozinho.' : 'Leva a resposta ao webmail: abre o Responder a todos do e-mail aberto e cola a resposta. O envio continua sendo feito por você.') : 'Com a extensão do Chrome, a resposta vai direto para o webmail. Clique para ver como instalar.'}">${ic('send')}Responder no webmail</button>`;
 function renderConcluida(alvo, g) {
   const r = g.resultado, resp = respostaDaGuia(g, false), a = autorizadosDe(g), n = negadosDe(g);
   const prox = S.guias.findIndex(x => !guiaTerminal(x)), todas = S.guias.every(guiaTerminal);

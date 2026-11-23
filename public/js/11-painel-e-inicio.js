@@ -11,24 +11,91 @@ function sequenciaGuia(g) {
   s.forEach(x => { x.ok = x.v !== '' && g.copiados[x.k] === x.v; });
   return s;
 }
+const guiaNumOk = g => /^[TS]\d{7,8}$/.test((g && g.numero) || '');
+const campoDeTexto = el => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit)$/i.test(el.type || '')));
+/* sininho do painel: quantos alertas pedem ação (bloqueios + "Conferi" pendentes); o clique abre a lista */
+function htmlMiniSino(g, st) {
+  const b = st.bloqueios.length, cr = st.criticos.length, pend = atencaoPendente(g, st).length, tot = st.A.length, n = b + pend;
+  const cls = b || cr ? 'bad' : pend ? 'warn' : tot ? 'ok' : '';
+  const tit = tot ? [b && pl(b, 'bloqueio', 'bloqueios'), cr && pl(cr, 'confirmação obrigatória', 'confirmações obrigatórias'), pend && pend + ' a conferir', st.obs.length && st.obs.length + ' com observação', pl(tot, 'alerta no total', 'alertas no total')].filter(Boolean).join(' · ') + '. Clique para ver e conferir.' : 'Nenhum alerta nesta guia.';
+  return `<button type="button" class="mini-sino ${cls} ${Mini.verAlertas ? 'on' : ''}" data-mact="alertas" aria-expanded="${Mini.verAlertas ? 'true' : 'false'}" aria-label="Alertas e ocorrências: ${esc(tit)}" title="${esc(tit)}">${ic(b ? 'ban' : 'bell', 'sm')}${n ? `<span class="n">${n}</span>` : tot ? ic('check', 'sm') : ''}</button>`;
+}
+function htmlMiniAlertas(g, st) {
+  const ordem = a => ({ bloqueio: 0, obs: 1, atencao: 2 }[a.modo] ?? 3) + (a.nivel === 'info' ? 1 : 0);
+  const L = [...st.A].sort((a, b) => ordem(a) - ordem(b));
+  if (!L.length) return `<div class="mini-alertas"><div class="mini-al ok">${ic('check', 'sm')}Nenhum alerta para esta guia.</div></div>`;
+  return `<div class="mini-alertas" role="region" aria-label="Alertas e ocorrências">${L.map(a => {
+    const pede = pedeConferi(a), conf = pede && g.conf && g.conf[a.key], crit = ehCritico(a);
+    const cls = a.modo === 'bloqueio' || (crit && !conf) ? 'bad' : a.modo === 'obs' ? 'obs' : a.nivel === 'info' ? 'info' : conf ? 'ok' : 'warn';
+    const rot = a.modo === 'bloqueio' ? 'Bloqueio' : crit ? 'Confirmação obrigatória' : a.modo === 'obs' ? 'Com observação' : a.nivel === 'info' ? 'Informativo' : 'Atenção';
+    const noConferidor = a.vincular || a.acaoCarteira || a.cadastrarCodigo || a.aprendidoI != null;
+    return `<div class="mini-alerta ${cls}"><div class="ma-t"><b>${rot}:</b> ${esc(a.texto)}</div>${pede || noConferidor ? `<div class="mini-btns">${pede ? `<button type="button" class="btn sm conferi-btn ${conf ? 'on' : ''}" data-mact="conferi" data-conf="${esc(a.key)}" aria-pressed="${conf ? 'true' : 'false'}">${ic('check', 'sm')}${conf ? 'Conferido' : 'Conferi'}${a.conferiRot ? ': ' + esc(a.conferiRot) : ''}</button>` : ''}${noConferidor ? `<button type="button" class="btn sm ghost" data-mact="abrir">${ic('right', 'sm')}Resolver no conferidor</button>` : ''}</div>` : ''}</div>`;
+  }).join('')}</div>`;
+}
+const htmlMiniMsg = () => miniMsg ? `<div class="mini-msg" role="status">${esc(miniMsg)}</div>` : '';
+const htmlMiniPend = pend => pend.length ? `<ul class="mini-pend">${pend.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+/* depois do nº da guia (botão Próximo): a guia, a observação, a situação da autorização, a resposta e Concluir */
+function htmlMiniFinal(g, st) {
+  if (g.semGuia) return htmlMiniSemGuia(g, st);
+  if (g.status !== 'concluido') aplicarSugestaoSituacao(g);
+  const r = g.resultado, ok = guiaNumOk(g), pend = pendenciasConclusao(g, st);
+  const obsTxt = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g), obsOk = g.copiados.obs === obsTxt;
+  const showResp = mostraResposta(g), podeResp = showResp && !!(r.situacao || usaConsolidada()), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
+  const lib = ok && podeResp;
+  return `<div class="mini-final">
+    <div class="mini-num mini-num-final"><label for="miniGuia">Nº da guia</label><input type="text" id="miniGuia" class="num ${g.numero && !ok ? 'invalido' : ''}" value="${esc(g.numero || '')}" maxlength="10" placeholder="T00000000" autocomplete="off">
+      <button type="button" class="btn sm ${obsOk ? 'copiado' : ''}" data-mact="copObs" title="Copia a observação da guia (texto simples) para colar no sistema">${ic(obsOk ? 'check' : 'copy', 'sm')}${obsOk ? 'Observação copiada' : 'Copiar observação'}</button></div>
+    <div class="mini-sec">Situação da autorização</div>
+    ${g.sitSug && r.situacao === g.sitSug.v ? `<div class="mini-div">${ic('info', 'sm')} Sugerida pelos prints: confira antes de concluir.</div>` : ''}
+    <div class="mini-sit">${htmlSituacao(g)}</div>
+    <div class="mini-sec">Resposta à clínica</div>
+    ${showResp ? `<div class="mini-btns"><button type="button" class="btn sm ${g.copiados.resp ? 'copiado' : 'pri'}" data-mact="copResp" ${lib ? '' : 'disabled'} title="Copia a resposta com formatação, para colar no e-mail">${ic(g.copiados.resp ? 'check' : 'copy', 'sm')}${g.copiados.resp ? 'Resposta copiada' : 'Copiar resposta'}</button>${extInstalada() ? `<button type="button" class="btn sm line" data-mact="webmail" ${lib ? '' : 'disabled'} title="Abre o Responder a todos no webmail com a resposta colada">${ic('send', 'sm')}Responder no webmail</button>` : ''}</div>
+      ${!podeResp ? '<div class="mini-div muted">Escolha a situação para liberar a resposta.</div>' : !ok ? '<div class="mini-div muted">Informe o nº da guia para liberar a resposta.</div>' : ''}`
+      : `<div class="mini-div muted">Este e-mail tem ${guiasAtivas().length} guias: a resposta com todas sai na última (faltam ${faltam}).</div>`}
+    ${htmlMiniMsg()}${htmlMiniPend(pend)}
+    <div class="mini-btns mini-rodape"><button type="button" class="btn sm ghost" data-mact="voltar">${ic('left', 'sm')}Voltar</button><button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Conferidor</button><button type="button" class="btn sm pri" data-mact="concluir" ${pend.length ? 'disabled' : ''}>${ic('check', 'sm')}Concluir guia</button></div>
+  </div>`;
+}
+function htmlMiniSemGuia(g, st) {
+  const pend = pendenciasConclusao(g, st), showResp = mostraResposta(g), faltam = S.guias.filter(x => x !== g && !guiaTerminal(x)).length;
+  return `<div class="mini-final"><div class="mini-al">${ic('mail', 'sm')}<span>Responder sem gerar guia: <b>${esc(nomeModelo(g.semGuia))}</b></span></div>
+    ${showResp ? `<div class="mini-btns"><button type="button" class="btn sm ${g.copiados.resp ? 'copiado' : 'pri'}" data-mact="copResp">${ic(g.copiados.resp ? 'check' : 'copy', 'sm')}${g.copiados.resp ? 'Resposta copiada' : 'Copiar resposta'}</button>${extInstalada() ? `<button type="button" class="btn sm line" data-mact="webmail">${ic('send', 'sm')}Responder no webmail</button>` : ''}</div>` : `<div class="mini-div muted">A resposta com todas as guias sai na última (faltam ${faltam}).</div>`}
+    ${htmlMiniMsg()}${htmlMiniPend(pend)}
+    <div class="mini-btns mini-rodape"><button type="button" class="btn sm ghost" data-mact="voltar">${ic('left', 'sm')}Voltar e gerar a guia</button><button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Conferidor</button><button type="button" class="btn sm pri" data-mact="concluir" ${pend.length ? 'disabled' : ''}>${ic('check', 'sm')}Concluir</button></div></div>`;
+}
+/* guia já tratada (o e-mail ainda aberto): resposta, próxima guia ou encerrar */
+function htmlMiniFeita(g) {
+  const prox = S.guias.findIndex(x => !guiaTerminal(x)), todas = S.guias.every(guiaTerminal), conc = g.status === 'concluido';
+  const podeResp = conc && (!usaConsolidada() || todas);
+  return `<div class="mini-final"><div class="mini-al ${conc ? 'ok' : ''}">${ic(conc ? 'check' : 'info', 'sm')}<span>${conc ? (g.semGuia ? `Respondida sem guia (${esc(nomeModelo(g.semGuia))})` : `Guia <b class="num">${esc(g.numero)}</b> concluída · ${esc(SIT_ROTULO[g.resultado.situacao] || '')}`) : esc(STATUS[g.status] || g.status)}</span></div>
+    ${podeResp ? `<div class="mini-btns"><button type="button" class="btn sm line" data-mact="copRespFeita">${ic('copy', 'sm')}Copiar resposta</button>${extInstalada() ? `<button type="button" class="btn sm line" data-mact="webmailFeita">${ic('send', 'sm')}Responder no webmail</button>` : ''}</div>` : ''}
+    ${htmlMiniMsg()}
+    <div class="mini-btns mini-rodape"><button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Conferidor</button>${prox >= 0 ? `<button type="button" class="btn sm pri" data-mact="selGuia" data-i="${prox}">Próxima guia pendente${ic('right', 'sm')}</button>` : ''}${todas ? `<button type="button" class="btn sm pri" data-mact="encerrar">${ic('check', 'sm')}Encerrar atendimento</button>` : ''}</div></div>`;
+}
 function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
   const modo = flutuante ? Mini.modoAtual() : 'guia';
   const abas = flutuante && (S || Lista.listas.length) ? `<div class="mini-abas" role="tablist"><button type="button" role="tab" class="${modo === 'guia' ? 'on' : ''}" data-mact="modo" data-v="guia">${ic('filecheck', 'sm')}Guia atual</button><button type="button" role="tab" class="${modo === 'lista' ? 'on' : ''}" data-mact="modo" data-v="lista">${ic('rows', 'sm')}${esc(Lista.nomeCurto())}${Lista.pendentesMeus() ? ` <span class="tag warn">${Lista.pendentesMeus()}</span>` : ''}</button></div>` : '';
   if (modo === 'lista') return `<div class="mini">${abas}${htmlMiniLista()}</div>`;
-  if (!g || !S) return `<div class="mini">${abas}<div class="mini-vazio">${ic('mail', 'lg')}<b>Nenhum atendimento aberto</b><span class="muted">Abra um e-mail no conferidor (ou pelo botão do webmail) e os campos aparecem aqui.</span></div></div>`;
+  if (!g || !S) return `<div class="mini">${abas}<div class="mini-vazio">${ic('mail', 'lg')}<b>Nenhum atendimento aberto</b><span class="muted">Abra um e-mail no conferidor (ou pelo botão do webmail) e os campos aparecem aqui.</span>${flutuante ? htmlMiniMsg() : ''}</div></div>`;
   const p = g.pedido, st = situacaoGuia(g), av = prontoPrints(g) ? avaliarPrints(g) : null, cl = clinicaDe(S);
   const seq = sequenciaGuia(g), comValor = seq.filter(x => x.v), feitos = comValor.filter(x => x.ok).length, prox = comValor.find(x => !x.ok);
+  const etapa = !flutuante ? 'campos' : guiaTerminal(g) ? 'feita' : S.vista === 4 ? 'final' : 'campos';
   const linha = x => `<button type="button" class="mini-row ${x.ok ? 'ok' : ''} ${x.v ? '' : 'vazio'} ${prox && x.k === prox.k ? 'prox' : ''}" data-mcopy="${esc(x.k)}" ${x.v ? '' : 'disabled'} title="${x.v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(x.rot.replace(/^Qtd\. de \d+$/, 'Qtd.'))}</span><span class="v num">${esc(x.v || '—')}</span>${x.ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
   const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
   const pc = comValor.length ? Math.round(100 * feitos / comValor.length) : 0;
-  return `<div class="mini">${abas}
-    <div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''} · etapa ${S.vista}</div></div><span class="tag ${pc === 100 ? 'ok' : ''}">${feitos}/${comValor.length}</span></div>
-    <div class="lst-barra"><i style="width:${pc}%"></i></div>
+  const ult = ultimaDaGuia(g), ultOk = ult && g.copiados.ultima === ult.guia;
+  const htmlUlt = ult ? `<button type="button" class="mini-ult ${ultOk ? 'ok' : ''}" data-mcopy="ultima" title="Copiar o nº da última guia deste paciente${ult.clinica ? ' (' + esc(ult.clinica) + ')' : ''}"><span>Última guia deste paciente:</span> <b class="num">${esc(ult.guia)}</b> <span class="muted">${fmtData(ult.concluidoEm)}</span>${ic(ultOk ? 'check' : 'copy', 'sm')}</button>` : '';
+  const htmlCrit = st.criticos.map(a => `<div class="mini-critico" role="alert"><div><b>Confirmação obrigatória:</b> ${esc(a.texto)}</div><div class="mini-btns">${a.guiaAnterior ? `<button type="button" class="btn sm line" data-mact="copValor" data-v="${esc(a.guiaAnterior)}" title="Copiar o nº da guia anterior">${ic('copy', 'sm')}${esc(a.guiaAnterior)}</button>` : ''}<button type="button" class="btn sm conferi-btn critico" data-mact="conferi" data-conf="${esc(a.key)}">${ic('check', 'sm')}Conferi${a.conferiRot ? ': ' + esc(a.conferiRot) : ''}</button></div></div>`).join('');
+  const cab = `<div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(p.beneficiario || 'Beneficiário não informado')}</b>${htmlUlt}<div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''} · etapa ${S.vista}</div></div><div class="mini-h-d">${flutuante ? htmlMiniSino(g, st) : ''}<span class="tag ${pc === 100 ? 'ok' : ''}" title="Campos copiados">${feitos}/${comValor.length}</span></div></div>
+    <div class="lst-barra"><i style="width:${pc}%"></i></div>${etapa !== 'feita' ? htmlCrit : ''}${flutuante && Mini.verAlertas ? htmlMiniAlertas(g, st) : ''}`;
+  if (etapa === 'final') return `<div class="mini">${abas}${cab}${htmlMiniFinal(g, st)}</div>`;
+  if (etapa === 'feita') return `<div class="mini">${abas}${cab}${htmlMiniFeita(g)}</div>`;
+  return `<div class="mini">${abas}${cab}
     ${st.bloqueios.length ? `<div class="mini-al bad">${ic('ban', 'sm')}<span><b>${pl(st.bloqueios.length, 'bloqueio', 'bloqueios')}:</b> ${esc(curtoTxt(st.bloqueios[0].texto, 90))}</span></div>` : ''}
     ${prox ? `<button type="button" class="mini-prox" data-mcopy="${esc(prox.k)}" title="Copia o próximo campo (atalho: barra de espaço)"><small>Copiar próximo</small><b>${esc(prox.rot)}</b><span class="num">${esc(prox.v)}</span></button>` : `<div class="mini-al ok">${ic('check', 'sm')}Todos os campos foram copiados.</div>`}
     <div class="mini-lista">${seq.slice(0, MINI_CAMPOS.length).map(linha).join('')}
       <div class="mini-sec">Serviços</div>
-      ${p.itens.map(it => { const sc = seq.find(x => x.k === 'c:' + it.codigo), sq = seq.find(x => x.k === 'q:' + it.codigo); return `<div class="mini-item ${(it.qtd || 1) > 1 ? 'qtd-alta' : ''}">${linha(sc)}${linha(sq)}</div>`; }).join('') || '<p class="muted">Sem serviços.</p>'}</div>
+      ${p.itens.map(it => { const sc = seq.find(x => x.k === 'c:' + it.codigo), sq = seq.find(x => x.k === 'q:' + it.codigo), d = descRefItem(g, it).texto; return `<div class="mini-item ${(it.qtd || 1) > 1 ? 'qtd-alta' : ''}">${linha(sc)}${linha(sq)}${d ? `<div class="mini-desc" title="${esc(d)}">${esc(d)}</div>` : ''}</div>`; }).join('') || '<p class="muted">Sem serviços.</p>'}</div>
     ${semPrints ? '' : `<div class="mini-sec">Conferência pelos prints</div>
     <div class="mini-prints">
       ${av ? `<div class="mini-al ${av.ok ? 'ok' : prob.length ? 'warn' : ''}">${ic(av.ok ? 'check' : 'alert', 'sm')}${av.ok ? 'Conferido pelos prints' + (av.ressalvas ? ' (com ressalva)' : '') : prob.length ? pl(prob.length, 'ponto para conferir', 'pontos para conferir') : av.avisos[0] || 'Faltam prints'}</div>
@@ -36,10 +103,10 @@ function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
         ${prob.length ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Resolver divergências no conferidor</button>` : ''}
         ${av.avisos.filter(a => /Falta/.test(a)).map(a => `<div class="mini-div">• ${esc(a)}</div>`).join('')}` : '<p class="muted" style="margin:0 0 6px">Nenhum print lido ainda.</p>'}
       <div class="mini-btns">${Captura.suportada() ? `<button type="button" class="btn sm pri" data-mact="capturar">${ic('monitor', 'sm')}${Captura.ativa() ? 'Capturar janela' : 'Conectar janela'}</button>` : ''}<button type="button" class="btn sm" data-mact="colar">${ic('clip', 'sm')}Colar print</button></div>
-      ${miniMsg ? `<div class="mini-msg">${esc(miniMsg)}</div>` : ''}
+      ${htmlMiniMsg()}
       <div class="mini-num"><label for="miniGuia">Nº da guia</label><input type="text" id="miniGuia" class="num" value="${esc(g.numero || '')}" maxlength="10" placeholder="T00000000" autocomplete="off">${g.numero ? `<span class="muted">${g.numeroOrigem === 'print' ? 'do print' : 'digitado'}</span>` : ''}</div>
     </div>`}
-    <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button><span class="dica" style="margin:0">Espaço = copiar próximo</span>` : `<button type="button" class="btn sm line" data-act="visualizacao" data-v="completa">${ic('monitor', 'sm')}Voltar à visualização completa</button>`}</div>
+    <div class="mini-btns" style="margin-top:8px">${flutuante ? `<button type="button" class="btn sm line" data-mact="abrir">${ic('right', 'sm')}Ir para o conferidor</button>${guiaNumOk(g) ? `<button type="button" class="btn sm pri" data-mact="proximo" title="Observação, situação da autorização, resposta e Concluir guia">Próximo${ic('right', 'sm')}</button>` : ''}<span class="dica" style="margin:0">Espaço = copiar próximo</span>` : `<button type="button" class="btn sm line" data-act="visualizacao" data-v="completa">${ic('monitor', 'sm')}Voltar à visualização completa</button>`}</div>
   </div>`;
 }
 /* painel flutuante, modo lista do dia: a próxima guia da minha fila, para gerar sem sair do sistema */
@@ -61,7 +128,7 @@ function htmlMiniLista() {
     <div class="lst-barra"><i style="width:${pc}%"></i></div>
     ${q > 1 ? `<div class="mini-al warn">${ic('alert', 'sm')}<b>Quantidade ${q}</b> neste serviço.</div>` : ''}
     ${it.obs ? `<div class="mini-al">${ic('message', 'sm')}<span><b>Obs.:</b> ${esc(it.obs)}</span></div>` : ''}
-    ${ja ? `<div class="mini-al warn">${ic('alert', 'sm')}<span>Já autorizada: <b>${esc(ja.guia)}</b> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</span></div>` : ''}
+    ${ja ? `<div class="mini-critico" role="alert"><div><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + esc(ja.operador) : ''}. Ao registrar, o painel pede confirmação.</div></div>` : ''}
     ${prox ? `<button type="button" class="mini-prox" data-mact="lstCopiar" data-k="${prox[0]}" title="Copia o próximo campo (atalho: barra de espaço)"><small>Copiar próximo</small><b>${esc(prox[1])}</b><span class="num">${esc(prox[2])}</span></button>` : `<div class="mini-al ok">${ic('check', 'sm')}Campos copiados. Registre o nº da guia.</div>`}
     <div class="mini-lista">${campos.map(([k, r, v]) => `<button type="button" class="mini-row ${cps[k] ? 'ok' : ''} ${v ? '' : 'vazio'} ${prox && prox[0] === k ? 'prox' : ''} ${k === 'qtd' && q > 1 ? 'qtd-alta' : ''}" data-mact="lstCopiar" data-k="${k}" ${v ? '' : 'disabled'}><span class="r">${esc(r)}</span><span class="v num">${esc(v || '—')}</span>${cps[k] ? ic('check', 'sm') : ic('copy', 'sm')}</button>`).join('')}
       <div class="mini-div muted">${esc(it.servico || '')}</div></div>
@@ -82,8 +149,9 @@ async function miniCopiar(chave, win) {
   if (!ok) { miniMsg = 'Não consegui copiar: clique de novo.'; Mini.atualizar(); return; }
   g.copiados[chave] = v; miniMsg = 'Copiado: ' + v; persistir(); render();
 }
+const MINI_ACOES_TELA = new Set(['setSit', 'setGlosa']);
 const Mini = {
-  win: null, modo: null, lstCopiados: {}, pendente: false, semPend: null,
+  win: null, modo: null, lstCopiados: {}, pendente: false, semPend: null, verAlertas: false, focoProx: false,
   aberto() { return !!(this.win && !this.win.closed); },
   modoAtual() { return this.modo || (!S && Lista.pendentesMeus() ? 'lista' : 'guia'); },
   avisar(t) { miniMsg = t || ''; this.pendente = false; this.atualizar(); },
@@ -100,9 +168,12 @@ const Mini = {
     d.body.innerHTML = '<div id="miniApp" class="mini-janela"></div>';
     d.addEventListener('click', e => this.clique(e));
     d.addEventListener('keydown', e => this.tecla(e));
-    d.addEventListener('input', e => { const it = itemMiniLista().it; if (e.target.id === 'miniLstGuia' && it) Lista.rascunho[it.id] = e.target.value; });
-    d.addEventListener('change', e => { if (e.target.id === 'miniGuia') this.salvarGuia(e.target.value); });
-    d.addEventListener('focusout', () => setTimeout(() => { if (this.pendente && this.aberto() && !/INPUT/.test((this.win.document.activeElement || {}).tagName || '')) { this.pendente = false; this.atualizar(); } }, 50));
+    d.addEventListener('input', e => {
+      const t = e.target; if (t.id === 'miniLstGuia') { const it = itemMiniLista().it; if (it) Lista.rascunho[it.id] = t.value; return; }
+      if (S && t.id !== 'miniGuia' && guiaAtiva()) digitouFinal(t, guiaAtiva());   // etapa final: detalhe do motivo, glosa
+    });
+    d.addEventListener('change', e => { const t = e.target; if (t.id === 'miniGuia') { this.salvarGuia(t.value); return; } if (S && guiaAtiva()) mudouFinal(t, guiaAtiva()); });   // itens não autorizados, motivos, glosa
+    d.addEventListener('focusout', () => setTimeout(() => { if (this.pendente && this.aberto() && !campoDeTexto(this.win.document.activeElement)) { this.pendente = false; this.atualizar(); } }, 50));
     d.addEventListener('paste', e => { const fs = [...(e.clipboardData ? e.clipboardData.files : [])].filter(f => /^image\//.test(f.type)); if (!fs.length) return; e.preventDefault(); if (!S) { this.avisar('Nenhum atendimento aberto para receber o print.'); return; } this.avisar('Lendo o print…'); processarPrints(fs, t => this.avisar(t)); });
     this.win.addEventListener('pagehide', () => { this.win = null; if (Vis.get() === 'flutuante') Vis.set('completa'); render(); });
     this.atualizar(); render();
@@ -110,13 +181,16 @@ const Mini = {
   atualizar() {
     if (!this.aberto()) { this.win = null; return; }
     const d = this.win.document, el = d.getElementById('miniApp'); if (!el) return;
-    const ae = d.activeElement; if (ae && ae.tagName === 'INPUT' && el.contains(ae)) { this.pendente = true; return; }   // não apaga o que está sendo digitado
+    const ae = d.activeElement; if (campoDeTexto(ae) && el.contains(ae)) { this.pendente = true; return; }   // não apaga o que está sendo digitado
+    const rol = d.scrollingElement ? d.scrollingElement.scrollTop : 0;
     el.innerHTML = htmlMini(S ? guiaAtiva() : null, { flutuante: true }) + (this.semPend ? this.htmlSemGuia() : '');
+    if (d.scrollingElement) d.scrollingElement.scrollTop = rol;   // redesenhar não volta o painel para o topo
     if (this.semPend) { const i = d.getElementById('miniMot'); if (i) i.focus(); }
+    if (this.focoProx) { this.focoProx = false; const b = d.querySelector('[data-mact=proximo]'); if (b) b.focus(); }   // Enter no nº da guia: o Próximo fica no foco
   },
   htmlSemGuia() { return `<div class="mini-sem"><label for="miniMot">${esc(this.semPend.v ? this.semPend.v + '… (data ou nº da guia)' : 'Motivo (vai para o e-mail de entrega)')}</label><input type="text" id="miniMot" autocomplete="off"><div class="mini-btns"><button type="button" class="btn sm pri" data-mact="lstSemOk">Registrar sem guia</button><button type="button" class="btn sm ghost" data-mact="lstSemCancela">Cancelar</button></div></div>`; },
   salvarGuia(v) {
-    const g = guiaAtiva(); if (!g) return; v = String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+    const g = guiaAtiva(); if (!g) return; v = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); if (/^\d{8}$/.test(v)) v = 'T' + v;
     if (v && !/^[TS]\d{7,8}$/.test(v)) { miniMsg = 'Nº da guia: T ou S + 7 ou 8 dígitos.'; this.pendente = false; this.atualizar(); return; }
     if (v === (g.numero || '')) return;
     g.numero = v; g.numeroOrigem = 'digitado'; evento(g, 'numero', `Nº da guia digitado no painel flutuante: ${v || '(apagado)'}`); miniMsg = v ? 'Nº da guia salvo: ' + v : '';
@@ -126,7 +200,7 @@ const Mini = {
     const d = this.win.document, t = e.target, emCampo = t && /INPUT|TEXTAREA|SELECT/.test(t.tagName);
     if (e.key === 'Enter' && t.id === 'miniLstGuia') { e.preventDefault(); this.acao('lstRegistrar'); return; }
     if (e.key === 'Enter' && t.id === 'miniMot') { e.preventDefault(); this.acao('lstSemOk'); return; }
-    if (e.key === 'Enter' && t.id === 'miniGuia') { e.preventDefault(); t.blur(); return; }
+    if (e.key === 'Enter' && t.id === 'miniGuia') { e.preventDefault(); this.focoProx = true; t.blur(); return; }
     if (e.key === 'Escape' && this.semPend) { this.semPend = null; this.atualizar(); return; }
     if ((e.key === ' ' || e.code === 'Space') && !emCampo) { const b = d.querySelector('.mini-prox'); if (b) { e.preventDefault(); b.click(); } }
   },
@@ -145,6 +219,7 @@ const Mini = {
       const inp = d.getElementById('miniLstGuia'), v = String((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g, '');
       if (inp) inp.blur(); this.pendente = false;
       if (!/^[TS]\d{7,8}$/.test(v)) { miniMsg = 'Nº da guia: T ou S + 7 ou 8 dígitos.'; this.atualizar(); return; }
+      const ja = Lista.jaAutorizada(it); if (ja && !this.win.confirm(Lista.textoJa(it, ja))) { miniMsg = 'Registro cancelado: confira o pedido repetido.'; this.atualizar(); return; }
       await Lista.registrar(L, it, { st: 'gerada', guia: v }); Lista.foco = null; miniMsg = `Guia ${v} registrada (${it.benef.split(' ')[0]}).`;
       render(); this.atualizar(); const n = d.getElementById('miniLstGuia'); if (n) n.focus(); return;
     }
@@ -156,11 +231,62 @@ const Mini = {
       await Lista.registrar(L, alvo, { st: 'semguia', obs }); Lista.foco = null; miniMsg = `${alvo.benef.split(' ')[0]}: ${obs}.`; render(); this.atualizar(); return;
     }
   },
+  /* etapa final e alertas (guia atual) */
+  async guiaAcao(a, b) {
+    const g = S && guiaAtiva(); if (!g) return false;
+    const w = this.win;
+    switch (a) {
+      case 'alertas': this.verAlertas = !this.verAlertas; this.atualizar(); return true;
+      case 'conferi': acoes.conferiAlerta(b); return true;
+      case 'copValor': { const v = b.dataset.v || ''; this.avisar(v && await copiar(v, w) ? 'Copiado: ' + v : 'Não consegui copiar: clique de novo.'); return true; }
+      case 'proximo': {
+        const st = situacaoGuia(g);
+        if (!guiaNumOk(g)) { this.avisar('Informe o nº da guia (T ou S + 7 ou 8 dígitos).'); return true; }
+        if (st.bloqueios.length) { this.verAlertas = true; this.avisar('Há bloqueio nesta guia: veja os alertas no sino ou resolva no conferidor.'); return true; }
+        if (!st.pode) { this.avisar('Possível pedido repetido: confira o aviso em vermelho e marque "Conferi: não é repetido".'); return true; }
+        if (!podeFinal(g, st)) { this.avisar('Falta a conferência da grade: leia os prints do sistema (ou confira no conferidor).'); return true; }
+        if (g.status !== 'concluido') gravarGuia(g, g.status);
+        miniMsg = ''; mudarVista(4); return true;
+      }
+      case 'voltar': miniMsg = ''; if (g.semGuia) acoes.desfazerSemGuia(); else mudarVista(3); return true;
+      case 'copObs': {
+        const v = g.obsEdit != null ? g.obsEdit : observacaoDaGuia(g);
+        if (!(await copiar(v, w))) { this.avisar('Não consegui copiar: clique de novo.'); return true; }
+        g.copiados.obs = v; miniMsg = 'Observação copiada: cole no sistema.'; persistir(); render(); return true;
+      }
+      case 'copResp': case 'copRespFeita': {
+        const { html, texto } = respostaParaCopiar(g, a === 'copRespFeita');
+        if (/\{[A-Z_]+\}/.test(texto) && !w.confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return true;
+        const r = await copiarRico(html, texto, w);
+        if (!r) { this.avisar('Não consegui copiar: clique de novo.'); return true; }
+        if (a === 'copResp') g.copiados.resp = true;
+        miniMsg = r === 'rico' ? 'Resposta copiada com formatação: cole no e-mail.' : 'Resposta copiada como texto simples.'; persistir(); render(); return true;
+      }
+      case 'webmail': case 'webmailFeita': {
+        if (!extInstalada()) { this.avisar('Instale a extensão do Chrome para levar a resposta ao webmail.'); return true; }
+        const { html, texto } = respostaParaCopiar(g, a === 'webmailFeita');
+        if (/\{[A-Z_]+\}/.test(texto) && !w.confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return true;
+        levarRespostaAoWebmail(g, html, texto); miniMsg = 'Levando a resposta ao webmail…'; render(); return true;
+      }
+      case 'concluir': {
+        const pend = pendenciasConclusao(g, situacaoGuia(g));
+        if (pend.length) { this.avisar(pend[0]); return true; }
+        const txt = g.semGuia ? 'Respondida sem guia e registrada.' : `Guia ${g.numero} concluída e registrada.`;
+        await acoes.concluirGuia(); this.verAlertas = false; this.avisar(txt); return true;
+      }
+      case 'selGuia': miniMsg = ''; acoes.selGuia(b); return true;
+      case 'encerrar': acoes.encerrar(); this.avisar('Atendimento encerrado.'); return true;
+    }
+    return false;
+  },
   async clique(e) {
     const c = e.target.closest('[data-mcopy]'); if (c) { await miniCopiar(c.dataset.mcopy, this.win); return; }
-    const b = e.target.closest('[data-mact]'); if (!b) return;
+    const ba = e.target.closest('[data-act]');
+    if (ba && !ba.disabled && MINI_ACOES_TELA.has(ba.dataset.act)) { e.preventDefault(); acoes[ba.dataset.act](ba); return; }   // botões da etapa 4 reaproveitados (situação, glosa)
+    const b = e.target.closest('[data-mact]'); if (!b || b.disabled) return;
     const a = b.dataset.mact;
     if (/^(modo|abrirLista|lst)/.test(a)) { await this.acao(a, b); return; }
+    if (await this.guiaAcao(a, b)) return;
     if (a === 'abrir') { window.focus(); return; }
     if (a === 'capturar') { this.avisar(Captura.ativa() ? 'Capturando a janela do sistema…' : 'Escolha a janela do sistema na lista do Chrome…'); await capturarJanela(this.win.navigator, t => this.avisar(t)); return; }
     if (a === 'colar') {

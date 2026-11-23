@@ -504,16 +504,34 @@ const Apr = {
     const k = this.chave(e), x = this.lista.find(y => this.chave(y) === k), op = operador();
     if (x) { x.n++; x.ultimo = agora(); if (op && !x.ops.includes(op)) x.ops = [...x.ops, op].slice(-5); if (e.ref) x.ref = e.ref; }
     else this.lista.push({ tipo: e.tipo, clinicaId: e.clinicaId || '', clinica: e.clinica || '', campo: e.campo, lido: String(e.lido), correto: String(e.correto), ref: e.ref || '', sistema: e.sistema || '', n: 1, primeiro: agora(), ultimo: agora(), ops: op ? [op] : [] });
+    await this.gravar();
+  },
+  async gravar() {
     const doc = { atualizadoEm: agora(), itens: this.lista };
     LS.set('aprendizado', doc);
     if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } }
   },
-  async remover(k) { await this.carregar(); this.lista = this.lista.filter(y => this.chave(y) !== k); const doc = { atualizadoEm: agora(), itens: this.lista }; LS.set('aprendizado', doc); if (Pasta.ok) { try { await Pasta.gravar(['aprendizado'], 'correcoes.json', doc); } catch (er) { } } },
+  async remover(k) { await this.carregar(); this.lista = this.lista.filter(y => this.chave(y) !== k); await this.gravar(); },
+  /* "Conferi" num aviso que se repete do mesmo jeito (ex.: código + descrição do e-mail): fica registrado por clínica.
+     Desmarcar o Conferi desfaz a contagem. Com o mínimo de APR_CONF_MIN, o aviso passa a vir como informativo. */
+  conferidoAntes(clinicaId, tipo, assin) { return this.lista.find(e => e.tipo === 'conferido' && e.clinicaId === clinicaId && e.campo === tipo && e.lido === String(assin)) || null; },
+  async marcarConferido(a, on) {
+    const cl = clinicaDe(S); if (!cl || a.apr == null || !APR_CONF_MIN[a.tipo] || a.aprendidoConf) return;
+    await this.carregar();
+    const e = { tipo: 'conferido', clinicaId: cl.id, clinica: cl.nome, campo: a.tipo, lido: String(a.apr), correto: 'conferido' };
+    const k = this.chave(e), x = this.lista.find(y => this.chave(y) === k), op = operador();
+    if (on) {
+      if (x) { x.n++; x.ultimo = agora(); if (op && !x.ops.includes(op)) x.ops = [...x.ops, op].slice(-5); }
+      else this.lista.push({ ...e, ref: a.sub || '', sistema: '', n: 1, primeiro: agora(), ultimo: agora(), ops: op ? [op] : [] });
+    } else if (x) { x.n--; if (x.n <= 0) this.lista = this.lista.filter(y => y !== x); }
+    else return;
+    await this.gravar();
+  },
   /* correções de e-mail desta clínica que batem com o que acabou de ser lido */
   sugestoes(p, cl) {
     if (!cl) return [];
     const out = [], da = this.lista.filter(e => e.tipo === 'email' && e.clinicaId === cl.id);
-    const atual = { codigo: [...p.itens.map(i => i.codigo), ...p.invalidos], medico: [p.medico.nome], crm: [p.medico.crm], cid: [p.cid], local: [p.local], emissao: [p.emissao.bruto] };
+    const atual = { codigo: [...p.itens.map(i => i.codigo), ...p.invalidos], medico: [p.medico.nome], crm: [p.medico.crm], cid: [p.cid], local: [p.local], emissao: [p.emissao.bruto], executante: [cl.executante] };
     for (const e of da) {
       if (e.campo === 'quantidade') continue;   // quantidade vira sugestão de regra (Configurações › Aprendizado)
       const vs = atual[e.campo] || []; if (vs.some(v => v && String(v) === e.lido)) out.push(e);
@@ -671,6 +689,7 @@ Object.assign(acoes, {
     else if (e.campo === 'cid') p.cid = e.correto;
     else if (e.campo === 'local') p.local = e.correto;
     else if (e.campo === 'emissao') p.emissao = lerEmissao(e.correto, S.email.data);
+    else if (e.campo === 'executante') g.executante = e.correto;
     if (e.campo !== 'codigo') marcarOrigem(g, e.campo === 'crm' ? 'medico' : e.campo, 'aprendido');
     p.aprendidos.splice(+b.dataset.i, 1);
     evento(g, 'aprendido', `${e.campo}: "${e.lido}" → "${e.correto}" (correção já feita ${pl(e.n, 'vez', 'vezes')} nesta clínica).`);
@@ -679,7 +698,7 @@ Object.assign(acoes, {
 });
 
 /* ---------- Configurações › Aprendizado ---------- */
-const CAMPO_APR = { codigo: 'Código', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data do pedido', paciente: 'Nome do beneficiário', ident: 'Carteira', guia: 'Nº da guia', credNome: 'Credenciado', profissional: 'Médico (print)', registro: 'CRM (print)', dtSolic: 'Data (print)', item: 'Item' };
+const CAMPO_APR = { executante: 'Credenciado executante', codigo: 'Código', quantidade: 'Quantidade', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data do pedido', paciente: 'Nome do beneficiário', ident: 'Carteira', guia: 'Nº da guia', credNome: 'Credenciado', profissional: 'Médico (print)', registro: 'CRM (print)', dtSolic: 'Data (print)', item: 'Item' };
 function regraSugerida(e) {
   if (e.tipo !== 'email') return '';
   if (e.campo === 'codigo') return 'troca';
@@ -688,7 +707,11 @@ function regraSugerida(e) {
 }
 function cfgAprendizado() {
   const L = [...Apr.lista].sort((a, b) => b.n - a.n || (a.ultimo < b.ultimo ? 1 : -1));
-  const em = L.filter(e => e.tipo === 'email'), pr = L.filter(e => e.tipo === 'print');
+  const em = L.filter(e => e.tipo === 'email'), pr = L.filter(e => e.tipo === 'print'), cf = L.filter(e => e.tipo === 'conferido');
+  const oQue = e => { const [c, d] = e.lido.split('|'); return e.lido === '*' ? 'qualquer e-mail da clínica' : /^cod-/.test(e.campo) && d != null ? `${c} · “${d || 'sem descrição'}”` : e.lido; };
+  const linhaCf = e => { const min = APR_CONF_MIN[e.campo] || 1, k = Apr.chave(e);
+    return `<tr><td>${esc(e.clinica || '—')}</td><td>${esc((ALERTAS[e.campo] || {}).nome || e.campo)}</td><td class="num">${esc(oQue(e))}</td><td class="c"><span class="tag ${e.n >= min ? 'ok' : ''}">${e.n}× de ${min}</span></td><td>${e.n >= min ? 'vira informativo' : `falta${min - e.n > 1 ? 'm' : ''} ${min - e.n}`}</td><td class="num">${fmtData(e.ultimo)}</td><td>${esc((e.ops || []).join(', '))}</td>
+      <td class="c"><button class="btn sm line" data-act="aprRemover" data-k="${esc(k)}" title="Esquecer: o aviso volta a pedir Conferi">${ic('trash', 'sm')}</button></td></tr>`; };
   const linha = e => { const k = Apr.chave(e), rg = regraSugerida(e), cl = cfgEdit.clinicas.find(c => c.id === e.clinicaId);
     const jaRegra = rg === 'troca' && cl && lerTrocas(cl.leitura.trocas).mapa[e.lido] === e.correto || rg === 'qtdPadrao' && cl && String(cl.leitura.qtdPadrao) === e.correto;
     return `<tr><td>${esc(e.clinica || (e.tipo === 'print' ? SISTEMAS_PRINT[e.sistema] || '—' : '—'))}</td><td>${esc(CAMPO_APR[e.campo] || e.campo)}${e.ref ? ` <span class="muted">(${esc(e.ref)})</span>` : ''}</td><td class="num">${esc(e.lido || '—')}</td><td class="num"><b>${esc(e.correto || '—')}</b></td><td class="c"><span class="tag ${e.n >= 3 ? 'warn' : ''}">${e.n}×</span></td><td class="num">${fmtData(e.ultimo)}</td><td>${esc((e.ops || []).join(', '))}</td>
@@ -696,9 +719,12 @@ function cfgAprendizado() {
   const tabela = (lista, vazio) => lista.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Clínica / sistema</th><th>Campo</th><th>Lido</th><th>Correto</th><th>Vezes</th><th>Última</th><th>Operadores</th><th></th></tr></thead><tbody>${lista.map(linha).join('')}</tbody></table></div>` : `<p class="muted">${vazio}</p>`;
   return `<div class="card">${cabSecao('Aprendizado (correções)')}
     <p class="dica">Cada correção que os operadores fazem fica registrada aqui (pasta compartilhada › aprendizado). No e-mail, quando o mesmo valor aparece de novo na mesma clínica, o atendimento sugere a mesma correção. No print, um erro de leitura confirmado vira aviso de “leitura conhecida”. Correções frequentes de código ou de quantidade podem <b>virar regra da clínica</b> (depois clique em Salvar configurações).</p>
-    <div class="acoes" style="margin-top:0"><span class="tag">${em.length} do e-mail · ${pr.length} do print</span><span class="esp"></span><button class="btn" data-act="aprBaixar" ${L.length ? '' : 'disabled'}>${ic('download')}Baixar (.json) para ajuste dos leitores</button></div>
+    <div class="acoes" style="margin-top:0"><span class="tag">${em.length} do e-mail · ${pr.length} do print · ${cf.length} conferidos</span><span class="esp"></span><button class="btn" data-act="aprBaixar" ${L.length ? '' : 'disabled'}>${ic('download')}Baixar (.json) para ajuste dos leitores</button></div>
     <h3>Leitura do e-mail</h3>${tabela(em, 'Nenhuma correção de e-mail registrada ainda.')}
-    <h3 style="margin-top:16px">Leitura dos prints (erros de leitura confirmados)</h3>${tabela(pr, 'Nenhum erro de leitura confirmado ainda.')}</div>`;
+    <h3 style="margin-top:16px">Leitura dos prints (erros de leitura confirmados)</h3>${tabela(pr, 'Nenhum erro de leitura confirmado ainda.')}
+    <h3 style="margin-top:16px">Avisos conferidos (Conferi)</h3>
+    <p class="dica">Cada “Conferi” num aviso que se repete do mesmo jeito fica registrado por clínica. Ex.: o código 50000470 com a descrição “PSICOLOGIA” no e-mail. Atingido o número de vezes, o mesmo aviso passa a vir como informativo, sem pedir Conferi. Desmarcar o Conferi desfaz a contagem. Avisos de cada caso (possível pedido repetido, carteira, parametrização, médico) nunca viram aprendizado.</p>
+    ${cf.length ? `<div class="tabela-scroll"><table class="t"><thead><tr><th>Clínica</th><th>Aviso</th><th>O que foi conferido</th><th>Vezes</th><th>Efeito</th><th>Última</th><th>Operadores</th><th></th></tr></thead><tbody>${cf.map(linhaCf).join('')}</tbody></table></div>` : '<p class="muted">Nenhum aviso conferido registrado ainda.</p>'}</div>`;
 }
 Object.assign(acoes, {
   aprRegra(b) {
@@ -708,7 +734,7 @@ Object.assign(acoes, {
     else cl.leitura.qtdPadrao = Number(e.correto);
     marcarSujo(); render(); toast(`Regra adicionada em ${cl.nome}. Clique em Salvar configurações.`);
   },
-  async aprRemover(b) { const x = Apr.lista.find(y => Apr.chave(y) === b.dataset.k); if (!(await confirmar({ titulo: 'Esquecer correção', texto: x ? `Esquecer a correção <b>“${esc(x.lido)}” → “${esc(x.correto)}”</b>${x.clinica ? ' de ' + esc(x.clinica) : ''}? Ela deixa de ser sugerida.` : 'Esquecer esta correção?', ok: 'Esquecer correção', risco: 'warn' }))) return; await Apr.remover(b.dataset.k); render(); },
+  async aprRemover(b) { const x = Apr.lista.find(y => Apr.chave(y) === b.dataset.k); if (!(await confirmar({ titulo: x && x.tipo === 'conferido' ? 'Esquecer aviso conferido' : 'Esquecer correção', texto: x && x.tipo === 'conferido' ? `Esquecer o aviso <b>${esc((ALERTAS[x.campo] || {}).nome || x.campo)}</b> (${esc(x.lido === '*' ? 'qualquer e-mail' : x.lido.replace('|', ' · '))})${x.clinica ? ' de ' + esc(x.clinica) : ''}? Ele volta a pedir Conferi.` : x ? `Esquecer a correção <b>“${esc(x.lido)}” → “${esc(x.correto)}”</b>${x.clinica ? ' de ' + esc(x.clinica) : ''}? Ela deixa de ser sugerida.` : 'Esquecer esta correção?', ok: 'Esquecer', risco: 'warn' }))) return; await Apr.remover(b.dataset.k); render(); },
   aprBaixar() { baixar(nomeArquivo('aprendizado', isoDia(new Date()), 'json'), JSON.stringify({ tipo: 'conferidor-aprendizado', versao: VERSAO, gerado: agora(), itens: Apr.lista }, null, 1), 'application/json'); }
 });
 /* ====================================================================
