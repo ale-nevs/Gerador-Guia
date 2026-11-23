@@ -155,6 +155,13 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Acompanhamento: guias paradas há mais de 10 min (versão 2.2.6)
+- **Guia em andamento — mais que 10 min:** embaixo das colunas Lendo o pedido, Gerando guia e Anexando e-mail, uma seção reúne as guias de hoje que ninguém está com aberta há mais de 10 min, da mais antiga para a mais recente.
+  - Cada guia mostra a etapa em que parou, o operador e há quanto tempo está parada.
+  - Antes, essas guias sumiam do quadro. Agora ficam à vista até alguém continuar, responder à clínica ou excluir (aba Corrigir guia).
+  - Os 10 min vêm das Preferências ("Acompanhamento: guia parada vai para mais que N min após…"). Com 0, nada é separado e todas ficam nas colunas.
+  - Guias abertas ao vivo continuam nas colunas, com "nesta etapa há N min". O total do quadro conta todas.
+
 ### Reabrir guia da lista do dia, aba Corrigir guia e e-mail de ajuste (versão 2.2.5)
 - **Aba Corrigir guia:** mostra todas as guias registradas **sem Nº da guia**, de todos os dias, para conferir e corrigir:
   - respostas sem guia do e-mail (com o modelo usado, ex.: Pendência);
