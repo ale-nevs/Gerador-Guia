@@ -80,7 +80,7 @@ function pintarProgresso() {
 }
 setInterval(async () => { if (document.hidden || !Vis.simples()) return; try { await Reg.carregar(); await Presenca.ler(); pintarProgresso(); } catch (e) { } }, 20000);   // relê a presença: os outros computadores mudam de guia e de etapa
 const extInstalada = () => document.documentElement.dataset.conferidorExt || '';
-const EXT_VERSAO = '1.2.0';   // versão da extensão publicada junto com o site
+const EXT_VERSAO = '1.3.0';   // versão da extensão publicada junto com o site
 const extDesatualizada = () => { const v = extInstalada(); if (!v) return false; const a = v.split('.').map(Number), b = EXT_VERSAO.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0); } return false; };
 function renderTopo() {
   const op = operadorObj(), hoje = new Date();
@@ -818,7 +818,7 @@ function renderFinalSemGuia(alvo, g) {
     seguir: `<button class="btn pri" data-act="concluirGuia" ${pend.length ? 'disabled' : ''}>${ic('check')}Concluir guia</button>` })}`;
 }
 /* "Responder no webmail": aparece sempre; sem a extensão, o clique explica como instalar */
-const btnWebmail = (fonte = 'editor', desativado = false) => `<button class="btn line" data-act="responderWebmail" data-fonte="${fonte}" ${desativado ? 'disabled' : ''} title="${extInstalada() ? 'Leva a resposta ao webmail: lá, clique em Responder, no corpo do texto e em Colar resposta. O envio continua sendo feito por você.' : 'Com a extensão do Chrome, a resposta vai direto para o webmail. Clique para ver como instalar.'}">${ic('send')}Responder no webmail</button>`;
+const btnWebmail = (fonte = 'editor', desativado = false) => `<button class="btn line" data-act="responderWebmail" data-fonte="${fonte}" ${desativado ? 'disabled' : ''} title="${extInstalada() ? (extDesatualizada() ? 'Leva a resposta ao webmail: lá, clique em Responder, no corpo do texto e em Colar resposta. Atualize a extensão para o Responder a todos abrir sozinho.' : 'Leva a resposta ao webmail: abre o Responder a todos do e-mail aberto e cola a resposta. O envio continua sendo feito por você.') : 'Com a extensão do Chrome, a resposta vai direto para o webmail. Clique para ver como instalar.'}">${ic('send')}Responder no webmail</button>`;
 function renderConcluida(alvo, g) {
   const r = g.resultado, resp = respostaDaGuia(g, false), a = autorizadosDe(g), n = negadosDe(g);
   const prox = S.guias.findIndex(x => !guiaTerminal(x)), todas = S.guias.every(guiaTerminal);

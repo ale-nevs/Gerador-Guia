@@ -109,7 +109,7 @@ Mostra o trabalho do dia, sem separar por operador: totais por resultado, o que 
 - A página funciona até 320 px de largura, sem rolagem horizontal.
 
 ### Extensão do Chrome (botão "Abrir no conferidor")
-No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada" (ou **Atualizar extensão**, quando a instalada é mais antiga que a do site). Na versão 1.2.0 o botão mostra se o e-mail já está em atendimento ou já foi atendido, "Abrindo…" e "Aberto: NOME", fica cinza quando o e-mail é fechado (pede confirmação) e, com **Responder no webmail** (etapa 4), cola a resposta pronta no corpo da resposta do webmail; o envio continua sendo feito pelo operador. Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
+No topo do site há um ícone de download: ele baixa a extensão (`public/extensao/conferidor-guias-extensao.zip`) e mostra o passo a passo. Instalada, o webmail ganha um botão flutuante **Abrir no conferidor**; o clique abre o e-mail na aba do Conferidor, sem baixar o .eml. O ícone do topo vira um sinal de "instalada" (ou **Atualizar extensão**, quando a instalada é mais antiga que a do site). O botão mostra se o e-mail já está em atendimento ou já foi atendido, "Abrindo…" e "Aberto: NOME", e fica cinza quando o e-mail é fechado (pede confirmação). Com **Responder no webmail** (etapa 4 ou painel flutuante), a versão 1.3.0 abre o "Responder a todos" do e-mail e cola a resposta pronta; o envio continua sendo feito pelo operador (veja a versão 2.2.9 abaixo). Detalhes e limites em `extensao/LEIA-ME.md`. Depois de mudar a extensão, rode `python3 extensao/empacotar.py` para atualizar o .zip do site.
 
 ### Conferência pelos prints (etapa 3)
 No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de Senhas" do sistema oficial, por OCR no próprio navegador (arquivos em `public/ocr/`, sem IA externa e sem enviar imagens).
@@ -125,7 +125,7 @@ No lugar da conferência cega, a etapa 3 lê os prints da tela "Liberação de S
 ### Captura da janela, modo simples e painel flutuante
 - **Conectar à janela do sistema** (etapa 3, ao lado de Colar print): o Chrome pergunta qual janela compartilhar; escolha a do sistema (PS Web ou Liberação de Senhas). Depois, abra no sistema a aba que quer conferir e clique em **Capturar a janela do sistema**: a imagem é lida como um print colado, sem Print Screen. A conexão vale até recarregar a página ou clicar em "Parar de compartilhar" no Chrome. A janela do sistema não pode estar minimizada (pode estar atrás de outras).
 - **Modo simples** (etapa 3): mostra só o essencial — os campos na ordem de lançamento, cada um copiável com um clique (fica verde quando copiado), a conferência pelos prints, os alertas e o botão de seguir. Bom para monitor pequeno. O botão volta ao modo completo.
-- **Painel flutuante**: abre uma janelinha que fica **por cima do sistema**, no canto da tela, com os mesmos campos para copiar, o contador de copiados, os botões Capturar/Colar print, o resumo da conferência e o nº da guia. Acompanha o atendimento em tempo real. Funciona no Chrome e no Edge atuais (em navegador antigo abre como janela comum).
+- **Painel flutuante**: abre uma janelinha que fica **por cima do sistema**, no canto da tela, com os mesmos campos para copiar, o contador de copiados, os botões Capturar/Colar print, o resumo da conferência e o nº da guia. Na versão 2.2.9 também tem o sininho de alertas, a descrição dos serviços e a etapa final (situação, copiar observação e resposta, Concluir guia). Acompanha o atendimento em tempo real. Funciona no Chrome e no Edge atuais (em navegador antigo abre como janela comum).
 
 ### Prevenção de erros e aprendizado
 - **Antes de aceitar uma divergência do print** (botão Ignorar), o app lê aquela parte de novo com mais preparos e posições. Se a releitura bater com o pedido, era erro de leitura: corrige sozinho e nada é ignorado.
@@ -154,6 +154,26 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - **Copiar próximo:** botão grande com o próximo campo na ordem do sistema (atalho: barra de espaço com o painel selecionado); a linha do próximo fica marcada e há barra de progresso.
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
+
+### Painel flutuante completo e Responder a todos no webmail (versão 2.2.9, extensão 1.3.0)
+**Painel flutuante:** dá para fazer a guia inteira por ele, sem voltar ao conferidor.
+- **Sininho** no topo do painel, ao lado do contador: mostra quantos alertas pedem ação (vermelho com bloqueio, amarelo com "Conferi" pendente, verde quando tudo foi conferido). O clique abre a lista de **alertas e ocorrências**, cada um com o botão **Conferi**. Os que precisam de uma ação de tela (vincular clínica, cadastrar código…) têm **Resolver no conferidor**.
+- **Serviços:** a descrição aparece embaixo do código e da quantidade (a do cadastro da clínica; sem cadastro, a do e-mail).
+- **Próximo:** com o nº da guia preenchido, aparece ao lado de "Ir para o conferidor" (com Enter no nº da guia ele já fica selecionado). Abre a etapa final no painel:
+  - o **nº da guia** (editável) com **Copiar observação**;
+  - a **Situação da autorização** (autorizada, parcial com os itens não autorizados e o motivo, não autorizada com o motivo) e "Retirou alguma glosa?";
+  - **Copiar resposta** (com formatação, para o e-mail) e **Responder no webmail** (com a extensão);
+  - as pendências que faltam e **Concluir guia**. **Voltar** retorna aos campos.
+- Num e-mail com várias guias, cada uma é concluída pelo painel. A resposta com todas sai na última; depois aparecem **Copiar resposta**, **Responder no webmail** e **Encerrar atendimento**.
+- O Próximo respeita as mesmas regras do conferidor: sem bloqueio e com a conferência da grade (prints) feita.
+
+**Extensão 1.3.0, Responder no webmail:** igual à extensão da Ouvidoria. A resposta chega ao webmail, que abre o **Responder a todos** do e-mail aberto e já cola a resposta no topo do texto (acima da assinatura e da mensagem original).
+- Abre sozinho só quando o e-mail aberto no webmail é o do atendimento (mesmo Message-ID, ou mesmo assunto e remetente). Se for outro e-mail, o botão flutuante avisa ("Abra o e-mail X"). Quando você abre o e-mail certo, ele responde sozinho. Para responder ao e-mail aberto assim mesmo, clique duas vezes no botão.
+- Como abre: atalho **A** do SmarterMail; se não abrir em 3,5 s, clica no botão "Responder a todos". Funciona com a resposta no mesmo quadro ou em janela própria.
+- A resposta vai só para o editor que surgiu depois do pedido. Rascunhos já abertos não são tocados. O texto é conferido depois de colar.
+- Se nada abrir em ~9 s, o botão avisa: clique em Responder a todos (a resposta é colada quando o texto abrir) ou clique no corpo do e-mail e no botão para colar ali.
+- **O envio continua sendo seu**: a extensão só abre e cola. A resposta fica só na memória do navegador e é apagada logo depois de colada (ou em 15 min). O × do botão descarta a resposta pendente.
+- **Atualizar:** baixe a extensão pelo ícone do topo (aparece "Atualizar extensão"), substitua a pasta, clique em recarregar em `chrome://extensions` e aperte F5 no webmail. Precisa do Chrome ou Edge 116 ou mais novo.
 
 ### Leitura dos e-mails da MRA (versão 2.2.8)
 - **CPF no lugar da carteira** ("NOME  CPF 01574152521  50000470 …"): o nome, o serviço, o médico e o local da linha passam a ser lidos. A carteira fica em branco, com o alerta mostrando o CPF ("Localize o beneficiário pelo CPF no sistema").

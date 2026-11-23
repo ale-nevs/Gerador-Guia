@@ -1,5 +1,5 @@
 'use strict';
-const VERSAO = '2.2.8';
+const VERSAO = '2.2.9';
 const HIST_DIAS = 30;        // janela técnica de leitura dos registros (não configurável)
 const MAX_BENEFICIARIOS = 5; // beneficiários diferentes por e-mail
 
@@ -136,24 +136,25 @@ function toast(msg, tipo) {
   clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', tipo === 'bad' ? 5000 : 2200);
 }
 /* Copia texto simples. Devolve true só se a cópia realmente aconteceu. */
-async function copiar(texto) {
-  try { if (navigator.clipboard && window.isSecureContext !== false) { await navigator.clipboard.writeText(texto); return true; } } catch (e) { }
-  try { const ta = document.createElement('textarea'); ta.value = texto; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return !!ok; } catch (e) { return false; }
+/* w: janela onde está o clique (o painel flutuante tem a própria área de transferência) */
+async function copiar(texto, w = window) {
+  try { if (w.navigator.clipboard && w.isSecureContext !== false) { await w.navigator.clipboard.writeText(texto); return true; } } catch (e) { }
+  try { const d = w.document, ta = d.createElement('textarea'); ta.value = texto; ta.style.cssText = 'position:fixed;opacity:0'; d.body.appendChild(ta); ta.select(); const ok = d.execCommand('copy'); ta.remove(); return !!ok; } catch (e) { return false; }
 }
 /* Copia com formatação (HTML + texto simples), para colar em e-mail. */
-async function copiarRico(html, texto) {
+async function copiarRico(html, texto, w = window) {
   try {
-    if (navigator.clipboard && window.ClipboardItem && window.isSecureContext !== false) {
-      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([texto], { type: 'text/plain' }) })]);
+    if (w.navigator.clipboard && w.ClipboardItem && w.isSecureContext !== false) {
+      await w.navigator.clipboard.write([new w.ClipboardItem({ 'text/html': new w.Blob([html], { type: 'text/html' }), 'text/plain': new w.Blob([texto], { type: 'text/plain' }) })]);
       return 'rico';
     }
   } catch (e) { }
   try {
-    const d = document.createElement('div'); d.contentEditable = 'true'; d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0'; d.innerHTML = html; document.body.appendChild(d);
-    const r = document.createRange(); r.selectNodeContents(d); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    const ok = document.execCommand('copy'); s.removeAllRanges(); d.remove(); if (ok) return 'rico';
+    const doc = w.document, d = doc.createElement('div'); d.contentEditable = 'true'; d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0'; d.innerHTML = html; doc.body.appendChild(d);
+    const r = doc.createRange(); r.selectNodeContents(d); const s = w.getSelection(); s.removeAllRanges(); s.addRange(r);
+    const ok = doc.execCommand('copy'); s.removeAllRanges(); d.remove(); if (ok) return 'rico';
   } catch (e) { }
-  return (await copiar(texto)) ? 'simples' : false;
+  return (await copiar(texto, w)) ? 'simples' : false;
 }
 function baixar(nome, conteudo, tipo) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo || 'text/plain' }));

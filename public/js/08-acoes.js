@@ -50,7 +50,12 @@ window.addEventListener('message', ev => {
   const responder = r => { if (d.pid) window.postMessage({ __conferidorPagina: 'resposta', pid: d.pid, ...r }, location.origin); };
   if (d.__conferidorExt === 'webmail' && d.msg) { if (Abas.pausada) Abas.assumir(); abrirDoWebmail(d.msg).then(responder, () => responder({ ok: false })); }
   if (d.__conferidorExt === 'status' && d.msg) statusWebmail(d.msg).then(responder, () => responder({ info: null }));
-  if (d.__conferidorExt === 'respostaEntregue') toast(d.ok ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta".' : 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.'), d.ok ? '' : 'bad');
+  if (d.__conferidorExt === 'respostaEntregue') {
+    const t = !d.ok ? 'Não consegui levar a resposta ao webmail: ' + (d.motivo || 'tente de novo.')
+      : extDesatualizada() ? 'Resposta enviada ao webmail: lá, clique em Responder, no corpo do texto e no botão "Colar resposta". (Atualize a extensão para abrir o "Responder a todos" sozinha.)'
+      : 'Resposta levada ao webmail: o "Responder a todos" abre com a resposta colada. Revise e envie por lá.';
+    toast(t, d.ok ? '' : 'bad'); if (Mini.aberto()) Mini.avisar(d.ok ? 'Resposta levada ao webmail.' : t);
+  }
 });
 async function iniciar(email) {
   const clL = ehEmailLista(email);
@@ -335,14 +340,10 @@ const acoes = {
     const fonte = (b && b.dataset.fonte) || 'editor';
     if (fonte === 'lista') { Lista.responderWebmail(b.dataset.lista); return; }
     const g = guiaAtiva(); if (!g) return;
-    let html;
-    if (fonte === 'concluida') html = htmlParaEmail(respostaDaGuia(g, false).html.replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1'));
-    else { const ed = $('#edResp'); if (!ed) { toast('Abra a resposta na etapa 4 para levá-la ao webmail.', 'bad'); return; } html = htmlParaEmail(serializarEditor(ed)); }
-    const texto = htmlPlano(html);
+    const ed = fonte === 'concluida' ? null : $('#edResp');
+    const { html, texto } = ed ? (h => ({ html: htmlParaEmail(h), texto: htmlPlano(h) }))(serializarEditor(ed)) : respostaParaCopiar(g, fonte === 'concluida');
     if (/\{[A-Z_]+\}/.test(texto) && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    const quem = nomesAtend();
-    enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '' });
-    g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir(); render();
+    levarRespostaAoWebmail(g, html, texto); render();
   },
   async copiarRespSimples() {
     const g = guiaAtiva(), texto = htmlPlano(serializarEditor($('#edResp')));
@@ -514,8 +515,8 @@ const acoes = {
     if (!extInstalada()) { toast('Para levar o e-mail direto ao webmail, instale a extensão do Chrome (passo a passo abaixo).'); acoes.baixarExtensao(); return; }
     const e = emailAjusteDe(r, M.apont, false);
     if (e.faltando.length && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
-    enviarAoWebmail({ html: htmlParaEmail(e.html), texto: e.texto, quem: r.paciente || r.pacienteIni || '', assunto: `Ajuste da guia ${r.guia}` });
-    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = 'Levado ao webmail: cole na resposta aberta e envie por lá.';
+    enviarAoWebmail({ html: htmlParaEmail(e.html), texto: e.texto, quem: r.paciente || r.pacienteIni || '', assunto: `Ajuste da guia ${r.guia}`, alvo: alvoEmail([r.messageId], r.assunto, r.remetente) });
+    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = extDesatualizada() ? 'Levado ao webmail: cole na resposta aberta e envie por lá.' : 'Levado ao webmail: com o e-mail original aberto, o Responder a todos abre com o texto colado. Revise e envie por lá.';
   },
   relatarGuia() { const g = guiaAtiva(); if (g) abrirRelato({ g }); },
   async relatarHist(b) { const r = regPorId(b.dataset.id); if (!r) { toast('Registro não encontrado: atualize a lista e tente de novo.', 'bad'); return; } const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
@@ -728,7 +729,7 @@ document.addEventListener('input', e => {
   if (M && M.tipo === 'obs' && t.dataset.obstxt) { M.txt = t.value; M.editado = true; return; }
   if (!S) return;
   const g = guiaAtiva();
-  if (t.dataset.glf) { const gl = glosaDe(g); if (gl.itens[t.dataset.c]) gl.itens[t.dataset.c][t.dataset.glf] = t.value; persistir(); atualizarConcluir(g); return; }
+  if (digitouFinal(t, g)) return;
   if (t.dataset.cega) {
     const i = +t.dataset.i; g.cega.entradas[i] = { ...(g.cega.entradas[i] || {}), [t.dataset.cega]: t.value.replace(/\D/g, '') };
     if (t.value !== t.value.replace(/\D/g, '')) t.value = t.value.replace(/\D/g, '');
@@ -750,7 +751,6 @@ document.addEventListener('input', e => {
   }
   if (t.id === 'txtObs') { g.obsEdit = t.value; persistir(); const bt = $('[data-act=copiarObs]'); if (bt && g.copiados.obs !== t.value) $$('[data-act=copiarObs].copiado').forEach(x => estadoCopiaBtn(x, false)); return; }
   if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); const bt = $('[data-act=copiarEmail]'); if (bt) estadoCopiaBtn(bt, g.copiados.email === t.value.trim() && t.value.trim() !== ''); persistir(); return; }
-  if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return; }
 });
 document.addEventListener('change', async e => {
   const t = e.target;
@@ -810,16 +810,26 @@ document.addEventListener('change', async e => {
     }
     persistir(); return;
   }
-  if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return; }
-  if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return; }
-  if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return; }
+  mudouFinal(t, g);
+});
+/* campos da etapa 4 (situação, itens não autorizados, glosa): servem à tela e ao painel flutuante */
+function digitouFinal(t, g) {
+  if (t.dataset.glf) { const gl = glosaDe(g); if (gl.itens[t.dataset.c]) gl.itens[t.dataset.c][t.dataset.glf] = t.value; persistir(); atualizarConcluir(g); return true; }
+  if (t.dataset.resf === 'motivoTxt' || t.dataset.resf === 'obsAdicionais') { g.resultado[t.dataset.resf] = t.value; persistir(); return true; }
+  return false;
+}
+function mudouFinal(t, g) {
+  if (t.dataset.gl) { const gl = glosaDe(g); if (t.checked) gl.itens[t.dataset.gl] = gl.itens[t.dataset.gl] || { glosa: '', motivo: '' }; else delete gl.itens[t.dataset.gl]; persistir(); render(); return true; }
+  if (t.dataset.neg) { const r = g.resultado; if (t.checked) { r.naoAut[t.dataset.neg] = r.naoAut[t.dataset.neg] ?? ''; delete glosaDe(g).itens[t.dataset.neg]; } else delete r.naoAut[t.dataset.neg]; g.respEdit = null; persistir(); render(); return true; }
+  if (t.dataset.negmot) { g.resultado.naoAut[t.dataset.negmot] = t.value; g.respEdit = null; persistir(); render(); return true; }
   if (t.dataset.resf) {
     if (t.dataset.resf === 'usarCorrecao') { g.usarCorrecao = t.checked; g.respEdit = null; }
     else if (t.dataset.resf === 'emailPrestador') { g.resultado.emailPrestador = t.value.trim(); }
     else { g.resultado[t.dataset.resf] = t.value; if (g.respEdit == null) { /* o texto gerado acompanha */ } }
-    persistir(); render(); return;
+    persistir(); render(); return true;
   }
-});
+  return false;
+}
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-cega], #cegaN')) {
     e.preventDefault();
@@ -859,6 +869,18 @@ const ROT_ICONE = /^(Copiar.*|Atualizar|Lista|Numerada|Limpar formatação|Corri
    obrigando a decorar ícones. Agora os botões mantêm o texto; só os botões feitos para ser só ícone (classe "so", como os de
    copiar) ficam sem texto, sempre com dica e nome acessível. */
 const enviarAoWebmail = resposta => window.postMessage({ __conferidorPagina: 'responderWebmail', resposta }, location.origin);
+/* o e-mail que deve receber a resposta: a extensão só abre "Responder a todos" sozinha quando é ele que está aberto no webmail */
+const alvoEmail = (ids, assunto, de) => ({ messageIds: [...new Set((ids || []).filter(Boolean))], assunto: assunto || '', de: de || '' });
+/* resposta pronta para colar no e-mail (o texto editado na etapa 4, se houver; senão, o do modelo) */
+function respostaParaCopiar(g, concluida) {
+  const h = (g.respEdit != null && !concluida ? g.respEdit : respostaDaGuia(g, !concluida).html).replace(/<mark class="lacuna">(.*?)<\/mark>/g, '$1');
+  return { html: htmlParaEmail(h), texto: htmlPlano(h) };
+}
+function levarRespostaAoWebmail(g, html, texto) {
+  const quem = nomesAtend();
+  enviarAoWebmail({ html, texto, quem: quem[0] ? quem[0] + (quem.length > 1 ? ` e mais ${quem.length - 1}` : '') : '', assunto: S.email.assunto || '', alvo: alvoEmail([S.email.messageId], S.email.assunto, S.email.remetente.email) });
+  g.copiados.resp = true; evento(g, 'regra', 'Resposta levada ao webmail pela extensão'); persistir();
+}
 function soIcone(raiz) {
   raiz.querySelectorAll('.btn.so').forEach(b => { const t = b.getAttribute('aria-label') || b.dataset.dica || ''; if (t && !b.title && !b.dataset.dica) b.title = t; });
   return;

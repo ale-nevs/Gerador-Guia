@@ -267,7 +267,7 @@ ${intro.split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${esc(p).replace(/\
     const L = this.listas.find(l => l.id === id); if (!L) return;
     const { html, pend } = this.htmlEmail(L);
     if (pend && !confirm(`Ainda há ${pl(pend, 'guia pendente', 'guias pendentes')}. Levar o e-mail assim mesmo?`)) return;
-    enviarAoWebmail({ html, texto: this.textoEmail(L), quem: `${L.clinica} · ${L.nome}`, assunto: L.assunto || '' });
+    enviarAoWebmail({ html, texto: this.textoEmail(L), quem: `${L.clinica} · ${L.nome}`, assunto: L.assunto || '', alvo: alvoEmail(L.messageIds, L.assunto, L.remetente) });
   },
 
   /* ---------- telas ---------- */
