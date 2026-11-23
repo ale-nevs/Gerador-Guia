@@ -477,11 +477,12 @@ function maisUsadosSemGuia() {
   return { top: ord.slice(0, 3), n };
 }
 function htmlRespSemGuia() {
-  const { top, n } = maisUsadosSemGuia();
-  const btn = (k, cls) => `<button class="btn ${cls}" data-act="respSemGuia" data-modelo="${k}">${ic('mail', 'sm')}${esc(nomeModelo(k))}${n[k] ? ` <span class="muted">(${n[k]})</span>` : ''}</button>`;
-  return `<div class="linha-flex">${top.map(k => btn(k, 'line')).join('')}
+  const { top, n } = maisUsadosSemGuia(), g = S && guiaAtiva(), nf = g ? naoIdentificados(g).length : 0;
+  const vis = nf ? ['nao_identificado', ...top.filter(k => k !== 'nao_identificado')].slice(0, 3) : top;   // faltou dado: "Dados não identificados" vem primeiro
+  const btn = (k, cls) => `<button class="btn ${cls}" data-act="respSemGuia" data-modelo="${k}" ${k === 'nao_identificado' && nf ? `title="${esc(naoIdentificados(g).join('\n'))}"` : ''}>${ic('mail', 'sm')}${esc(nomeModelo(k))}${k === 'nao_identificado' && nf ? ` <span class="tag warn">${nf}</span>` : n[k] ? ` <span class="muted">(${n[k]})</span>` : ''}</button>`;
+  return `<div class="linha-flex">${vis.map(k => btn(k, 'line')).join('')}
     <details class="menu-resp"><summary class="btn line">${ic('list', 'sm')}Responder sem guia ▾</summary><div class="menu-lista" role="menu">${MODELOS_SEM_GUIA.map(k => btn(k, 'ghost menu-op')).join('')}</div></details></div>
-    <p class="dica" style="margin:6px 0 0">À vista, as 3 respostas mais usadas pela equipe nos últimos dias.</p>`;
+    <p class="dica" style="margin:6px 0 0">${nf ? `Faltam ${pl(nf, 'dado', 'dados')} no pedido: “${esc(nomeModelo('nao_identificado'))}” lista todos para a clínica. ` : ''}À vista, as respostas mais usadas pela equipe nos últimos dias.</p>`;
 }
 document.addEventListener('click', ev => { $$('details.menu-resp[open]').forEach(d => { if (!d.contains(ev.target)) d.open = false; }); });
 

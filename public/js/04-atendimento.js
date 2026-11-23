@@ -376,6 +376,38 @@ async function gravarTodas(status, soPendentes) { for (const g of S.guias) { if 
 const STATUS = { em_andamento: 'Em andamento', concluido: 'Concluída', cancelado: 'Cancelada', aguardando_clinica: 'Aguardando clínica', devolvido: 'Devolvido (legado)', descartado: 'Descartada' };
 
 /* ---------- Textos gerados ---------- */
+/* modelo "Dados não identificados": tudo o que faltou ou veio fora do padrão, na linguagem da clínica */
+function naoIdentificados(g) {
+  const p = g.pedido, L = [], em = p.emissao, P = cfg.preferencias;
+  if (!p.beneficiario) L.push('Nome completo do beneficiário');
+  if (!cartValida(g.carteiraUsada)) L.push(p.cpf && !p.carteiraBruta ? 'Número da carteira Promédica (17 caracteres, sem espaços): veio o CPF no lugar'
+    : p.carteiraBruta ? `Número da carteira Promédica: o informado ("${p.carteiraBruta}") não tem 17 caracteres (15 dígitos + 2 caracteres)` : 'Número da carteira Promédica (17 caracteres, sem espaços)');
+  const ruins = unicos([...p.invalidos, p.codigoSuspeito].filter(Boolean));
+  if (!p.itens.length && !ruins.length) L.push(p.soltos.length ? `Serviço solicitado: o número ${p.soltos.join(', ')} aparece no texto, mas sem identificar o serviço (informe código, descrição e quantidade)` : 'Código do serviço (8 dígitos), com a descrição e a quantidade');
+  ruins.forEach(c => L.push(`Código do serviço: "${c}" está incompleto ou incorreto (o código tem 8 dígitos)`));
+  p.itens.forEach(it => {
+    if (it.qtd == null) L.push(`Quantidade do serviço ${it.codigo}`);
+    else if (it.qtd < 1 || it.qtd > P.qtdMax) L.push(`Quantidade do serviço ${it.codigo}: o valor informado (${it.qtd}) não é válido`);
+  });
+  if (!p.medico.nome) L.push('Nome do médico solicitante');
+  if (!p.medico.crm) L.push('CRM do médico solicitante');
+  if (em.estado === 'ausente') L.push('Data do pedido médico (ou "SEM DATA")');
+  else if (em.estado === 'invalida') L.push(`Data do pedido médico: "${em.bruto}" não é uma data válida`);
+  if (!p.local) L.push('Local do pedido (local de emissão)');
+  if (!p.cid) L.push('CID');
+  return L;
+}
+function dadosIdentificados(g) {
+  const p = g.pedido, L = [], dt = dataPedidoTxt(p);
+  if (p.beneficiario) L.push('Beneficiário: ' + p.beneficiario);
+  if (cartValida(g.carteiraUsada)) L.push('Carteira: ' + g.carteiraUsada);
+  if (p.itens.length) L.push((p.itens.length > 1 ? 'Serviços:\n' : 'Serviço: ') + p.itens.map(i => `${p.itens.length > 1 ? '• ' : ''}${i.codigo} – ${descRef(g, i)}${i.qtd != null ? ' – quantidade: ' + i.qtd : ''}`).join('\n'));
+  if (p.medico.nome || p.medico.crm) L.push('Médico: ' + [p.medico.nome, p.medico.crm && `${p.medico.conselho || 'CRM'} ${p.medico.crm}`].filter(Boolean).join(' – '));
+  if (p.emissao.estado === 'valida' || p.emissao.estado === 'sem_data') L.push('Data do pedido: ' + dt);
+  if (p.local) L.push('Local: ' + p.local);
+  if (p.cid) L.push('CID: ' + p.cid);
+  return L.length ? 'Dados identificados no pedido:\n' + L.join('\n') : '';
+}
 function problemasDe(g) { return avaliar(g).filter(a => a.modo === 'bloqueio').map(a => '• ' + (a.clinica || a.texto)).join('\n') || '• (descreva a pendência)'; }
 function guiaAnterior(g) {
   const meus = new Set(g.pedido.itens.map(i => i.codigo));

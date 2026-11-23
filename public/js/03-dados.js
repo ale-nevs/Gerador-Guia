@@ -150,6 +150,21 @@ Modelo de pedido:
 {MODELO_PEDIDO}
 
 Permanecemos à disposição.` },
+  nao_identificado: { nome: 'Dados não identificados no pedido', texto:
+`{SAUDACAO}!
+
+Recebemos a solicitação de autorização enviada neste e-mail, mas não foi possível gerar a guia porque as informações abaixo não foram identificadas no pedido:
+
+{NAO_IDENTIFICADOS}
+
+{DADOS_IDENTIFICADOS}
+
+Por gentileza, responda este e-mail com o pedido completo para darmos continuidade.
+
+Modelo de pedido:
+{MODELO_PEDIDO}
+
+Permanecemos à disposição.` },
   ja_autorizado: { nome: 'Já autorizado (cobrança)', texto:
 `{SAUDACAO}!
 
@@ -262,6 +277,7 @@ Assunto: {ASSUNTO}
 /* Trecho de cada guia na resposta única, quando o e-mail tem várias guias e esta não foi gerada */
 const MULTI_PADRAO = {
   pendencia: 'Beneficiário: {BENEFICIARIO}\nNão foi possível gerar a guia pelo(s) motivo(s) abaixo:\n{PROBLEMAS}',
+  nao_identificado: 'Beneficiário: {BENEFICIARIO_REF}\nNão foi possível gerar a guia. Não identificamos no pedido:\n{NAO_IDENTIFICADOS}',
   ja_autorizado: 'Beneficiário: {BENEFICIARIO}\nJá autorizado anteriormente na guia {GUIA_ANTERIOR}, em {DATA_ANTERIOR}, com os serviços:\n{ITENS_ANTERIOR}',
   carteira_nao_localizada: 'Beneficiário: {BENEFICIARIO}\nNão localizado com a carteira informada ({CARTEIRA_INFORMADA}). Por gentileza, confirme o nome completo e a carteira Promédica.',
   nome_carteira: 'Beneficiário: {BENEFICIARIO}\nA carteira informada ({CARTEIRA_INFORMADA}) não pertence ao beneficiário. Por gentileza, confirme o nome completo e a carteira Promédica.',
@@ -280,6 +296,7 @@ const MODELOS_META = {
   ajuste: { grupo: 'Ajuste de guia', destino: 'email', uso: 'Botão E-mail de ajuste (aba Corrigir guia, Painel, histórico da guia, Corrigir guia e Reabrir da lista): avisa a clínica que a solicitação foi recebida e a guia foi ajustada, com os apontamentos.' },
   correcao: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, para guia autorizada que corrige um pedido anterior (assunto com RE:). Pode ser escolhido no lugar de "Guia autorizada".' },
   pendencia: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando há bloqueio e a clínica precisa corrigir dados do pedido.' },
+  nao_identificado: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: lista tudo o que não foi identificado no pedido (beneficiário, carteira, código, quantidade, médico, CRM, data, local e CID) e o que foi lido, com o modelo de pedido. Aparece em destaque quando falta algum dado.' },
   ja_autorizado: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando a clínica cobra um pedido já autorizado. Preenche a guia anterior mais recente da mesma carteira e código, se existir.' },
   carteira_nao_localizada: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando o beneficiário não é localizado no sistema oficial pela carteira informada.' },
   nome_carteira: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando nome e carteira não pertencem à mesma pessoa.' },
@@ -296,8 +313,8 @@ const MODELOS_META = {
   parametrizacao_linha: { grupo: 'Parametrização', destino: 'texto', uso: 'Formato de cada linha de terapia dentro do texto da parametrização.' }
 };
 Object.keys(MULTI_PADRAO).forEach(k => { MODELOS_META[k + '_multi'] = { grupo: 'Sem gerar guia: várias guias', destino: 'email', uso: 'Trecho desta guia dentro da resposta única do e-mail, quando ele tem várias guias e esta guia ficou sem ser gerada. Os trechos de todas as guias entram no campo "Resumo de todas as guias" do modelo "Resposta com várias guias".' }; });
-const MODELOS_RESPOSTA_ORDEM = ['autorizada', 'parcial', 'nao_autorizada', 'correcao', 'pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2', 'resposta_multipla', 'modelo_pedido'];
-const MODELOS_SEM_GUIA = ['pendencia', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2'];
+const MODELOS_RESPOSTA_ORDEM = ['autorizada', 'parcial', 'nao_autorizada', 'correcao', 'pendencia', 'nao_identificado', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2', 'resposta_multipla', 'modelo_pedido'];
+const MODELOS_SEM_GUIA = ['pendencia', 'nao_identificado', 'ja_autorizado', 'carteira_nao_localizada', 'nome_carteira', 'outra_clinica', 'excluido_carencia', 'sem_direito_local', 'personalizado_1', 'personalizado_2'];
 const MODELOS_SITUACAO = ['outra_clinica', 'excluido_carencia', 'sem_direito_local'];
 const MODELOS_PERSONALIZADOS = ['personalizado_1', 'personalizado_2'];
 const nomeModelo = k => k.endsWith('_multi') ? nomeModelo(k.slice(0, -6)) + ' (várias guias)' : ((cfg.modelos[k] && cfg.modelos[k].nome) || (MODELOS_PADRAO[k] || {}).nome || k);
@@ -371,6 +388,9 @@ const CAMPOS = [
   { k: 'MOTIVO_NAO_AUTORIZACAO', cat: 'Situação da autorização', nome: 'Motivo da não autorização', desc: 'Motivo selecionado na etapa Finalizar, com o detalhe digitado.', ex: 'Sem direito no local ou prestador', fn: c => [motivoNome(c.g.resultado.motivoId), c.g.resultado.motivoTxt].filter(Boolean).join(' — ') },
   { k: 'OBS_ADICIONAIS', cat: 'Situação da autorização', nome: 'Observações adicionais', desc: 'Texto livre digitado na etapa Finalizar. Se vazio, a linha some.', ex: 'Favor reenviar o pedido médico atualizado.', opc: true, fn: c => c.g.resultado.obsAdicionais },
   // Alertas
+  { k: 'NAO_IDENTIFICADOS', cat: 'Alertas e observações', nome: 'Dados não identificados', desc: 'Tudo o que não foi identificado (ou veio fora do padrão) no pedido: beneficiário, carteira, código, quantidade, médico, CRM, data, local e CID, um por linha.', ex: '• Número da carteira Promédica (17 caracteres, sem espaços)\n• CRM do médico solicitante', fn: c => naoIdentificados(c.g).map(x => '• ' + x).join('\n') || '• (nenhum dado faltando: descreva a pendência)' },
+  { k: 'DADOS_IDENTIFICADOS', cat: 'Alertas e observações', nome: 'Dados identificados', desc: 'O que foi lido no pedido, com o título "Dados identificados no pedido:" (para a clínica saber de qual solicitação se trata). Se nada foi lido, o trecho some.', ex: 'Dados identificados no pedido:\nBeneficiário: Maria da Silva\nServiço: 80000004 – Terapia Ocupacional – quantidade: 2', opc: true, fn: c => dadosIdentificados(c.g) },
+  { k: 'BENEFICIARIO_REF', cat: 'Dados do beneficiário', nome: 'Beneficiário (ou "não identificado")', desc: 'Nome lido no pedido; se não houver, "não identificado".', ex: 'Maria da Silva Souza', fn: c => c.g.pedido.beneficiario || 'não identificado' },
   { k: 'PROBLEMAS', cat: 'Alertas e observações', nome: 'Pendências identificadas', desc: 'Lista dos bloqueios do pedido, em linguagem para a clínica.', ex: '• Quantidade não informada para o serviço 80000004.', fn: c => c.extra.problemas },
   { k: 'TEXTO_ORIGINAL', cat: 'Alertas e observações', nome: 'Pedido original', desc: 'Texto do e-mail como recebido, sem as mensagens anteriores. É o mesmo para todas as guias do e-mail.', ex: 'Beneficiário: Maria... Serviço: 80000004...', fn: c => c.S.email.textoPrincipal },
   // Parametrização

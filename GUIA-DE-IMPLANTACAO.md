@@ -155,6 +155,22 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Modelo "Dados não identificados no pedido" (versão 2.2.11)
+Novo modelo em **Responder sem gerar guia**. Ele lista para a clínica tudo o que não foi identificado no pedido, um por linha:
+- nome do beneficiário;
+- carteira (ausente, fora do padrão, com o valor recebido, ou CPF no lugar);
+- código do serviço (ausente, incompleto, ou número solto no texto sem o serviço);
+- quantidade de cada serviço (ausente ou inválida);
+- nome e CRM do médico;
+- data do pedido (ausente ou não reconhecida);
+- local do pedido;
+- CID.
+
+Em seguida mostra os **dados identificados** (beneficiário, carteira, serviços, médico, data, local, CID), para a clínica saber de qual pedido se trata, e o **modelo de pedido**.
+- Quando falta algum dado, o botão aparece primeiro em "Responder sem gerar guia", com o número de itens. Passando o mouse, aparece a lista.
+- Em e-mail com várias guias, cada guia sem dados entra na resposta única com o trecho "Beneficiário… Não identificamos no pedido: …".
+- O texto pode ser editado antes de copiar, e o modelo pode ser mudado em Configurações › Modelos de e-mail. Campos novos: **Dados não identificados**, **Dados identificados** e **Beneficiário (ou "não identificado")**.
+
 ### Aprendizado pelo Conferi, possível pedido repetido e última guia do paciente (versão 2.2.10)
 **Conferi vira aprendizado.** Cada "Conferi" num aviso que se repete do mesmo jeito fica registrado por clínica (pasta › `aprendizado/correcoes.json`). Quando o mesmo aviso aparece de novo num atendimento da mesma clínica, ele vem como **informativo** ("Já conferido N vezes antes nesta clínica"), sem pedir Conferi.
 - **Descrição do e-mail × cadastro** (ex.: 50000470 com "PSICOLOGIA" no e-mail e "SESSAO DE PSICOTERAPIA INDIVIDUAL POR PSICOLOGO" no cadastro da MRA): vale para o mesmo código com a mesma descrição. Basta 1 Conferi. Outra descrição continua pedindo Conferi.
