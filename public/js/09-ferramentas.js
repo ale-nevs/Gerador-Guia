@@ -427,12 +427,12 @@ function montarRelato({ g, r, a, nota, imagens }) {
   };
 }
 function abrirRelato(alvo) {
-  M = { tipo: 'relato', alvo };
   abrirModal({ titulo: 'Relatar problema', sub: 'Gera um arquivo para enviar ao suporte do Conferidor', icone: 'help', tamanho: 'p',
     corpo: `<label class="lbl" for="relNota">O que aconteceu? (ex.: “leu a carteira com um 1 a mais”, “não achou o código 50000616”)</label><textarea id="relNota" rows="4" autofocus></textarea>
       <label class="chk" style="margin-top:10px"><input type="checkbox" id="relImg" checked><span>Incluir as imagens dos prints e os recortes (ajuda a corrigir a leitura)</span></label>
       <p class="dica" style="margin-top:10px">${ic('lock', 'sm')} O arquivo tem dados do beneficiário (nome, carteira, pedido). Envie só por canal interno da Promédica.</p>`,
     rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="relatoOk">${ic('download', 'sm')}Baixar arquivo</button>` });
+  M = { tipo: 'relato', alvo };   // depois de abrir: aberto por cima do histórico da guia, abrirModal fecha o histórico e zera o estado (o Baixar arquivo não fazia nada)
 }
 async function abrirHistoricoGuia(id) {
   const r = regPorId(id); if (!r) { toast('Registro não encontrado: ele pode ter sido excluído. Atualize a lista e tente de novo.', 'bad'); return; }

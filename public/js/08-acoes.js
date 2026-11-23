@@ -491,7 +491,7 @@ const acoes = {
     AUD_TAM = null; render(); toast(n ? `Imagens apagadas de ${pl(n, 'guia', 'guias')} (cerca de ${fmtBytes(Math.max(0, livres))} liberados).` : 'Nenhuma imagem antiga para apagar.');
   },
   relatarGuia() { const g = guiaAtiva(); if (g) abrirRelato({ g }); },
-  async relatarHist(b) { const r = Reg.todos[b.dataset.id] || Reg.cache.find(x => x.id === b.dataset.id); if (!r) return; const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
+  async relatarHist(b) { const r = regPorId(b.dataset.id); if (!r) { toast('Registro não encontrado: atualize a lista e tente de novo.', 'bad'); return; } const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
   async relatoOk() {
     const al = M && M.alvo; if (!al) return;
     const nota = ($('#relNota') || {}).value || '', imagens = !!($('#relImg') || {}).checked;
