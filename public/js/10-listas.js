@@ -97,7 +97,7 @@ const Lista = {
     L.itens.forEach(it => {
       const t = ultimo(tr, it.id); it.resp = t ? t.para : it.para; it.transf = t;
       const r = ultimo(res, it.id); it.r = r && r.st !== 'pendente' ? r : null;
-      const guias = new Set(res.map(d => d.itens && d.itens[it.id]).filter(x => x && x.st === 'gerada').map(x => x.guia)); it.duplicada = guias.size > 1 ? [...guias] : null;
+      const guias = new Set(res.map(d => d.itens && d.itens[it.id]).filter(x => x && x.st === 'gerada').map(x => x.guia)); it.duplicada = guias.size > 1 && !(r && r.reaberta) ? [...guias] : null;   // reaberta pelo Painel: o número novo substitui o antigo de propósito
     });
     L.ativos = res.map(d => ({ op: d.op, em: Object.values(d.itens || {}).reduce((m, x) => (x.em || '') > m ? x.em : m, '') })).filter(x => x.em);
     return L;
@@ -116,6 +116,8 @@ const Lista = {
     } finally { this.carregando = false; }
   },
   atual() { return this.listas.find(l => l.id === this.sel) || null; },
+  /* uma lista de qualquer dia, sem mexer na lista aberta na aba (usada para reabrir pelo Painel) */
+  async umaLista(dia, id) { if (!dia || !id) return null; const cab = await this.ler(dia, id, 'lista.json'); return cab && cab.itens ? this.montar(cab, await this.arquivosDe(dia, id, 'res-'), await this.arquivosDe(dia, id, 'transf-')) : null; },
   meus(L, op = operadorObj() && operadorObj().id) { return L ? L.itens.filter(i => i.resp === op) : []; },
   pendentesMeus() { const op = operadorObj(); if (!op) return 0; return this.listas.filter(l => !l.finalizadaEm).reduce((s, L) => s + L.itens.filter(i => i.resp === op.id && !i.r).length, 0); },
   async meuArquivo(L, prefixo) { const op = operadorObj(); const nome = `${prefixo}${slug(op.id || op.nome)}.json`; const d = (await this.ler(L.dia, L.id, nome)) || { op: op.id, opNome: op.nome, itens: {} }; return { nome, d }; },
@@ -200,11 +202,13 @@ const Lista = {
       clinica: L.clinica, clinicaId: L.clinicaId, remetente: L.remetente, carteira: it.carteira, paciente: it.benef, pacienteIni: iniciais(it.benef),
       itens: [{ c: it.codigo, q: it.qtd, d: it.servico, dc: it.servico, aut: gerada }], guia: gerada ? r.guia : null, status: 'concluido',
       resultado: gerada ? { situacao: 'autorizada' } : { situacao: 'sem_guia', modelo: 'lista', motivoTxt: r.obs },
-      abertoEm: it.distribuidoEm || r.em, concluidoEm: r.em, atualizadoEm: r.em, versao: VERSAO, origem: 'lista' };
+      abertoEm: it.distribuidoEm || r.em, concluidoEm: r.em, atualizadoEm: r.em, versao: VERSAO, origem: 'lista',
+      ...(r.reaberta ? { reaberta: { em: r.em, por: r.por, antes: { guia: r.reaberta.guia || '', situacao: r.reaberta.st === 'gerada' ? 'autorizada' : 'sem_guia' } } } : {}) };
   },
   async salvarAuditoria(L, it) {
     const r = it.r, eventos = [{ em: it.distribuidoEm, op: it.distribuidoPor, tipo: 'regra', texto: `Lista ${L.nome} (${L.clinica}): distribuída para ${nomeOp(it.para)}` }];
     ((it.transf && it.transf.hist) || []).forEach(h => eventos.push({ em: h.em, op: h.por, tipo: 'regra', texto: `Passada de ${nomeOp(h.de)} para ${nomeOp(h.para)}` }));
+    if (r.reaberta) eventos.push({ em: r.em, op: r.por, tipo: 'reaberta', texto: `Guia reaberta pelo Painel. Antes: ${r.reaberta.st === 'gerada' ? 'guia ' + r.reaberta.guia : 'sem guia (' + (r.reaberta.obs || '—') + ')'}, registrado por ${r.reaberta.por || '—'} em ${fmtDH(r.reaberta.em)}` });
     eventos.push({ em: r.em, op: r.por, tipo: 'numero', texto: r.st === 'gerada' ? `Guia ${r.guia} registrada por ${r.por}` : `Sem guia: ${r.obs} (registrado por ${r.por})` });
     const a = { id: 'lst-' + it.id, dia: L.dia, status: 'concluido', versao: VERSAO, salvoEm: agora(), operador: r.por, abertoEm: it.distribuidoEm,
       email: { remetente: L.remetente, assunto: L.assunto, recebidoEm: L.recebidoEm, texto: it.bloco }, clinica: L.clinica, paciente: it.benef, carteiraInformada: it.carteiraBruta, carteiraUsada: it.carteira,
@@ -213,6 +217,23 @@ const Lista = {
       resultado: { situacao: r.st === 'gerada' ? 'autorizada' : 'sem_guia', motivo: r.st === 'gerada' ? '' : r.obs, naoAutorizados: {}, obsAdicionais: it.obs || '', semGuia: r.st === 'gerada' ? '' : r.obs }, lista: { id: L.id, nome: L.nome } };
     if (Pasta.ok) { try { await Pasta.gravar(Aud.partes(L.dia), a.id + '.json', a); return; } catch (e) { } }
     try { await idbSet('aud:' + a.id, a); } catch (e) { }
+  },
+  /* Painel / histórico: reabre uma guia da lista para lançar (ou trocar) o número e autorizar */
+  async reabrirDoRegistro(r) {
+    if (!operadorObj()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
+    const L = await this.umaLista(r.dia, r.lista), it = L && L.itens.find(i => 'lst-' + i.id === r.id);
+    if (!it) { toast('Não achei esta guia na lista do dia (a lista pode ter sido apagada). Use Corrigir guia.', 'bad'); return; }
+    const a = it.r, q = it.qtd ?? 1, ja = this.jaAutorizada(it);
+    const atual = !a ? 'Pendente' : a.st === 'gerada' ? `Guia <b class="num">${esc(a.guia)}</b>` : `Sem guia: ${esc(a.obs || '—')}`;
+    abrirModal({ titulo: 'Reabrir guia da lista', sub: `${L.clinica} · ${L.nome} · ${diaBR(L.dia)}`, icone: 'undo', tamanho: 'p',
+      corpo: `<dl class="kv"><dt>Beneficiário</dt><dd>${esc(it.benef)}</dd><dt>Carteira</dt><dd class="num">${esc(it.carteira || '—')}</dd>
+        <dt>Serviço</dt><dd><span class="num">${esc(it.codigo)}</span> ${esc(it.servico || '')} × <b>${esc(q)}</b>${q > 1 ? ' <span class="tag warn">quantidade maior que 1</span>' : ''}</dd>
+        <dt>Registrado</dt><dd>${atual}${a ? ` <span class="muted">— ${esc(a.por || '')}, ${fmtDH(a.em)}</span>` : ''}</dd></dl>
+        ${ja ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div>Já há guia autorizada para esta carteira e este código: <b class="num">${esc(ja.guia)}</b> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
+        <label class="lbl" for="lstReGuia" style="margin-top:10px">Nº da guia</label><input type="text" id="lstReGuia" class="num" value="${esc(a && a.st === 'gerada' ? a.guia : '')}" placeholder="Ex.: T1234567" autocomplete="off" data-enter="lstReAutorizar" autofocus>
+        <p class="dica" style="margin-top:8px">Autorizar registra a guia com este número em seu nome, com a situação <b>Autorizada</b>. Ela entra no e-mail de entrega da lista, e o histórico guarda o que estava registrado antes.</p>`,
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn line" data-act="lstReAutorizarEmail" title="Autoriza e abre o e-mail avisando a clínica que a guia foi ajustada">${ic('mail')}Autorizar e gerar e-mail de ajuste</button><button class="btn pri" data-act="lstReAutorizar">${ic('check')}Autorizar</button>` });
+    M = { tipo: 'lstReabrir', L, it };   // depois de abrir (abrirModal limpa o estado)
   },
   /* guia já autorizada para a mesma carteira e código nos últimos 7 dias (fora desta lista) */
   jaAutorizada(it) {
@@ -363,6 +384,18 @@ Object.assign(acoes, {
       obs = obs ? `${obs} ${extra}`.trim() : extra;
     }
     if (await Lista.registrar(L, it, { st: 'semguia', obs })) { Lista.foco = null; toast('Registrado sem guia: ' + obs); render(); }
+  },
+  lstReAutorizarEmail() { return acoes.lstReAutorizar(null, true); },
+  async lstReAutorizar(b, gerarEmail) {
+    const m = M; if (!m || m.tipo !== 'lstReabrir') return;
+    const inp = $('#lstReGuia'), v = String((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!/^[TS]\d{7,8}$/.test(v)) { toast('Informe o número da guia: T ou S + 7 ou 8 dígitos.', 'bad'); if (inp) inp.focus(); return; }
+    const dup = m.L.itens.find(i => i !== m.it && i.r && i.r.st === 'gerada' && i.r.guia === v);
+    if (dup && !confirm(`A guia ${v} já foi registrada para ${dup.benef} nesta lista. Registrar de novo?`)) return;
+    const a = m.it.r, antes = a ? { st: a.st, guia: a.guia || '', obs: a.obs || '', por: a.por || '', em: a.em || '' } : { st: 'pendente', guia: '', obs: '', por: '', em: '' };
+    if (!(await Lista.registrar(m.L, m.it, { st: 'gerada', guia: v, reaberta: antes }))) return;
+    fecharModal(true); Lista.carregadoEm = null; render(); toast(`Guia ${v} autorizada (${m.it.benef.split(' ')[0]}).`);
+    if (gerarEmail === true) abrirEmailAjuste('lst-' + m.it.id);
   },
   async lstDesfazer(b) {
     const L = Lista.atual(), it = L && L.itens.find(i => i.id === b.dataset.item); if (!it || !it.r) return;

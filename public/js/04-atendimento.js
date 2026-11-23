@@ -322,7 +322,7 @@ async function gravarGuia(g, status, extra) {
 /* ---------- Reabrir uma guia concluída para corrigir (Painel, histórico da guia ou o próprio atendimento) ----------
    Reabrir não mexe no registro: ele continua como estava até a guia ser concluída de novo.
    Descartar o atendimento (ou Desistir da correção) deixa a guia como estava registrada. */
-const podeReabrir = r => !!r && !r.tipo && r.status === 'concluido' && r.origem !== 'lista';
+const podeReabrir = r => !!r && !r.tipo && r.status === 'concluido';   // guia da lista do dia reabre numa janela própria (nº da guia e Autorizar)
 function marcarReaberta(g, r, de) {
   const copia = de === 'atendimento' ? clonar({ ...g, reaberta: null }) : null;   // para Desistir da correção no mesmo atendimento
   g.reaberta = { em: agora(), por: operador(), de, copia, operador: (r && r.operador) || '', operadorId: (r && r.operadorId) || null,
