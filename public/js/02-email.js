@@ -292,12 +292,16 @@ function extrairItens(bloco) {
   return { itens, invalidos };
 }
 const RE_CONSELHO_NUM = /\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b\s*(?:[-\/]?\s*[A-Z]{2}\b)?\s*[:\-nº°.]*\s*\d{3,7}/i;   // "CRM 1234", "CRM-BA 29341", "CRM/SE: 8797"
+const UFS = 'AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO';
+const RE_UF_DEPOIS = new RegExp('(\\d)\\s*[-\\/]?\\s*(?:' + UFS + ')(?![\\p{L}\\d])', 'gu');   // "15141-BA", "41345 BA": a UF depois do número não é nome
 function lerMedico(bruto) {
-  bruto = String(bruto || '').replace(/\bRQE\b\s*[:\-nº°.]*\s*\d*/gi, ' ');   // "CRM 18103 / RQE 10935 - LORENA": RQE é a especialidade, não é nome nem CRM
+  bruto = String(bruto || '').replace(/[*_]/g, ' ').replace(/\bRQE\b\s*[:\-nº°.]*\s*\d*/gi, ' ')   // RQE é a especialidade, não é nome nem CRM
+    .replace(/([a-zà-ÿ])(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)(?=\s*[-\/:]?\s*(?:[A-Z]{2}\s*[:\-]?\s*)?\d)/g, '$1 $2')   // FariasCRM:50657
+    .replace(RE_UF_DEPOIS, '$1 ').replace(/^\s*(?:o|a)\s+(?=(?:dr|dra|doutor|doutora)\b)/i, '');   // O Dr. Emanuel   // "CRM 18103 / RQE 10935 - LORENA": RQE é a especialidade, não é nome nem CRM
   const conselho = (bruto.match(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/i) || [''])[0].toUpperCase();
   const dig = (bruto.match(/\d[\d.\s]{1,10}\d|\d{3,}/) || [''])[0].replace(/\D/g, '');
   const nome = bruto.replace(/(?<![\p{L}])(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)(?![\p{L}])/giu, ' ').replace(/(?<![\p{L}\d])[A-Z]{2}(?![\p{L}\d])(?=\s*[:\-\/]?\s*\d)/gu, ' ')
-    .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(?:dr|dra|doutor|doutora|prof|profa)\b\.?\s+/i, '');
+    .replace(/[\d.]+/g, ' ').replace(/[-–—:\/|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(?:dr|dra|doutor|doutora|prof|profa)\b\.?\s*/i, '');
   return { bruto, nome, crm: dig.length >= 3 ? dig : '', conselho };
 }
 const MESES_EXT = { janeiro: 1, jan: 1, fevereiro: 2, fev: 2, marco: 3, mar: 3, abril: 4, abr: 4, maio: 5, mai: 5, junho: 6, jun: 6, julho: 7, jul: 7, agosto: 8, ago: 8, setembro: 9, set: 9, outubro: 10, out: 10, novembro: 11, nov: 11, dezembro: 12, dez: 12 };
@@ -329,6 +333,7 @@ function lerEmissao(bruto, referencia) {
   const ref = referencia ? new Date(referencia) : new Date();
   return { estado: 'valida', bruto: b, data: dt.toISOString(), futura: dt > ref, mesesAtras: (ref - dt) / (30.44 * 864e5) };
 }
+const RE_CABECALHO_NOME = /^(?:n[ºo°]?\s*)?(?:(?:carteira|nome|completo|beneficiario|paciente|usuario)\s*)+$/i;   // cabeçalho de tabela (Nº CARTEIRA  NOME COMPLETO), não nome
 function lerPedido(texto, referencia) {
   texto = explodirTexto(texto);
   const secoes = secionar(texto);
@@ -342,7 +347,7 @@ function lerPedido(texto, referencia) {
   if (!p.beneficiario && cartDeLinha) {   // linha livre: "NOME  carteira  código  serviço"
     const linha = texto.split('\n').find(l => l.includes(cartDeLinha)) || '';
     const nome = linha.slice(0, linha.indexOf(cartDeLinha)).replace(/[^\p{L}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim();
-    if (nome.replace(/[^\p{L}]/gu, '').length >= 3) { p.beneficiario = nome; p.beneficiarios = [nome]; }
+    if (nome.replace(/[^\p{L}]/gu, '').length >= 3 && !RE_CABECALHO_NOME.test(semAcento(nome))) { p.beneficiario = nome; p.beneficiarios = [nome]; }
   }
   if (!p.beneficiario && cartDeLinha) {   // tabela "Nº CARTEIRA | NOME": carteira seguida do nome na mesma linha
     const linha = texto.split('\n').find(l => l.includes(cartDeLinha)) || '';
@@ -371,9 +376,13 @@ function lerPedido(texto, referencia) {
   const secMed = de('medico')[0];
   if (secMed) {   // "CONVÊNIO OU INSTITUIÇÃO ⏎ NOME DO MÉDICO ⏎ CRM-BA 12345" (Fortea): o nome é a linha logo acima do CRM, não a primeira
     const ls = secMed.linhas.map(x => x.trim()).filter(Boolean), k = ls.findIndex(l => RE_CONSELHO_NUM.test(l));
-    if (k > 0) medicoTxt = lerMedico(ls[k]).nome.replace(/[^\p{L}]/gu, '').length >= 4 ? ls[k] : `${ls[k - 1]} ${ls[k]}`;   // nome na própria linha do CRM, ou na de cima
+    if (k > 0) {   // nome antes do CRM na própria linha (PEDRO ALVES CRM-BA 6930) ou na linha de cima; depois do número vem a especialidade (CRM-17716 - ORTOPEDIA)
+      const mc = ls[k].match(RE_CONSELHO_NUM), antes = ls[k].slice(0, mc.index), num = mc[0].replace(/\D/g, '');
+      medicoTxt = lerMedico(antes).nome.replace(/[^\p{L}]/gu, '').length >= 4 ? `${antes} CRM ${num}` : `${ls[k - 1]} CRM ${num}`;
+    }
   }
-  if (!medicoTxt) { const m = texto.match(/(?:^|\n)\s*(?:dr\.?|dra\.?|doutor(?:a)?)\s+([^\n]+)/i); if (m) medicoTxt = m[0].trim().replace(/^(dr\.?|dra\.?|doutor(a)?)\s+/i, ''); }
+  let medicoPorDr = false;   // Dr. Edson, Dr.Juliana, O Dr. Emanuel: vale como médico (a leitura livre não troca)
+  if (!medicoTxt) { const m = texto.match(/(?:^|\n)[ \t*_]*(?:[oa][ \t]+)?(?:dr|dra|doutor|doutora)\b[ \t]*[.:]?[ \t]*([A-ZÀ-Ýa-zà-ÿ][^\n]*)/i); if (m && lerMedico(m[1]).nome.split(' ').filter(w => w.length > 1).length >= 2) { medicoTxt = m[1].trim(); medicoPorDr = true; } }
   if (!medicoTxt) { const m = texto.match(/\bCRM\s*[:\-]?\s*(\d{3,7})[ \t]*([^\n]*)/i); if (m) medicoTxt = `${m[2].trim()} CRM ${m[1]}`.trim(); }
   p.medico = lerMedico(medicoTxt);
   if (p.medico.nome && !p.medico.crm) { const m = texto.match(/\bCRM\s*(?:[-\/]\s*[A-Z]{2}\b)?\s*[:\-]?\s*(\d{3,7})/i); if (m) { p.medico.crm = m[1]; p.medico.conselho = p.medico.conselho || 'CRM'; p.medico.bruto = `${p.medico.bruto} CRM ${m[1]}`.trim(); } }   // CRM em linha própria, abaixo do nome
@@ -428,7 +437,7 @@ function lerPedido(texto, referencia) {
   p.secoesEncontradas = [...new Set(secoes.map(s => s.k).filter(Boolean))];
   if (cartDeLinha) {   // sem rótulos ("NOME  CARTEIRA  CÓDIGO ..."): lê o que sobrou em texto livre
     const tem = k => de(k).some(x => primeiraLinha(x));
-    aplicarLivre(texto, p, { medico: tem('medico'), cid: tem('cid') && /^[A-Za-z]\d{2,3}(\.\d)?$/.test(p.cid), local: tem('local'), emissao: tem('emissao') });
+    aplicarLivre(texto, p, { medico: tem('medico') || medicoPorDr, cid: tem('cid') && /^[A-Za-z]\d{2,3}(\.\d)?$/.test(p.cid), local: tem('local'), emissao: tem('emissao') });
   }
   return p;
 }
@@ -508,8 +517,23 @@ function juntarCodigos(t) {
     .replace(/(?<![\d.\-\/])([1-9]0)\.(\d{3})\.(\d{3})(?![\d.\-\/])/g, '$1$2$3')
     .replace(/(?<![\d.\-\/,])(\d{4})\.(\d{4})(?![\d.\-\/,])/g, '$1$2');
 }
+/* carta com tabela em texto (ex.: Psiconeuro): cabeçalhos quebrados, carteira colada no nome, Dr: e CRM no meio da linha */
+function arrumarCarta(t) {
+  t = t.replace(/N[ºo°]\s*CARTEIRA\s+NOME\s*\n?\s*COMPLETO/gi, '\nNº CARTEIRA  NOME COMPLETO\n')
+    .replace(/[ \t]*ESPECIALIDADE\s*SESS[ÃA]O\s+POR\s+SEMANA[ \t]*/gi, '\nESPECIALIDADE SESSÃO POR SEMANA\n')
+    .replace(/(\d\s*[x×])[ \t]*\n[ \t]*(por\s+semana)/gi, '$1 $2')   // 03 x / por semana quebrado em duas linhas
+    .replace(/((?:\d[ .\/-]?){14}\d[ .\/-]?[A-Z]{2})(?=[A-ZÀ-Ý][a-zà-ÿ])/g, '$1 ')   // 413100003688700-EQRita: carteira colada no nome
+    .replace(/([^\s])[ \t]+(?=D[Rr][Aa]?[ \t]*[:.][ \t]*[A-ZÀ-Ý])/g, '$1\n')   // ... por semana Dr: Rômulo: o médico começa linha
+    .replace(/([a-zà-ÿ])(CRM|CREMEB|CRP)(?=\s*[-\/:]?\s*(?:[A-Z]{2}\s*[:\-]?\s*)?\d)/g, '$1\n$2');   // FariasCRM:50657
+  const L = t.split('\n');   // nome que continua na linha de baixo (... Gomes de / Jesus ...)
+  for (let i = 0; i + 1 < L.length; i++) {
+    const m = L[i + 1].match(/^\s*([A-ZÀ-Ý][a-zà-ÿ]+)(?=\s|$)/);
+    if (m && CART_RE.test(L[i]) && /\s(?:de|da|do|das|dos|e)\s*$/i.test(L[i])) { L[i] = L[i].trimEnd() + ' ' + m[1]; L[i + 1] = L[i + 1].slice(m[0].length); }
+  }
+  return L.join('\n');
+}
 function lerPedidos(texto, referencia) {
-  texto = converterTabelas(juntarCodigos(texto));
+  texto = converterTabelas(juntarCodigos(arrumarCarta(texto)));
   const L = texto.split('\n').flatMap(explodirLinha);
   /* 1) separadores explícitos (linhas de traços, "Paciente 2") */
   const comDados = [], compartilhado = [];
@@ -621,14 +645,23 @@ function limparPeca(s) { return (s || '').replace(/[\/|;:,_*+]+/g, ' ').replace(
 
 /* devolve {crm, medico, cid, data, local, qtd} do que for possível ler no texto livre */
 let REGRAS_LEITURA = {};   // regras da clínica do e-mail (Configurações › Clínicas), valem durante a leitura
+/* linha de carta (frase), não dado: 2 ou mais palavras típicas de texto corrido */
+const PROSA = new Set('venho meio desta solicitar solicito solicitamos autorizacao referente ressaltamos segue anexo laudo encaminhamento analise providencias cabiveis abaixo citado citada paciente atendimento terapeutico obs semana mes novo contando quantidade terapias solicitadas outra clinica contrato eventual'.split(' '));
+const RE_ESPECIALIDADE = /^(?:ortopedi(?:a|sta)|pediatr(?:ia|a)|neuropediatr(?:ia|a)|neurologi(?:a|sta)|psiquiatr(?:ia|a)|cardiologi(?:a|sta)|clinic[oa] geral|geriatr(?:ia|a)|fisiatr(?:ia|a)|otorrinolaringologi(?:a|sta)|oftalmologi(?:a|sta)|genetica medica|medicina de familia)$/i;
+const ehProsa = l => (semAcento(l).toLowerCase().match(/[a-z]+/g) || []).filter(w => PROSA.has(w)).length >= 2;
+/* cabeçalho de tabela em texto (Nº CARTEIRA  NOME COMPLETO, ESPECIALIDADE SESSÃO POR SEMANA): só palavras de cabeçalho */
+const CABECALHO = new Set('n no carteira nome completo especialidade especialidades sessao sessoes por semana codigo codigos servico servicos quantidade qtd beneficiario paciente terapia terapias descricao'.split(' '));
+const ehCabecalho = l => { const w = semAcento(l).toLowerCase().match(/[a-z]+/g) || []; return w.length >= 2 && w.every(x => CABECALHO.has(x)); };
 function lerLivre(texto, p, rot = {}) {
   const r = {}, regra = REGRAS_LEITURA || {};
   // nas linhas com rótulo ("Médico: ...", "Número da carteira: ...") fica só o valor: o nome do campo não é médico nem local
-  const semRotulos = texto.split('\n').map(l => { const r = detectarRotulo(l); return r ? '   ' + r.valor + '   ' : l; }).join('\n');
+  const LT = texto.split('\n'), curta = l => (l.match(/\p{L}+/gu) || []).length <= 3 && !/\d/.test(l);
+  const semRotulos = LT.filter((l, i) => !ehProsa(l) && !ehCabecalho(l) && !(i > 0 && ehProsa(LT[i - 1]) && curta(l))).map(l => { const r = detectarRotulo(l); return r ? '   ' + r.valor + '   ' : l; }).join('\n');   // frases da carta (Venho por meio desta...) não são médico nem local
   let t = '\n' + semRotulos.normalize('NFC').replace(/[*_●•·]/g, ' ').replace(/\[\s*https?:[^\]]*\]/g, ' ').replace(/\[\s*image\s*:[^\]]*\]/gi, ' ') + '\n';
   // 1) tira o que já foi lido: carteira, nome do beneficiário; o código e a palavra do serviço viram a marca ¶
   //    (logo depois do serviço algumas clínicas escrevem a quantidade, às vezes colada no CRM: "PSICOLOGIA 119741-")
   t = t.replace(new RegExp(CART_RE.source, 'gi'), ' ');
+  if (p.carteiraBruta && p.carteiraBruta.length >= 10) t = t.split(p.carteiraBruta).join(' ');   // carteira com dígito a menos (digitada errada pela clínica) não é local
   if (p.beneficiario) t = t.replace(new RegExp(p.beneficiario.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'), ' ');
   const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (rot.medico && p.medico && p.medico.nome && p.medico.nome.length >= 3) t = t.replace(new RegExp('(?:\\b(?:dr|dra|doutor|doutora)\\b\\.?\\s*)?' + escRe(p.medico.nome.trim()).replace(/\s+/g, '\\s+'), 'i'), ' | ');   // médico já lido pelo rótulo
@@ -653,6 +686,7 @@ function lerLivre(texto, p, rot = {}) {
     else if ((m = t.match(/\bsem\s+data\b/i))) { r.data = 'SEM DATA'; t = t.replace(m[0], ' '); }
   }
   t = t.replace(/(?<!\d)\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d?(?!\d)/g, ' ');   // data cortada ("19/05/2"): não é CRM nem quantidade
+  t = t.replace(/(?<![\d\/])(?:0?[1-9]|1[0-2])[\/.\-](?:19|20)\d\d(?!\d)/g, ' ');   // mês/ano (11/2026): não é CRM
   // 4) CID: letra maiúscula isolada + 2 ou 3 dígitos; pode haver mais de um ("F32+F41.2", "F09/F41.8")
   if (!r.cid) {
     const cids = [];
@@ -663,8 +697,9 @@ function lerLivre(texto, p, rot = {}) {
   // 5) quantidade logo depois do serviço; "1" colado no CRM ("119741-" = 1 + CRM 19741)
   const aposS = t.indexOf('¶');
   if (aposS >= 0) {
-    const resto = t.slice(aposS + 1);
-    if ((m = resto.match(/^\s*\(?\s*0?(\d{1,2})\s*\)?(?=\s|$)(?!\s*[\/.]\d)/)) && !/^\s*\d{1,2}\s+\d{1,2}\s+20\d\d/.test(resto)) { r.qtd = Number(m[1]); r.qtdServico = true; t = t.slice(0, aposS + 1) + resto.replace(m[0], ' '); }
+    const resto = t.slice(aposS + 1), sem = resto.split('\n')[0].match(/(?<!\d)0?(\d{1,2})\s*[x×]\s*(?:(?:por|\/|na|ao)\s*)?semana/i);
+    if (sem) { r.qtd = Number(sem[1]); r.qtdServico = true; t = t.slice(0, aposS + 1) + resto.replace(/^[^\n]*/, l => l.replace(sem[0], ' ').replace(/(?<!\d)\d{1,3}\s*sess(?:[oõ]es|[aã]o)\b/i, ' ')); }   // 10 sessões - 03 x por semana: vale a frequência semanal
+    else if ((m = resto.match(/^\s*\(?\s*0?(\d{1,2})\s*\)?(?=\s|$)(?!\s*[\/.]\d)/)) && !/^\s*\d{1,2}\s+\d{1,2}\s+20\d\d/.test(resto)) { r.qtd = Number(m[1]); r.qtdServico = true; t = t.slice(0, aposS + 1) + resto.replace(m[0], ' '); }
     else if ((m = resto.match(/^\s*1(\d{5})(?!\d)/)) || (regra.qtdColada && (m = resto.match(/^\s*1(\d{4})(?!\d)(?=\s*[-–])/)))) { r.qtd = 1; r.qtdServico = true; r.crm = m[1]; r.qtdColada = true; t = t.slice(0, aposS + 1) + resto.replace(m[0], ' | '); }
   }
   if ((m = t.match(/\b(?:qnt|qtd|qtde|quant|quantidade)\b\.?\s*[:=\-]?\s*0?(\d{1,3})?(?!\d)/i))) { if (r.qtd == null && m[1]) r.qtd = Number(m[1]); t = t.replace(m[0], ' '); }   // "Qnt: 1"
@@ -673,21 +708,23 @@ function lerLivre(texto, p, rot = {}) {
   t = t.replace(/¶/g, ' ');
   // 6) CRM: número de 3 a 6 dígitos, de preferência com "CRM" na frente
   if (!r.crm) {
-    m = t.match(/\b(?:CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b[\s:.\-]*(?:[A-Z]{2}\b[\s:.\-]*)?(\d{3,6})(?!\d)/i) || t.match(/(?<!\d)(\d{3,6})(?!\d)/);
+    m = t.match(/\b(?:CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b[\s:.\-]*(?:[A-Z]{2}\b[\s:.\-]*)?(\d{3,6})(?!\d)/i) || t.match(/(?<!\d)(?!(?:19|20)\d\d(?!\d))(\d{3,6})(?!\d)/);   // sem CRM na frente, um ano não vale
     if (m) {
       r.crm = m[1];
       if (r.qtd == null && /^1\d{5}$/.test(r.crm)) { r.qtd = 1; r.crm = r.crm.slice(1); r.qtdColada = true; }   // "CRM 120583" sem quantidade no e-mail: 1 + CRM 20583
       t = t.replace(m[0], ' | ');
     }
   }
-  t = t.replace(/\b(?:CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b[\s:.\-]*/gi, ' | ');
+  t = t.replace(/\b(?:CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b[\s:.\-]*/gi, ' | ').replace(new RegExp('\\|[\\s*]*[-\\/]?\\s*(?:' + UFS + ')(?![\\p{L}])', 'gu'), ' | ');   // CRM:15141-BA: a UF não é local
+  t = t.replace(/(?<!\d)\d{1,2}\s*[x×]\s*(?:(?:por|\/|na|ao)\s*)?semana\b/gi, ' | ').replace(/(?<!\d)\d{1,3}\s*sess(?:[oõ]es|[aã]o)\b/gi, ' | ');   // 3X POR SEMANA, 10 sessões (já lidos na quantidade)
   // 7) quantidade solta (último recurso): 1 ou 2 dígitos isolados
   if (r.qtd == null) { const q = t.match(/(?:^|\s)0?(\d{1,2})(?=\s{2,}|\s*\n|\s*\|)/); if (q) r.qtd = Number(q[1]); }
   t = t.replace(/(?<![\dA-Za-z])\d{1,3}(?![\dA-Za-z])/g, ' ');   // números soltos que sobraram não fazem parte de nome nem de local
   // 8) peças de texto: separadas por linha, "|" ou 3+ espaços
   let servico = '';
-  const pecas = t.split(/\n|\||\s{3,}/).map(limparPeca).map(x => { const s = semAcento(x).match(RE_SERVICO_INI); if (s) { servico = servico || x.slice(0, s[0].length).trim(); return limparPeca(x.slice(s[0].length)); } return x; }).filter(x => /[A-Za-zÀ-ÿ]{2}/.test(x));
+  let pecas = t.split(/\n|\||\s{3,}/).map(limparPeca).map(x => { const s = semAcento(x).match(RE_SERVICO_INI); if (s) { servico = servico || x.slice(0, s[0].length).trim(); return limparPeca(x.slice(s[0].length)); } return x; }).filter(x => /[A-Za-zÀ-ÿ]{2}/.test(x));
   let medico = '', local = '';
+  pecas = pecas.filter(x => !new RegExp('^(?:' + UFS + ')$', 'i').test(x.trim()) && !RE_ESPECIALIDADE.test(semAcento(x.trim())));   // UF solta e especialidade do médico (ORTOPEDIA) não são local
   const juntas = pecas.join(' '), J = semAcento(juntas).toUpperCase(), lm = J.match(RE_LOCAL_FIM);
   if (lm) {   // local conhecido no fim do texto (com "Centro Médico", "Promédica"... na frente)
     const ini = lm.index + lm[0].indexOf(lm[1]);
