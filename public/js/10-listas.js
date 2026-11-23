@@ -232,7 +232,7 @@ const Lista = {
         ${ja ? `<div class="aviso" style="margin:8px 0">${ic('alert')}<div>Já há guia autorizada para esta carteira e este código: <b class="num">${esc(ja.guia)}</b> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
         <label class="lbl" for="lstReGuia" style="margin-top:10px">Nº da guia</label><input type="text" id="lstReGuia" class="num" value="${esc(a && a.st === 'gerada' ? a.guia : '')}" placeholder="Ex.: T1234567" autocomplete="off" data-enter="lstReAutorizar" autofocus>
         <p class="dica" style="margin-top:8px">Autorizar registra a guia com este número em seu nome, com a situação <b>Autorizada</b>. Ela entra no e-mail de entrega da lista, e o histórico guarda o que estava registrado antes.</p>`,
-      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="lstReAutorizar">${ic('check')}Autorizar</button>` });
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn line" data-act="lstReAutorizarEmail" title="Autoriza e abre o e-mail avisando a clínica que a guia foi ajustada">${ic('mail')}Autorizar e gerar e-mail de ajuste</button><button class="btn pri" data-act="lstReAutorizar">${ic('check')}Autorizar</button>` });
     M = { tipo: 'lstReabrir', L, it };   // depois de abrir (abrirModal limpa o estado)
   },
   /* guia já autorizada para a mesma carteira e código nos últimos 7 dias (fora desta lista) */
@@ -385,7 +385,8 @@ Object.assign(acoes, {
     }
     if (await Lista.registrar(L, it, { st: 'semguia', obs })) { Lista.foco = null; toast('Registrado sem guia: ' + obs); render(); }
   },
-  async lstReAutorizar() {
+  lstReAutorizarEmail() { return acoes.lstReAutorizar(null, true); },
+  async lstReAutorizar(b, gerarEmail) {
     const m = M; if (!m || m.tipo !== 'lstReabrir') return;
     const inp = $('#lstReGuia'), v = String((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!/^[TS]\d{7,8}$/.test(v)) { toast('Informe o número da guia: T ou S + 7 ou 8 dígitos.', 'bad'); if (inp) inp.focus(); return; }
@@ -394,6 +395,7 @@ Object.assign(acoes, {
     const a = m.it.r, antes = a ? { st: a.st, guia: a.guia || '', obs: a.obs || '', por: a.por || '', em: a.em || '' } : { st: 'pendente', guia: '', obs: '', por: '', em: '' };
     if (!(await Lista.registrar(m.L, m.it, { st: 'gerada', guia: v, reaberta: antes }))) return;
     fecharModal(true); Lista.carregadoEm = null; render(); toast(`Guia ${v} autorizada (${m.it.benef.split(' ')[0]}).`);
+    if (gerarEmail === true) abrirEmailAjuste('lst-' + m.it.id);
   },
   async lstDesfazer(b) {
     const L = Lista.atual(), it = L && L.itens.find(i => i.id === b.dataset.item); if (!it || !it.r) return;

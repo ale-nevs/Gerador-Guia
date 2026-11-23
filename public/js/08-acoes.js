@@ -425,14 +425,16 @@ const acoes = {
   /* ---- corrigir / cancelar / excluir guia (Painel) ---- */
   corrigirGuia(b) {
     const r = regPorId(b.dataset.id); if (!r) return;
-    M = { tipo: 'corrigir', id: r.id, carteira: r.carteira || '', itens: (r.itens || []).map(i => ({ c: i.c, d: i.d || '', q: i.q ?? '' })) };
+    const m0 = { tipo: 'corrigir', id: r.id, guia: r.guia || '', apont: '', carteira: r.carteira || '', itens: (r.itens || []).map(i => ({ c: i.c, d: i.d || '', q: i.q ?? '' })) }; M = m0;
     abrirModal({ titulo: 'Corrigir guia', sub: r.guia || '', icone: 'edit', tamanho: 'g', corpo: htmlModalCorrigir(),
-      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="cgSalvar">${ic('save')}Salvar correção</button>` });
+      rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button>${r.guia ? `<button class="btn line" data-act="cgSalvarEmail" title="Salva a correção e abre o e-mail avisando a clínica que a guia foi ajustada">${ic('mail')}Salvar e gerar e-mail de ajuste</button>` : ''}<button class="btn pri" data-act="cgSalvar">${ic('save')}Salvar correção</button>` });
+    M = m0;   // abrirModal limpa o estado (se havia outro modal aberto)
   },
   cgAdd() { M.itens.push({ c: '', d: '', q: '' }); $('#modalCorpo').innerHTML = htmlModalCorrigir(); },
   cgRem(b) { M.itens.splice(+b.dataset.i, 1); $('#modalCorpo').innerHTML = htmlModalCorrigir(); },
-  async cgSalvar() {
-    const r = regPorId(M.id), cart = normCart(M.carteira), E = [];
+  cgSalvarEmail() { return acoes.cgSalvar(null, true); },
+  async cgSalvar(b, gerarEmail) {
+    const r = regPorId(M.id), cart = normCart(M.carteira), E = [], apont = String(M.apont || '').trim();
     if (!cartValida(cart)) E.push('A carteira deve ter 17 caracteres (15 dígitos + 2).');
     const its = M.itens.filter(i => i.c || i.q !== '' || i.d);
     if (!its.length) E.push('Inclua ao menos um serviço.');
@@ -445,6 +447,7 @@ const acoes = {
     novo.itens = its.map(i => { const antes = (r.itens || []).find(x => x.c === i.c); return { c: i.c, q: Number(i.q), d: i.d || (antes && antes.d) || '', dc: descCadastro(cl, i.c) ?? null, aut: antes ? antes.aut : true }; });
     novo.atualizadoEm = agora();
     fecharModal(true); await Reg.salvar(novo); Reg.mesclarHist([novo]); render(); toast('Guia corrigida.');
+    if (gerarEmail && novo.guia) abrirEmailAjuste(novo.id, apont || sugestaoApontamentos(novo));
   },
   async cancelarGuia(b) {
     const r = regPorId(b.dataset.id); if (!r) return;
@@ -493,6 +496,26 @@ const acoes = {
       }
     }
     AUD_TAM = null; render(); toast(n ? `Imagens apagadas de ${pl(n, 'guia', 'guias')} (cerca de ${fmtBytes(Math.max(0, livres))} liberados).` : 'Nenhuma imagem antiga para apagar.');
+  },
+  emailAjuste(b) { abrirEmailAjuste(b.dataset.id); },
+  async ajCopiar() {
+    const r = M && M.tipo === 'ajuste' && regPorId(M.id); if (!r) return; const e = emailAjusteDe(r, M.apont, false);
+    if (e.faltando.length && !confirm('Ainda há campos sem valor (entre chaves) no texto. Copiar mesmo assim?')) return;
+    const ok = await copiarRico(htmlParaEmail(e.html), e.texto); if (!ok) { toast('Não foi possível copiar.', 'bad'); return; }
+    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = 'Copiado. Cole na resposta à clínica.'; toast('E-mail de ajuste copiado.');
+  },
+  async ajCopiarTexto() {
+    const r = M && M.tipo === 'ajuste' && regPorId(M.id); if (!r) return; const e = emailAjusteDe(r, M.apont, false);
+    if (!(await copiar(e.texto))) { toast('Não foi possível copiar.', 'bad'); return; }
+    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = 'Copiado como texto simples.'; toast('E-mail de ajuste copiado.');
+  },
+  async ajWebmail() {
+    const r = M && M.tipo === 'ajuste' && regPorId(M.id); if (!r) return;
+    if (!extInstalada()) { toast('Para levar o e-mail direto ao webmail, instale a extensão do Chrome (passo a passo abaixo).'); acoes.baixarExtensao(); return; }
+    const e = emailAjusteDe(r, M.apont, false);
+    if (e.faltando.length && !confirm('Ainda há campos sem valor (entre chaves) no texto. Levar mesmo assim?')) return;
+    enviarAoWebmail({ html: htmlParaEmail(e.html), texto: e.texto, quem: r.paciente || r.pacienteIni || '', assunto: `Ajuste da guia ${r.guia}` });
+    await registrarAjuste(); const st = $('#modalEstado'); if (st) st.textContent = 'Levado ao webmail: cole na resposta aberta e envie por lá.';
   },
   relatarGuia() { const g = guiaAtiva(); if (g) abrirRelato({ g }); },
   async relatarHist(b) { const r = regPorId(b.dataset.id); if (!r) { toast('Registro não encontrado: atualize a lista e tente de novo.', 'bad'); return; } const a = await Aud.ler(r); const g = S && S.guias.find(x => x.id === r.id); abrirRelato({ r, a, g }); },
@@ -698,8 +721,10 @@ document.addEventListener('input', e => {
   }
   if (M && M.tipo === 'corrigir') {
     if (t.dataset.cgc !== undefined) { M.carteira = t.value; return; }
+    if (t.dataset.cga !== undefined) { M.apont = t.value; return; }
     if (t.dataset.cgi) { const x = M.itens[+t.dataset.i]; const v = t.dataset.cgi === 'd' ? t.value : t.value.replace(/\D/g, ''); x[t.dataset.cgi] = v; if (t.value !== v) t.value = v; return; }
   }
+  if (M && M.tipo === 'ajuste' && t.dataset.ajuste) { M.apont = t.value; const r = regPorId(M.id), pv = $('#ajPrev'); if (r && pv) pv.innerHTML = emailAjusteDe(r, M.apont, true).html; return; }   // prévia do e-mail de ajuste
   if (M && M.tipo === 'obs' && t.dataset.obstxt) { M.txt = t.value; M.editado = true; return; }
   if (!S) return;
   const g = guiaAtiva();

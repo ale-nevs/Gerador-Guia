@@ -128,6 +128,15 @@ Serviços autorizados:
 {OBS_ADICIONAIS}
 
 Permanecemos à disposição para eventuais esclarecimentos.` },
+  ajuste: { nome: 'Guia ajustada', texto:
+`{SAUDACAO}!
+
+Recebemos a solicitação de ajuste e informamos que a guia nº **{GUIA}**, de {BENEFICIARIO} (carteira {CARTEIRA}), foi ajustada.
+
+Ajuste realizado:
+{APONTAMENTOS}
+
+Permanecemos à disposição.` },
   pendencia: { nome: 'Pendência de dados', texto:
 `{SAUDACAO}!
 
@@ -268,6 +277,7 @@ const MODELOS_META = {
   autorizada: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Autorizada.' },
   parcial: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Parcialmente autorizada. Lista os itens autorizados e os não autorizados.' },
   nao_autorizada: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, quando a situação da guia é Não autorizada. Inclui o motivo registrado.' },
+  ajuste: { grupo: 'Ajuste de guia', destino: 'email', uso: 'Botão E-mail de ajuste (aba Corrigir guia, Painel, histórico da guia, Corrigir guia e Reabrir da lista): avisa a clínica que a solicitação foi recebida e a guia foi ajustada, com os apontamentos.' },
   correcao: { grupo: 'Resposta pelo resultado da guia', destino: 'email', uso: 'Etapa Finalizar, para guia autorizada que corrige um pedido anterior (assunto com RE:). Pode ser escolhido no lugar de "Guia autorizada".' },
   pendencia: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando há bloqueio e a clínica precisa corrigir dados do pedido.' },
   ja_autorizado: { grupo: 'Sem gerar guia: guia única', destino: 'email', uso: 'Botão em Responder sem gerar guia: quando a clínica cobra um pedido já autorizado. Preenche a guia anterior mais recente da mesma carteira e código, se existir.' },
@@ -369,6 +379,8 @@ const CAMPOS = [
   { k: 'PARAM_TERAPIAS', cat: 'Dados de parametrização', nome: 'Lista de terapias', desc: 'Todas as terapias da parametrização, uma por linha.', ex: 'Terapia: Terapia Ocupacional — Quantidade: 8', fn: c => (c.extra.param || {}).terapias },
   { k: 'TERAPIA_DESCRICAO', cat: 'Dados de parametrização', nome: 'Descrição da terapia', desc: 'Usado no modelo de cada linha de terapia.', ex: 'Terapia Ocupacional', fn: c => (c.extra.terapia || {}).descricao },
   { k: 'TERAPIA_QTD', cat: 'Dados de parametrização', nome: 'Quantidade da terapia', desc: 'Usado no modelo de cada linha de terapia.', ex: '8', fn: c => (c.extra.terapia || {}).qtd },
+  // Ajuste de guia
+  { k: 'APONTAMENTOS', cat: 'Ajuste de guia', nome: 'Apontamentos do ajuste', desc: 'O que foi ajustado na guia, digitado no e-mail de ajuste (um por linha).', ex: '• Quantidade de 50000470 corrigida de 1 para 2', fn: c => ((c.extra || {}).apontamentos || '').trim(), html: c => esc(c.extra.apontamentos.trim()).replace(/\n/g, '<br>') },
   // Outros
   { k: 'SAUDACAO', cat: 'Gerais', nome: 'Saudação', desc: 'Bom dia, Boa tarde ou Boa noite, conforme a hora.', ex: 'Bom dia', fn: () => saudacao() },
   { k: 'MODELO_PEDIDO', cat: 'Gerais', nome: 'Modelo de pedido', desc: 'Texto do modelo de pedido para as clínicas.', ex: 'Beneficiário: … Carteira: …', fn: c => htmlPlano(modeloHtmlBruto('modelo_pedido')), html: c => modeloHtmlBruto('modelo_pedido') },
