@@ -155,6 +155,13 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Reabrir guia da lista do dia (versão 2.2.5)
+- **Guias da Erasmo (lista do dia) no Guias do dia:** o botão **Reabrir**, na tabela e no Histórico da guia, abre uma janela com o beneficiário, a carteira, o serviço, a quantidade (com destaque quando é maior que 1) e o que está registrado: guia, sem guia com o motivo, quem registrou e quando. Digite o **Nº da guia** e clique em **Autorizar** (ou Enter).
+  - A guia passa a constar como **Autorizada** com o número digitado, em nome de quem autorizou. Ela entra na aba da lista e no e-mail de entrega, e o Painel marca como **Reaberta**.
+  - O histórico guarda o que estava registrado antes (ex.: "sem guia: Guia já liberada em 12/11" ou o número anterior).
+  - Serve para lançar o número de uma guia registrada sem guia ou para trocar um número. Trocar o número de propósito não acende o aviso de guia duplicada na lista.
+  - Não precisa fechar o atendimento aberto. O número segue a mesma regra da lista (T ou S + 7 ou 8 dígitos), e há aviso se o número já foi usado em outra guia da mesma lista ou se já há guia autorizada para a carteira e o código na semana.
+
 ### Leitura do e-mail e Relatar problema (versão 2.2.4)
 - **Quantidade por serviço na seção de quantidade (Fortea):** quando o e-mail lista os serviços numa seção e, em outra, "50000470 (2x NA SEMANA)" com um código por linha, cada serviço fica com a sua quantidade. Antes, a primeira quantidade da seção valia para todos (ex.: o 2x da psicologia virava 1x). Serviço que não aparece na seção de quantidade fica sem quantidade, e o alerta pede para conferir.
 - **Médico solicitante com convênio ou instituição na primeira linha:** em "CREDENCIADOS DIVERSOS ⏎ NOME DO MÉDICO ⏎ CRM-BA 29341", o nome lido é o da linha logo acima do CRM (ou o da própria linha do CRM, quando ele vem junto). O CRM com UF (CRM-BA, CRM-SE, CRM/BA) passou a ser lido: nos 38 e-mails da Fortea enviados, o CRM era lido em 2 e agora em todos.

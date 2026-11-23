@@ -366,6 +366,7 @@ const acoes = {
   async reabrirRegistro(b) {
     const r = regPorId(b.dataset.id);
     if (!podeReabrir(r)) { toast('Só dá para reabrir uma guia concluída.', 'bad'); return; }
+    if (r.origem === 'lista') { await Lista.reabrirDoRegistro(r); return; }   // lista do dia: só o número da guia e Autorizar (não precisa fechar o atendimento aberto)
     if (S) { toast('Conclua ou feche o atendimento aberto antes de reabrir outra guia.', 'bad'); return; }
     if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
     const a = await Aud.ler(r);
