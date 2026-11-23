@@ -356,10 +356,10 @@ const acoes = {
     const g = guiaAtiva(), st = situacaoGuia(g), pend = pendenciasConclusao(g, st);
     if (pend.length) { toast(pend[0], 'bad'); return; }
     if (g.semGuia) { g.resultado.situacao = 'sem_guia'; g.numero = ''; }
-    const doPainel = !!(g.reaberta && g.reaberta.de === 'painel');
+    const volta = g.reaberta && g.reaberta.de === 'painel' ? (g.reaberta.volta || 'painel') : null;
     await gravarGuia(g, 'concluido'); g.vista = 4; g.etapa = 4;
     await depoisDeGuiaTratada(g, resumoUltimo(g));
-    if (doPainel && !S) { aba = 'painel'; render(); }   // reaberta pelo Painel: volta para a lista de guias
+    if (volta && !S) { aba = volta; render(); }   // reaberta pelo Painel ou pela aba Corrigir guia: volta para lá
   },
   reabrirGuia() { const g = guiaAtiva(); marcarReaberta(g, regPorId(g.id), 'atendimento'); persistir(); mudarVista(4); toast('Guia reaberta para correção. O registro só muda quando você concluir de novo.'); },
   /* Painel / histórico: reabre uma guia concluída de um e-mail já fechado */
@@ -373,7 +373,8 @@ const acoes = {
     if (!a || !a.email || !a.email.texto) { toast('O e-mail desta guia não está no histórico (auditoria), então não dá para reabrir. Use Corrigir guia para trocar a carteira e os serviços.', 'bad'); return; }
     let st = null; try { st = estadoReaberto(r, a); } catch (e) { console.error(e); }
     if (!st) { toast('Não consegui montar a guia de novo a partir do e-mail guardado. Use Corrigir guia.', 'bad'); return; }
-    fecharModal(true); S = st; aba = 'atend';
+    const volta = aba === 'corrigir' ? 'corrigir' : 'painel';
+    fecharModal(true); S = st; aba = 'atend'; guiaAtiva().reaberta.volta = volta;
     const g = guiaAtiva(), feitos = new Set((r.alertas || []).filter(x => x.c).map(x => x.k));   // avisos que já tinham sido conferidos
     try { situacaoGuia(g).A.forEach(x => { if (feitos.has(x.tipo)) g.conf[x.key] = true; }); } catch (e) { }
     persistir(); render(); window.scrollTo(0, 0);
@@ -381,7 +382,7 @@ const acoes = {
   },
   desistirReabertura() {
     const g = guiaAtiva(); if (!g || !g.reaberta) return;
-    if (g.reaberta.de !== 'atendimento' || !g.reaberta.copia) { S = null; persistir(); aba = 'painel'; render(); toast('Correção cancelada: a guia continua como estava registrada.'); return; }
+    if (g.reaberta.de !== 'atendimento' || !g.reaberta.copia) { S = null; persistir(); aba = g.reaberta.volta || 'painel'; render(); toast('Correção cancelada: a guia continua como estava registrada.'); return; }
     S.guias[S.ativa] = g.reaberta.copia; S.vista = 4; persistir(); render(); toast('Correção cancelada: a guia continua como estava registrada.');
   },
 
@@ -412,6 +413,8 @@ const acoes = {
   atualizarQuadro() { render(); },
   atualizarPainel() { if ($('#painelSemana')) painelSemana = $('#painelSemana').value || painelSemana; if ($('#painelMes')) painelMes = $('#painelMes').value || painelMes; if ($('#painelDia')) painelDia = $('#painelDia').value || isoDia(new Date()); conc = null; amostra = null; render(); },
   painelModo(b) { painelModo = b.dataset.v; render(); },
+  corrAtualizar() { render(); },
+  corrLimpar() { corrFiltro = { q: '', periodo: 'tudo', tipo: '', clinica: '', op: '' }; $$('[data-cf]').forEach(el => { el.value = el.dataset.cf === 'periodo' ? 'tudo' : ''; }); repintarCorrigir(); },
   limparFiltros() { painelFiltro = { q: '', status: '', res: '', clinica: '', param: '' }; $$('[data-fp]').forEach(el => { el.value = ''; }); repintarGuiasPainel(); },
   exportarCsv() {
     const base = regsDoPeriodo();
@@ -681,6 +684,7 @@ document.addEventListener('input', e => {
     const q = norm(t.value), alvo = t.dataset.filtro === 'cl' ? '#listaCl .cl-item' : '#tabCod tbody tr';
     $$(alvo).forEach(x => x.classList.toggle('oculto', !!q && !(x.dataset.busca || '').includes(q))); return;
   }
+  if (t.dataset.cf === 'q') { corrFiltro.q = t.value; clearTimeout(tFiltro); tFiltro = setTimeout(repintarCorrigir, 150); return; }   // aba Corrigir guia: só a tabela
   if (t.dataset.fp === 'q') { painelFiltro.q = t.value; clearTimeout(tFiltro); tFiltro = setTimeout(repintarGuiasPainel, 150); return; }   // só a tabela: o campo de busca fica, com o foco e o que está sendo digitado
   /* modais */
   if (M && M.tipo === 'param') {
@@ -747,6 +751,7 @@ document.addEventListener('change', async e => {
     try { const novo = mesclarConfig(configPadrao(), JSON.parse(await f.text())); const keep = cfgEdit; cfgEdit = novo; cfgEdit.clinicas.forEach(cl => { cl._lista = Object.entries(cl.codigos || {}).map(([c, d]) => ({ c, d })).sort((a, b) => a.c < b.c ? -1 : 1); }); cfgDirty = true; render(); toast('Importado como rascunho. Confira e clique em Salvar configurações.'); } catch (err) { toast('Arquivo inválido: não é um config.json do sistema.', 'bad'); }
     return;
   }
+  if (t.dataset.cf !== undefined && t.dataset.cf !== 'q') { corrFiltro[t.dataset.cf] = t.value; repintarCorrigir(); return; }
   if (t.dataset.fp !== undefined && t.dataset.fp !== 'q') { painelFiltro[t.dataset.fp] = t.value; repintarGuiasPainel(); return; }
   if (t.dataset.cfg !== undefined && cfgEdit) { setCfg(t); if (t.dataset.rr) render(); return; }
   if (M && M.tipo === 'param' && t.dataset.pm === 'clinicaId') { M.clinicaId = t.value; $('#modalCorpo').innerHTML = htmlModalParam(); return; }

@@ -114,7 +114,7 @@ function renderTopo() {
     ${htmlSistemaTopo(false)}
     ${htmlSeletorVis(false)}`;
   const temLista = Lista.listas.length || cfg.clinicas.some(c => c.lista || /erasmo/i.test(c.nome)), pendL = Lista.pendentesMeus();
-  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ...(temLista ? [['lista', 'rows', Lista.nomeCurto()]] : []), ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['config', 'settings', 'Configurações']]
+  $('#abas').innerHTML = [['atend', 'filecheck', 'Atendimento'], ...(temLista ? [['lista', 'rows', Lista.nomeCurto()]] : []), ['quadro', 'activity', 'Acompanhamento'], ['painel', 'chart', 'Painel do dia'], ['corrigir', 'edit', 'Corrigir guia'], ['config', 'settings', 'Configurações']]
     .map(([k, i, t]) => `<button data-act="aba" data-aba="${k}" class="${aba === k ? 'ativo' : ''}" title="${t}" ${aba === k ? 'aria-current="page"' : ''}>${ic(i)}<span class="txt-fino">${t}</span>${k === 'lista' && pendL ? ` <span class="tag warn">${pendL}</span>` : ''}</button>`).join('')
     + (pendL && aba !== 'lista' ? `<span class="esp" style="flex:1"></span><button class="btn sm lst-continuar" data-act="irLista" title="Suas guias pendentes da lista do dia">${ic('right', 'sm')}Continuar ${esc(Lista.nomeCurto())} (${pendL})</button>` : '');
   $('#verRodape').textContent = 'v' + VERSAO;
@@ -308,6 +308,7 @@ function renderTela(app) {
   if (aba === 'lista') return Lista.render(app);
   if (aba === 'painel') return renderPainel(app);
   if (aba === 'quadro') return renderQuadro(app);
+  if (aba === 'corrigir') return renderCorrigir(app);
   if (aba === 'config') return renderConfig(app);
   if (!S) return renderEntrada(app);
   const g = guiaAtiva();
@@ -1115,6 +1116,82 @@ function repintarGuiasPainel() {
   $('#guiasPainelTit').textContent = tituloGuiasPainel(per, lista, regs);
   const csv = $('#btnCsv'); if (csv) { csv.disabled = !lista.length; $('#nCsv').textContent = lista.length; }
   const lf = $('#btnLimparFiltros'); if (lf) lf.disabled = !Object.values(painelFiltro).some(Boolean);
+}
+/* ====================================================================
+   Aba Corrigir guia: todas as guias sem Nº da guia (sem guia, lista do dia, em andamento, concluídas sem número)
+   ==================================================================== */
+let corrFiltro = { q: '', periodo: 'tudo', tipo: '', clinica: '', op: '' };
+const CORR_MAX = 300;
+const CORR_TIPOS = { semguia: 'Sem guia (e-mail)', lista: 'Sem guia (lista do dia)', andamento: 'Em andamento', semnumero: 'Concluída sem número' };
+const tipoCorr = r => r.status === 'em_andamento' ? 'andamento' : (r.resultado || {}).situacao === 'sem_guia' ? (r.origem === 'lista' ? 'lista' : 'semguia') : 'semnumero';
+const motivoCorr = r => { const t = tipoCorr(r), rs = r.resultado || {}; return t === 'andamento' ? proximoPasso(r) : t === 'lista' ? (rs.motivoTxt || 'Sem guia') : t === 'semguia' ? nomeModelo(rs.modelo || '') : 'Concluída sem o número da guia'; };
+const tagCorr = t => t === 'andamento' ? tagStatus('em_andamento') : t === 'semnumero' ? `<span class="tag warn">${ic('alert', 'sm')}Sem nº</span>` : `<span class="tag obs">${ic('info', 'sm')}Sem guia${t === 'lista' ? ' · lista' : ''}</span>`;
+/* registros de todos os dias sem número de guia (a versão mais recente de cada um) */
+function regsSemNumero() {
+  const m = new Map(Object.values(Reg.todos).map(r => [r.id, r]));
+  Reg.cache.forEach(r => { const a = m.get(r.id); if (!a || (r.atualizadoEm || '') >= (a.atualizadoEm || '')) m.set(r.id, r); });
+  const quando = r => r.concluidoEm || r.abertoEm || '';
+  return [...m.values()].filter(r => !r.tipo && !r.guia && (r.status === 'concluido' || r.status === 'em_andamento')).sort((a, b) => (quando(a) < quando(b) ? 1 : -1));
+}
+function filtrarCorr(regs) {
+  const f = corrFiltro, termos = norm(f.q).split(' ').filter(Boolean), lim = f.periodo === 'tudo' ? '' : isoDia(addDias(new Date(), -(Number(f.periodo) - 1)));
+  return regs.filter(r => {
+    if (lim && (r.dia || '') < lim) return false;
+    if (f.tipo && tipoCorr(r) !== f.tipo) return false;
+    if (f.clinica === SEM_CLINICA ? !!r.clinicaId : f.clinica && (r.clinicaId || '') !== f.clinica) return false;
+    if (f.op && (r.operadorId || r.operador || '') !== f.op) return false;
+    if (termos.length) { const txt = norm([r.paciente, r.pacienteIni, r.carteira, r.clinica, r.remetente, r.operador, r.listaNome, motivoCorr(r), (r.itens || []).map(i => i.c).join(' ')].filter(Boolean).join(' ')); if (!termos.every(t => txt.includes(t))) return false; }
+    return true;
+  });
+}
+function htmlLinhasCorr(lista, total) {
+  if (!lista.length) return `<tr><td colspan="7" class="muted">${total ? 'Nenhuma guia corresponde aos filtros.' : 'Nenhuma guia sem número. Tudo certo.'}</td></tr>`;
+  return lista.slice(0, CORR_MAX).map(r => {
+    const t = tipoCorr(r), aqui = !!(S && S.guias.some(g => g.id === r.id)), q = r.concluidoEm || r.abertoEm;
+    const acoesR = (aqui ? `<button class="btn sm ico line" data-act="aba" data-aba="atend" title="Ir para o atendimento: esta guia está aberta neste computador" aria-label="Ir para o atendimento">${ic('right', 'sm')}</button>` : '')
+      + (podeReabrir(r) ? btnIcone('reabrirRegistro', r.id, 'undo', 'Reabrir', r.origem === 'lista' ? 'lança o número da guia da lista e autoriza' : t === 'semguia' ? 'abre a guia na etapa 4: use "Gerar a guia" para lançar o número (o registro só muda ao concluir)' : 'abre a guia na etapa 4 para lançar o número (o registro só muda ao concluir)') : '')
+      + (r.status === 'concluido' ? btnIcone('corrigirGuia', r.id, 'edit', 'Corrigir guia', 'troca só a carteira e os serviços, sem reabrir') : '')
+      + btnIcone('verGuia', r.id, 'eye', 'Ver histórico', 'prints enviados, o que foi lido, ignorado, copiado e respondido')
+      + btnIcone('excluirGuia', r.id, 'trash', 'Excluir guia', 'apaga o registro (não dá para desfazer)', 'dng');
+    return `<tr><td class="c num">${fmtData(q)}<br>${fmtHora(q)}</td><td>${esc(r.paciente || r.pacienteIni || '—')}${r.listaNome ? `<div class="dica" style="margin:2px 0 0">${esc(r.listaNome)}</div>` : ''}</td><td class="num">${esc(r.carteira || '—')}</td>
+      <td>${htmlClinica(cfg.clinicas.find(c => c.id === r.clinicaId), r.clinica || r.remetente)}${r.operador ? `<div style="margin-top:4px">${htmlOperador(r.operador, r.operadorId)}</div>` : ''}</td>
+      <td class="num">${(r.itens || []).map(i => `${esc(i.c)} × ${esc(i.q ?? '?')}`).join('<br>')}</td>
+      <td>${tagCorr(t)}${aqui ? ' <span class="tag info">aberta aqui</span>' : ''}<div class="proximo">${esc(motivoCorr(r))}</div></td>
+      <td class="c"><div class="acoes-ic">${acoesR}</div></td></tr>`;
+  }).join('') + (lista.length > CORR_MAX ? `<tr><td colspan="7" class="muted">Mostrando as ${CORR_MAX} mais recentes de ${lista.length}. Use os filtros para achar as outras.</td></tr>` : '');
+}
+const resumoCorr = (lista, regs) => `${pl(lista.length, 'guia', 'guias')}${lista.length !== regs.length ? ' de ' + regs.length : ''}`;
+async function renderCorrigir(app) {
+  const gen = Redesenho.gen, mesma = !!$('#corrTopo'), y = scrollY;   // redesenho da mesma tela: sem esqueleto e sem voltar ao topo
+  if (!mesma) app.innerHTML = htmlEsqueleto(8);
+  await Reg.carregarTudo();
+  if (gen !== Redesenho.gen) return;
+  const regs = regsSemNumero(), lista = filtrarCorr(regs), f = corrFiltro;
+  const n = k => regs.filter(r => tipoCorr(r) === k).length;
+  const clins = unicos(regs.map(r => r.clinicaId).filter(Boolean)); if (f.clinica && f.clinica !== SEM_CLINICA && !clins.includes(f.clinica)) clins.push(f.clinica);
+  const ops = new Map(); regs.forEach(r => { const k = r.operadorId || r.operador; if (k && !ops.has(k)) ops.set(k, r.operador || nomeOp(k)); }); if (f.op && !ops.has(f.op)) ops.set(f.op, nomeOp(f.op));
+  const sel = (id, k, rot, opcoes) => `<div><label class="lbl" for="${id}">${rot}</label><select id="${id}" data-cf="${k}">${opcoes.map(([v, t]) => `<option value="${esc(v)}" ${f[k] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+  app.innerHTML = `<div class="card" id="corrTopo"><div class="card-h"><h2>Guias sem Nº da guia</h2><span class="tag ${regs.length ? 'warn' : 'ok'}" id="corrN">${resumoCorr(lista, regs)}</span><span class="esp"></span><button class="btn sm line" data-act="corrAtualizar">${ic('refresh', 'sm')}Atualizar</button></div>
+    <p class="dica" style="margin:0 0 6px">Todas as guias registradas sem número, de todos os dias: respostas sem guia (do e-mail e da lista do dia), guias em andamento e guias concluídas sem número. Confira cada uma e corrija: <b>Reabrir</b> (${ic('undo', 'sm')}) lança o número; na lista do dia, basta digitar o número e autorizar.</p>
+    <p class="dica" style="margin:0 0 12px">${Object.entries(CORR_TIPOS).map(([k, t]) => `<span class="tag">${esc(t)}: ${n(k)}</span>`).join(' ')}</p>
+    <div class="filtros" style="margin-bottom:12px">
+      <div><label class="lbl" for="cfQ">Buscar</label><div class="busca">${ic('search', 'sm')}<input type="search" id="cfQ" data-cf="q" value="${esc(f.q)}" placeholder="Beneficiário, carteira, clínica, motivo…" autocomplete="off"></div></div>
+      ${sel('cfP', 'periodo', 'Período', [['tudo', 'Todos os dias'], ['1', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias']])}
+      ${sel('cfT', 'tipo', 'Situação', [['', 'Todas'], ...Object.entries(CORR_TIPOS)])}
+      ${sel('cfC', 'clinica', 'Clínica', [['', 'Todas'], ...clins.map(id => [id, (cfg.clinicas.find(c => c.id === id) || {}).nome || (regs.find(r => r.clinicaId === id) || {}).clinica || id]), ...(regs.some(r => !r.clinicaId) || f.clinica === SEM_CLINICA ? [[SEM_CLINICA, 'Clínica não identificada']] : [])])}
+      ${sel('cfO', 'op', 'Operador', [['', 'Todos'], ...[...ops].sort((a, b) => a[1].localeCompare(b[1]))])}
+      <div><button class="btn ghost" id="btnCorrLimpar" data-act="corrLimpar" ${Object.entries(f).some(([k, v]) => v && !(k === 'periodo' && v === 'tudo')) ? '' : 'disabled'}>${ic('x', 'sm')}Limpar filtros</button></div>
+    </div>
+    <div class="tabela-scroll"><table class="t" id="tabCorr"><thead><tr><th>Data</th><th>Beneficiário</th><th>Carteira</th><th>Clínica</th><th>Serviços</th><th>Situação</th><th></th></tr></thead><tbody>${htmlLinhasCorr(lista, regs.length)}</tbody></table></div></div>`;
+  if (mesma) window.scrollTo(0, y);
+}
+/* filtros e busca: só a tabela, com os registros já carregados (sem reler a pasta, sem tirar o foco nem mexer na rolagem) */
+function repintarCorrigir() {
+  const tab = $('#tabCorr'); if (aba !== 'corrigir' || !tab) { render(); return; }
+  const regs = regsSemNumero(), lista = filtrarCorr(regs);
+  tab.tBodies[0].innerHTML = htmlLinhasCorr(lista, regs.length);
+  $('#corrN').textContent = resumoCorr(lista, regs);
+  const lf = $('#btnCorrLimpar'); if (lf) lf.disabled = !Object.entries(corrFiltro).some(([k, v]) => v && !(k === 'periodo' && v === 'tudo'));
 }
 async function conciliarEmails(files) {
   const emails = [];

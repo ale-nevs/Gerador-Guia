@@ -155,7 +155,14 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
-### Reabrir guia da lista do dia (versão 2.2.5)
+### Reabrir guia da lista do dia e aba Corrigir guia (versão 2.2.5)
+- **Aba Corrigir guia:** mostra todas as guias registradas **sem Nº da guia**, de todos os dias, para conferir e corrigir:
+  - respostas sem guia do e-mail (com o modelo usado, ex.: Pendência);
+  - sem guia da lista do dia (com o motivo, ex.: Paciente excluso);
+  - guias em andamento (com o próximo passo) e guias concluídas sem número.
+  - Filtros por período (todos os dias, hoje, 7 ou 30 dias), situação, clínica e operador, e busca por beneficiário, carteira, clínica ou motivo. A tabela muda na hora, sem a página subir. No topo, a contagem de cada situação.
+  - Ações por guia (ícones, com o nome na dica): **Reabrir** (na lista do dia, digite o número e autorize; nas do e-mail, a guia abre na etapa 4, e numa resposta sem guia o botão de gerar a guia leva para lançar o número), **Corrigir guia**, **Ver histórico** e **Excluir guia** (para limpar guias paradas). Guia aberta neste computador aparece marcada, com o botão para ir ao atendimento.
+  - Ao concluir uma guia reaberta por esta aba, o sistema volta para ela e a guia sai da lista.
 - **Guias da Erasmo (lista do dia) no Guias do dia:** o botão **Reabrir**, na tabela e no Histórico da guia, abre uma janela com o beneficiário, a carteira, o serviço, a quantidade (com destaque quando é maior que 1) e o que está registrado: guia, sem guia com o motivo, quem registrou e quando. Digite o **Nº da guia** e clique em **Autorizar** (ou Enter).
   - A guia passa a constar como **Autorizada** com o número digitado, em nome de quem autorizou. Ela entra na aba da lista e no e-mail de entrega, e o Painel marca como **Reaberta**.
   - O histórico guarda o que estava registrado antes (ex.: "sem guia: Guia já liberada em 12/11" ou o número anterior).
