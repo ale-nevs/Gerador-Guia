@@ -155,6 +155,11 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Leitura do e-mail e Relatar problema (versão 2.2.4)
+- **Quantidade por serviço na seção de quantidade (Fortea):** quando o e-mail lista os serviços numa seção e, em outra, "50000470 (2x NA SEMANA)" com um código por linha, cada serviço fica com a sua quantidade. Antes, a primeira quantidade da seção valia para todos (ex.: o 2x da psicologia virava 1x). Serviço que não aparece na seção de quantidade fica sem quantidade, e o alerta pede para conferir.
+- **Médico solicitante com convênio ou instituição na primeira linha:** em "CREDENCIADOS DIVERSOS ⏎ NOME DO MÉDICO ⏎ CRM-BA 29341", o nome lido é o da linha logo acima do CRM (ou o da própria linha do CRM, quando ele vem junto). O CRM com UF (CRM-BA, CRM-SE, CRM/BA) passou a ser lido: nos 38 e-mails da Fortea enviados, o CRM era lido em 2 e agora em todos.
+- **Relatar problema pelo histórico da guia:** o **Baixar arquivo** não fazia nada quando o relato era aberto pelo histórico (Painel ou Auditar). Agora baixa o arquivo e guarda a cópia na pasta "relatos". Pela etapa 3 já funcionava.
+
 ### Reabrir guia e Guias do dia (versão 2.2.3)
 - **Reabrir guia concluída:** no Painel (Guias do dia) e no **Histórico da guia** (também pelo Auditar), o botão **Reabrir** abre a guia de novo na etapa 4. Ela é montada com o e-mail guardado no histórico e os dados registrados: número, situação, itens não autorizados, glosa, observação e as correções feitas à mão. Dá para corrigir o número, a situação, a observação ou a resposta e concluir de novo.
   - O registro continua como estava até você clicar em **Concluir guia**. **Desistir da correção** (ou descartar o atendimento) deixa a guia exatamente como estava registrada.

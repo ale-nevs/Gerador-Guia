@@ -291,6 +291,7 @@ function extrairItens(bloco) {
   const invalidos = [...bloco.matchAll(/(?<!\d)(\d{5,7}|\d{9,12})(?!\d)/g)].map(m => m[1]);
   return { itens, invalidos };
 }
+const RE_CONSELHO_NUM = /\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b\s*(?:[-\/]?\s*[A-Z]{2}\b)?\s*[:\-nº°.]*\s*\d{3,7}/i;   // "CRM 1234", "CRM-BA 29341", "CRM/SE: 8797"
 function lerMedico(bruto) {
   bruto = String(bruto || '').replace(/\bRQE\b\s*[:\-nº°.]*\s*\d*/gi, ' ');   // "CRM 18103 / RQE 10935 - LORENA": RQE é a especialidade, não é nome nem CRM
   const conselho = (bruto.match(/\b(CRM|CREMEB|CRP|CREFITO|CRFA|CRO)\b/i) || [''])[0].toUpperCase();
@@ -367,10 +368,15 @@ function lerPedido(texto, referencia) {
   const lc = normCart(p.carteiraBruta);
   p.carteira = cartValida(lc) ? lc : null;
   let medicoTxt = primeiraLinha(de('medico')[0]);
+  const secMed = de('medico')[0];
+  if (secMed) {   // "CONVÊNIO OU INSTITUIÇÃO ⏎ NOME DO MÉDICO ⏎ CRM-BA 12345" (Fortea): o nome é a linha logo acima do CRM, não a primeira
+    const ls = secMed.linhas.map(x => x.trim()).filter(Boolean), k = ls.findIndex(l => RE_CONSELHO_NUM.test(l));
+    if (k > 0) medicoTxt = lerMedico(ls[k]).nome.replace(/[^\p{L}]/gu, '').length >= 4 ? ls[k] : `${ls[k - 1]} ${ls[k]}`;   // nome na própria linha do CRM, ou na de cima
+  }
   if (!medicoTxt) { const m = texto.match(/(?:^|\n)\s*(?:dr\.?|dra\.?|doutor(?:a)?)\s+([^\n]+)/i); if (m) medicoTxt = m[0].trim().replace(/^(dr\.?|dra\.?|doutor(a)?)\s+/i, ''); }
   if (!medicoTxt) { const m = texto.match(/\bCRM\s*[:\-]?\s*(\d{3,7})[ \t]*([^\n]*)/i); if (m) medicoTxt = `${m[2].trim()} CRM ${m[1]}`.trim(); }
   p.medico = lerMedico(medicoTxt);
-  if (p.medico.nome && !p.medico.crm) { const m = texto.match(/\bCRM\s*[:\-]?\s*(\d{3,7})/i); if (m) { p.medico.crm = m[1]; p.medico.conselho = p.medico.conselho || 'CRM'; p.medico.bruto = `${p.medico.bruto} CRM ${m[1]}`.trim(); } }   // CRM em linha própria, abaixo do nome
+  if (p.medico.nome && !p.medico.crm) { const m = texto.match(/\bCRM\s*(?:[-\/]\s*[A-Z]{2}\b)?\s*[:\-]?\s*(\d{3,7})/i); if (m) { p.medico.crm = m[1]; p.medico.conselho = p.medico.conselho || 'CRM'; p.medico.bruto = `${p.medico.bruto} CRM ${m[1]}`.trim(); } }   // CRM em linha própria, abaixo do nome
   let cidTxt = primeiraLinha(de('cid')[0]);
   if (!cidTxt) { const m = texto.match(/\bCID(?:[\s\-]*10)?\s*[:\-]?\s*([A-Za-z])\s?(\d{2,3}(?:\.\d{1,2})?)/i); if (m) cidTxt = m[1] + m[2]; }
   if (cidTxt) {   // "CID 10 F84.0", "CID F 84.0 E F41.1": tira o rótulo repetido e junta os CIDs com " + "
@@ -389,6 +395,11 @@ function lerPedido(texto, referencia) {
   p.local = primeiraLinha(de('local')[0]);
   p.obs = de('obs').map(s => s.linhas.join(' ').trim()).filter(Boolean).join(' | ');
   const aplicarQtd = (lista, qsec) => {
+    /* quantidade por código na própria seção ("50000470 (2x NA SEMANA)", um código por linha): cada serviço fica com a sua */
+    const porCodigo = {};
+    qsec.linhas.forEach(l => { const m = l.match(/(?<![\dA-Za-z])(\d{8})(?!\d)(.*)$/); if (!m) return; const q = m[2].match(/(?<!\d)(\d{1,2})\s*[x×]/i) || m[2].match(/(?<![\d,./:-])(\d{1,2})(?![\d,./:])/); if (q && porCodigo[m[1]] == null) porCodigo[m[1]] = Number(q[1]); });
+    const semQtd = lista.filter(it => it.qtd == null);
+    if (semQtd.some(it => porCodigo[it.codigo] != null)) { semQtd.forEach(it => { if (porCodigo[it.codigo] != null) { it.qtd = porCodigo[it.codigo]; it.origemQtd = 'campo'; } }); qsec.usada = true; return; }   // código sem quantidade na seção fica sem (o alerta pede para conferir)
     const lq = primeiraLinha(qsec), q = ((lq.match(/(?<!\d)(\d{1,2})\s*[x×]\s*(?:por|\/|na|ao)\s*semana/i) || lq.match(/\d+/) || [null, null])[1] ?? (lq.match(/\d+/) || [null])[0]);   // "10 sessões - 3 x por semana": vale o 3
     const sem = lista.filter(it => it.qtd == null);
     if (q != null && sem.length) { sem.forEach(it => { it.qtd = Number(q); it.origemQtd = 'campo'; }); if (sem.length > 1) p.qtdUnicaAplicada = true; qsec.usada = true; }
