@@ -779,6 +779,9 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .mc.ok .mc-i{color:var(--ok-solid)}.mc.bad{background:var(--bad-bg)}.mc.bad .mc-i{color:var(--bad-solid)}.mc.warn{background:var(--warn-bg)}.mc.warn .mc-i{color:var(--warn-solid)}.mc.ign .mc-i,.mc.info .mc-i{color:var(--text-3)}
 .seg-sis-topo button{min-width:56px;justify-content:center}
 .card-q.parada{opacity:.75;border-style:dashed}
+.col-atrasadas{margin-top:12px;border-color:var(--warn-br)}
+.col-atrasadas .lista-q{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.col-atrasadas .card-q{margin-bottom:0}
 .pres-op small b{color:var(--text)}
 @media (max-width:1499px){.chip.pasta .txt-fino{display:none}.chip.pasta{padding:0 10px}}
 .seg-sis-topo .seg-rot{display:inline-flex!important}

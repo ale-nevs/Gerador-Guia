@@ -43,7 +43,7 @@ function validarCfg(c) {
   MODELOS_PERSONALIZADOS.forEach(k => { if (!(c.modelos[k].nome || '').trim()) add('modelos', 'Modelo personalizado: informe o nome.'); });
   const mots = new Set();
   c.motivos.forEach((m, i) => { const n = norm(m.nome); if (!n) add('prefs', `Motivo ${i + 1}: informe o texto.`); else if (mots.has(n)) add('prefs', `Motivo repetido: “${m.nome}”.`); mots.add(n); });
-  if (!Number.isInteger(c.preferencias.acoesMinutos) || c.preferencias.acoesMinutos < 0 || c.preferencias.acoesMinutos > 1440) add('prefs', 'O tempo para limpar a aba Ações deve ser um número de 0 a 1440 minutos.');
+  if (!Number.isInteger(c.preferencias.acoesMinutos) || c.preferencias.acoesMinutos < 0 || c.preferencias.acoesMinutos > 1440) add('prefs', 'O tempo para separar as guias paradas no Acompanhamento deve ser um número de 0 a 1440 minutos.');
   if (!Number.isInteger(c.preferencias.qtdMax) || c.preferencias.qtdMax < 1 || c.preferencias.qtdMax > 99) add('prefs', 'A quantidade máxima por serviço deve ser um número de 1 a 99.');
   return E;
 }
@@ -335,7 +335,7 @@ function cfgPrefs() {
     <div class="stack">
       <label class="switch"><input type="checkbox" data-cfg="preferencias.conferenciaCega" ${p.conferenciaCega ? 'checked' : ''}><span><b>Exigir a conferência da grade antes de finalizar (pelos prints ou, sem prints, a conferência cega)</b></span></label>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.guardarPrints" ${p.guardarPrints !== false ? 'checked' : ''}><span><b>Guardar os prints e o que foi lido no histórico de cada guia</b> (pasta compartilhada › auditoria). Usado em “Histórico” do Painel e em Ações › Auditar. Contém dados do beneficiário.</span></label>
-      <div style="max-width:300px"><label class="lbl" for="pAcoes">Limpar da aba Ações após (minutos sem movimento; 0 = não limpar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
+      <div style="max-width:300px"><label class="lbl" for="pAcoes">Acompanhamento: guia parada vai para “mais que N min” após (minutos sem movimento; 0 = não separar)</label><input type="number" id="pAcoes" min="0" max="1440" data-cfg="preferencias.acoesMinutos" value="${p.acoesMinutos}"></div>
       <div style="max-width:300px"><label class="lbl" for="pParado">Avisar “atendimento parado” após (minutos na mesma etapa; 0 = não avisar)</label><input type="number" id="pParado" min="0" max="240" data-cfg="preferencias.minutosParado" value="${p.minutosParado ?? 10}"></div>
       <div style="max-width:300px"><label class="lbl" for="pQtd">Quantidade máxima por serviço</label><input type="number" id="pQtd" min="1" max="99" data-cfg="preferencias.qtdMax" value="${p.qtdMax}"></div>
       <label class="switch"><input type="checkbox" data-cfg="preferencias.obsParametrizadoAuto" ${p.obsParametrizadoAuto ? 'checked' : ''}><span><b>Pré-selecionar o texto de “atendimento parametrizado”</b></span></label>

@@ -155,6 +155,33 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Leitura dos e-mails da MRA (versão 2.2.8)
+- **CPF no lugar da carteira** ("NOME  CPF 01574152521  50000470 …"): o nome, o serviço, o médico e o local da linha passam a ser lidos. A carteira fica em branco, com o alerta mostrando o CPF ("Localize o beneficiário pelo CPF no sistema").
+- **Carteira fora do padrão** (dígito a mais ou a menos, com um espaço no meio ou terminando em letra e número: "80000070000157700IE", "403702 7000040000A2"): antes o leitor perdia a linha inteira. Agora lê nome, serviço, médico e local, e a carteira aparece como "fora do padrão", com o valor recebido, para o operador corrigir.
+- **Local colado ao médico** na linha do CRM ("CARLA … MORAES ESPAÇO BOM VIVER"): o local conhecido no fim é separado do nome.
+- **Descrição entre parênteses quebrada em duas linhas** ("(AVALIAÇÃO / E ACOMPANHAMENTO)"): não vira médico nem local.
+- **"SEM DATA DATA"** não deixa "DATA" no nome do médico. Os botões do webmail copiados junto com o e-mail ("ResponderEncaminhar", "Adicionar reação") são ignorados.
+- **Saudação com data** ("Segue pedido de Autorização de Segunda Feira 23/11/26"): não vira a data do pedido (corrigido na 2.2.7). Nos relatos, isso gerava divergência com a data do print.
+- **Nos 20 e-mails da MRA enviados:** 19 pedidos lidos completos. O outro é um pedido de reenvio de guia, sem pedido.
+- **Quantidade:** a MRA não escreve a quantidade em boa parte dos pedidos. Ligue em **Configurações › Clínicas › MRA › Regras de leitura** a "Quantidade padrão: 1" (e "Quantidade colada no CRM", se ainda não estiver). Assim o "× ?" vira 1 sozinho, em vez de o operador corrigir à mão.
+
+### Leitura de e-mail em formato de carta (Psiconeuro) (versão 2.2.7)
+- **E-mail em forma de carta com tabela em texto** ("Venho por meio desta solicitar…", "Nº CARTEIRA  NOME COMPLETO", "ESPECIALIDADE  SESSÃO POR SEMANA"): antes, a frase da carta virava o médico e o local, e o "mês 11/2026" virava o CRM 2026.
+  - Agora as frases da carta e os cabeçalhos da tabela são ignorados.
+  - O médico é lido quando vem com "Dr." ("Dr: Fulano", "Dr. Fulano", "O Dr. Fulano", "Dr.Fulano"), com o CRM da linha de baixo. O CRM é aceito com UF antes ou depois do número (CRM-BA: 7780, CRM:15141-BA, CRM: 41345 BA) e colado no nome (FariasCRM:50657). A especialidade depois do CRM (CRM-17716 - ORTOPEDIA) não vira nome nem local.
+  - "10 sessões - 03 x por semana" vale **3** (frequência semanal), também quando o "x" e o "por semana" estão em linhas diferentes.
+  - Texto quebrado ("413100003688700-EQRita de Cassia Gomes de / Jesus"): a carteira e o nome completo são separados certo.
+  - Sem médico no e-mail, o campo fica vazio e aparece o bloqueio de médico não informado: preencha pelo laudo ou encaminhamento em anexo.
+  - Nos 16 e-mails da Psiconeuro enviados, nome, carteira, médico, CRM e quantidades batem com o texto. A leitura da MRA e da Fortea não mudou.
+- **Aprendizado a limpar:** como o CRM do e-mail saía errado (2026), alguns operadores marcaram o CRM certo do print como "erro de leitura do print". Em **Configurações › Aprendizado**, apague as entradas da leitura do print com "correto" 2026 e a do e-mail com o médico "Venho por meio desta solicitar…".
+
+### Acompanhamento: guias paradas há mais de 10 min (versão 2.2.6)
+- **Guia em andamento — mais que 10 min:** embaixo das colunas Lendo o pedido, Gerando guia e Anexando e-mail, uma seção reúne as guias de hoje que ninguém está com aberta há mais de 10 min, da mais antiga para a mais recente.
+  - Cada guia mostra a etapa em que parou, o operador e há quanto tempo está parada.
+  - Antes, essas guias sumiam do quadro. Agora ficam à vista até alguém continuar, responder à clínica ou excluir (aba Corrigir guia).
+  - Os 10 min vêm das Preferências ("Acompanhamento: guia parada vai para mais que N min após…"). Com 0, nada é separado e todas ficam nas colunas.
+  - Guias abertas ao vivo continuam nas colunas, com "nesta etapa há N min". O total do quadro conta todas.
+
 ### Reabrir guia da lista do dia, aba Corrigir guia e e-mail de ajuste (versão 2.2.5)
 - **Aba Corrigir guia:** mostra todas as guias registradas **sem Nº da guia**, de todos os dias, para conferir e corrigir:
   - respostas sem guia do e-mail (com o modelo usado, ex.: Pendência);

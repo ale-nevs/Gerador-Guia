@@ -60,11 +60,11 @@ function guiasEmAndamento() {
   (Presenca.lista || []).forEach(d => (d.guias || []).forEach(x => { const r = mapa.get(x.id) || {};
     mapa.set(x.id, { ...r, id: x.id, paciente: x.paciente || r.paciente, carteira: x.carteira || r.carteira, clinica: x.clinica || r.clinica, clinicaId: x.clinicaId || r.clinicaId, vista: x.vista, idxGuia: x.idx, totalGuias: x.total, itens: r.itens || Array(x.itens || 0).fill({}), operador: d.operador, operadorId: d.operadorId, aoVivo: true, ativa: x.ativa, desde: x.desde, sinal: d.em, visivel: d.visivel }); }));
   if (S) S.guias.filter(g => !guiaTerminal(g)).forEach(g => { const r = montarRegistro(g, 'em_andamento'); mapa.set(g.id, { ...r, vista: g === guiaAtiva() ? S.vista : (g.vista || g.etapa || 2), aoVivo: true, ativa: g === guiaAtiva(), desde: g === guiaAtiva() ? inicioEtapa() : null, visivel: !document.hidden }); });
-  return [...mapa.values()].filter(r => r.aoVivo || !lim || r.parado <= lim).sort((a, b) => (b.aoVivo - a.aoVivo) || ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
+  return [...mapa.values()].map(r => ({ ...r, atrasada: !r.aoVivo && !!lim && r.parado > lim })).sort((a, b) => (b.aoVivo - a.aoVivo) || ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1));
 }
 function listaProgresso() {
   const porOp = new Map();
-  guiasEmAndamento().sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1)).forEach(r => { const k = r.operadorId || r.operador || '?'; if (!porOp.has(k)) porOp.set(k, r); });
+  guiasEmAndamento().filter(r => !r.atrasada).sort((a, b) => ((a.atualizadoEm || '') < (b.atualizadoEm || '') ? 1 : -1)).forEach(r => { const k = r.operadorId || r.operador || '?'; if (!porOp.has(k)) porOp.set(k, r); });
   return [...porOp.values()].map(r => {
     const o = cfg.operadores.find(x => x.id === r.operadorId) || cfg.operadores.find(x => x.nome === r.operador) || null;
     const v = r.vista || r.etapa || 2, p = v <= 2 ? 33 : v >= 4 ? 100 : 66;
@@ -1318,25 +1318,30 @@ async function renderQuadro(app) {
 function repintarQuadro() {
   if (aba !== 'quadro' || Redesenho.baixo) return;
   const pres = $('#cardPresenca'), cab = $('#cardQuadro'), cols = $('#quadroCols'); if (!pres || !cab || !cols) return;
-  pres.outerHTML = htmlPresenca(); cols.remove(); cab.outerHTML = htmlQuadroGuias();
+  pres.outerHTML = htmlPresenca(); cols.remove(); const at = $('#quadroAtrasadas'); if (at) at.remove(); cab.outerHTML = htmlQuadroGuias();
 }
 function htmlQuadroGuias() {
   const lim = Number(cfg.preferencias.acoesMinutos) || 0, hoje = isoDia(new Date());
-  const lista = guiasEmAndamento();
+  const todas = guiasEmAndamento(), lista = todas.filter(r => !r.atrasada), atrasadas = todas.filter(r => r.atrasada).sort((a, b) => (b.parado || 0) - (a.parado || 0));
   const cols = [
     [2, 'Lendo o pedido', 'search', 'Pedido e alertas (etapas 1 e 2)'],
     [3, 'Gerando guia', 'filecheck', 'Guia e conferência (etapa 3)'],
     [4, 'Anexando e-mail', 'mail', 'Finalizar: observação e resposta (etapa 4)']
   ];
   const col = r => { const v = r.vista || r.etapa || 2; return v <= 2 ? 2 : v >= 4 ? 4 : 3; };
-  return `<div class="card" id="cardQuadro"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${lista.length ? 'info' : 'ok'}">${ic(lista.length ? 'clip' : 'check', 'sm')}${lista.length ? pl(lista.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
-    <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está. <b>Ao vivo</b>: alguém está com ela aberta agora (atualiza a cada 30 s). ${lim ? `Guia parada (ninguém com ela aberta) some depois de ${lim} min sem movimento.` : ''}</p></div>
+  const cardQ = (r, comEtapa) => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), ms = Date.now() - new Date(r.desde), min = r.desde && Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : null;
+    const tot = presInt(r.totalGuias, 1, 99, 1), idx = presInt(r.idxGuia, 0, 98, 0), par = presInt(r.parado, 0, 99999, 0), nIt = presInt((r.itens || []).length, 0, 999, 0);   // números vindos de arquivos da pasta
+    const estado = r.aoVivo ? `<span class="tag ok">${ic('activity', 'sm')}ao vivo</span>${r.ativa ? '' : ' <span class="tag">aberta, em outra guia do e-mail</span>'}${r.visivel === false ? ' <span class="tag">em outra janela</span>' : ''}` : `<span class="tag ${r.atrasada ? 'bad' : 'warn'}">${ic('pause', 'sm')}parada há ${pl(par, 'min', 'min')}</span>`;
+    const etapa = comEtapa ? `<span class="tag">${ic(cols.find(c => c[0] === col(r))[2], 'sm')}${cols.find(c => c[0] === col(r))[1]}</span> ` : '';
+    return `<div class="card-q ${r.aoVivo ? '' : 'parada'}"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
+      <div class="proximo">${etapa}${tot > 1 ? `Guia ${idx + 1} de ${tot} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl(nIt, 'item', 'itens')}${min != null ? ` · nesta etapa há ${min < 1 ? 'menos de 1 min' : min + ' min'}` : ''}</div>
+      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}${estado}</div></div>`; };
+  return `<div class="card" id="cardQuadro"><div class="card-h"><h2>Guias em andamento hoje</h2><span class="tag ${todas.length ? 'info' : 'ok'}">${ic(todas.length ? 'clip' : 'check', 'sm')}${todas.length ? pl(todas.length, 'guia', 'guias') : 'Nada em andamento'}</span><span class="esp"></span><span class="muted" style="font-size:var(--fs-sm)">${diaBR(hoje)}</span><button class="btn sm line" data-act="atualizarQuadro">${ic('refresh', 'sm')}Atualizar lista</button></div>
+    <p class="dica" style="margin:0">Beneficiário × clínica de cada guia aberta, na etapa em que está. <b>Ao vivo</b>: alguém está com ela aberta agora (atualiza a cada 30 s). ${lim ? `Guia parada (ninguém com ela aberta) há mais de ${lim} min vai para <b>Guia em andamento — mais que ${lim} min</b>, embaixo.` : ''}</p></div>
   <div class="quadro" id="quadroCols">${cols.map(([n, t, i, d]) => { const its = lista.filter(r => col(r) === n);
     return `<section class="col-q"><h3>${ic(i)}${t} <span class="tag">${its.length}</span></h3><p class="dica" style="margin:-6px 0 10px">${d}</p>
-    ${its.map(r => { const cl = cfg.clinicas.find(c => c.id === r.clinicaId), ms = Date.now() - new Date(r.desde), min = r.desde && Number.isFinite(ms) ? Math.max(0, Math.round(ms / 60000)) : null;
-      const tot = presInt(r.totalGuias, 1, 99, 1), idx = presInt(r.idxGuia, 0, 98, 0), par = presInt(r.parado, 0, 99999, 0), nIt = presInt((r.itens || []).length, 0, 999, 0);   // números vindos de arquivos da pasta
-      const estado = r.aoVivo ? `<span class="tag ok">${ic('activity', 'sm')}ao vivo</span>${r.ativa ? '' : ' <span class="tag">aberta, em outra guia do e-mail</span>'}${r.visivel === false ? ' <span class="tag">em outra janela</span>' : ''}` : `<span class="tag warn">${ic('pause', 'sm')}parada há ${pl(par, 'min', 'min')}</span>`;
-      return `<div class="card-q ${r.aoVivo ? '' : 'parada'}"><div class="t1">${esc(r.paciente || r.pacienteIni || 'Beneficiário')} <span class="muted">×</span> ${htmlClinica(cl, r.clinica || r.remetente)}</div>
-      <div class="proximo">${tot > 1 ? `Guia ${idx + 1} de ${tot} · ` : ''}<span class="num">${esc(r.carteira || 'sem carteira')}</span> · ${pl(nIt, 'item', 'itens')}${min != null ? ` · nesta etapa há ${min < 1 ? 'menos de 1 min' : min + ' min'}` : ''}</div>
-      <div class="linha-flex" style="margin-top:6px">${htmlOperador(r.operador, r.operadorId)}${estado}</div></div>`; }).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>`;
+    ${its.map(r => cardQ(r)).join('') || '<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia nesta etapa.</p>'}</section>`; }).join('')}</div>
+  ${lim ? `<section class="col-q col-atrasadas" id="quadroAtrasadas"><h3>${ic('pause')}Guia em andamento — mais que ${lim} min <span class="tag ${atrasadas.length ? 'bad' : ''}">${atrasadas.length}</span></h3>
+    <p class="dica" style="margin:-6px 0 10px">Guias de hoje que ninguém está com aberta há mais de ${lim} min (o tempo vem das Preferências). Quem abriu precisa continuar ou responder à clínica; se a guia foi abandonada, dá para excluir na aba <b>Corrigir guia</b>.</p>
+    ${atrasadas.length ? `<div class="lista-q">${atrasadas.map(r => cardQ(r, true)).join('')}</div>` : `<p class="muted" style="font-size:var(--fs-sm)">Nenhuma guia parada há mais de ${lim} min.</p>`}</section>` : ''}`;
 }
