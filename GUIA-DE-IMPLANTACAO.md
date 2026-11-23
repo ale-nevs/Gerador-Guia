@@ -155,6 +155,16 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Leitura dos e-mails da MRA (versão 2.2.8)
+- **CPF no lugar da carteira** ("NOME  CPF 01574152521  50000470 …"): o nome, o serviço, o médico e o local da linha passam a ser lidos. A carteira fica em branco, com o alerta mostrando o CPF ("Localize o beneficiário pelo CPF no sistema").
+- **Carteira fora do padrão** (dígito a mais ou a menos, com um espaço no meio ou terminando em letra e número: "80000070000157700IE", "403702 7000040000A2"): antes o leitor perdia a linha inteira. Agora lê nome, serviço, médico e local, e a carteira aparece como "fora do padrão", com o valor recebido, para o operador corrigir.
+- **Local colado ao médico** na linha do CRM ("CARLA … MORAES ESPAÇO BOM VIVER"): o local conhecido no fim é separado do nome.
+- **Descrição entre parênteses quebrada em duas linhas** ("(AVALIAÇÃO / E ACOMPANHAMENTO)"): não vira médico nem local.
+- **"SEM DATA DATA"** não deixa "DATA" no nome do médico. Os botões do webmail copiados junto com o e-mail ("ResponderEncaminhar", "Adicionar reação") são ignorados.
+- **Saudação com data** ("Segue pedido de Autorização de Segunda Feira 23/11/26"): não vira a data do pedido (corrigido na 2.2.7). Nos relatos, isso gerava divergência com a data do print.
+- **Nos 20 e-mails da MRA enviados:** 19 pedidos lidos completos. O outro é um pedido de reenvio de guia, sem pedido.
+- **Quantidade:** a MRA não escreve a quantidade em boa parte dos pedidos. Ligue em **Configurações › Clínicas › MRA › Regras de leitura** a "Quantidade padrão: 1" (e "Quantidade colada no CRM", se ainda não estiver). Assim o "× ?" vira 1 sozinho, em vez de o operador corrigir à mão.
+
 ### Leitura de e-mail em formato de carta (Psiconeuro) (versão 2.2.7)
 - **E-mail em forma de carta com tabela em texto** ("Venho por meio desta solicitar…", "Nº CARTEIRA  NOME COMPLETO", "ESPECIALIDADE  SESSÃO POR SEMANA"): antes, a frase da carta virava o médico e o local, e o "mês 11/2026" virava o CRM 2026.
   - Agora as frases da carta e os cabeçalhos da tabela são ignorados.

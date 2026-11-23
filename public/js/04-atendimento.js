@@ -162,7 +162,8 @@ function avaliar(g) {
   /* identificação */
   if (!p.beneficiario) add('falta-benef', 'Beneficiário não informado.', { clinica: 'Nome do beneficiário não informado.' });
   if (!cartValida(g.carteiraUsada)) {
-    if (!p.beneficiario && !p.carteiraBruta) add('cart', 'Carteira e nome do beneficiário não informados.', { clinica: 'Número da carteira Promédica não informado.' });
+    if (p.cpf && !p.carteiraBruta) add('cart', `Carteira não informada: o e-mail traz o CPF ${p.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')}. Localize o beneficiário pelo CPF no sistema e informe a carteira usada.`, { clinica: 'Número da carteira Promédica não informado (veio o CPF no lugar).' });
+    else if (!p.beneficiario && !p.carteiraBruta) add('cart', 'Carteira e nome do beneficiário não informados.', { clinica: 'Número da carteira Promédica não informado.' });
     else add('cart', p.carteiraBruta ? `Carteira fora do padrão: "${p.carteiraBruta}" (${normCart(p.carteiraBruta).length} caracteres; o correto são 17: 15 dígitos + 2 caracteres). Localize o beneficiário pelo nome no sistema e informe a carteira usada.` : 'Carteira não informada. Localize o beneficiário pelo nome no sistema e informe a carteira usada.', { acaoCarteira: true });
   } else if (p.carteira !== g.carteiraUsada) {
     add('cart-dif', `Carteira usada (${g.carteiraUsada}) diferente da informada no e-mail (${p.carteiraBruta || 'não informada'}). Confirme que nome e carteira são do mesmo beneficiário.`);
