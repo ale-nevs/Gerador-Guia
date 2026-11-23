@@ -817,3 +817,23 @@ body:has(#cfgBarra:not([hidden])) .toast{bottom:86px}   /* aviso acima da barra 
 .mini-pend{margin:0;padding-left:18px;font-size:var(--fs-xs);color:var(--warn-fg)}
 .mini-rodape{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
 .mini-rodape [data-mact=concluir],.mini-rodape [data-mact=encerrar],.mini-rodape [data-mact=selGuia]{margin-left:auto}
+/* possível pedido repetido (aviso crítico): vermelho, no topo, segura a guia até o Conferi */
+.faixa-critica{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;border:2px solid var(--bad-solid);border-radius:var(--r);background:var(--bad-bg);color:var(--bad-fg)}
+.faixa-critica>.ic{flex:none;width:22px;height:22px}
+.faixa-critica .tx{flex:1 1 320px;min-width:0}
+.faixa-critica .tx b{display:block;text-transform:uppercase;letter-spacing:.05em;font-size:var(--fs-xs)}
+.faixa-critica .acoes-al{display:flex;gap:6px;flex-wrap:wrap}
+.al.critico{border-color:var(--bad-solid);background:var(--bad-bg);color:var(--bad-fg);border-left-width:4px}
+.al.critico.conferido{border-color:var(--ok-br);background:var(--ok-bg);color:var(--ok-fg)}
+.btn.conferi-btn.critico{background:var(--bad-solid);border-color:var(--bad-solid);color:#fff}
+.btn.conferi-btn.critico:hover{filter:brightness(.92);background:var(--bad-solid)}
+.mini-critico{display:grid;gap:4px;padding:8px 10px;border:2px solid var(--bad-solid);border-radius:var(--r-sm);background:var(--bad-bg);color:var(--bad-fg);font-size:var(--fs-xs);line-height:1.35}
+.mini-critico .mini-btns{margin-top:2px}
+.lst-obs.critico{border-width:2px;border-color:var(--bad-solid)}
+/* última guia do paciente (copiar) */
+.mini-ult{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:2px 0;padding:2px 6px;border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font:600 var(--fs-xs)/1.3 var(--font-sans);cursor:pointer;text-align:left}
+.mini-ult:hover{border-color:var(--accent);background:var(--accent-bg)}
+.mini-ult.ok{border-style:solid;border-color:var(--ok-br);background:var(--ok-bg)}
+.mini-ult .num{font-size:var(--fs-sm)}
+.ult-cp{display:flex;align-items:center;gap:4px;margin-top:2px;font-weight:500;color:var(--text-2)}
+.ult-cp .btn.so{min-height:22px;padding:0 4px}

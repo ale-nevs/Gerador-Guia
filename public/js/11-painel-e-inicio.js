@@ -15,9 +15,9 @@ const guiaNumOk = g => /^[TS]\d{7,8}$/.test((g && g.numero) || '');
 const campoDeTexto = el => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit)$/i.test(el.type || '')));
 /* sininho do painel: quantos alertas pedem ação (bloqueios + "Conferi" pendentes); o clique abre a lista */
 function htmlMiniSino(g, st) {
-  const b = st.bloqueios.length, pend = atencaoPendente(g, st).length, tot = st.A.length, n = b + pend;
-  const cls = b ? 'bad' : pend ? 'warn' : tot ? 'ok' : '';
-  const tit = tot ? [b && pl(b, 'bloqueio', 'bloqueios'), pend && pend + ' a conferir', st.obs.length && st.obs.length + ' com observação', pl(tot, 'alerta no total', 'alertas no total')].filter(Boolean).join(' · ') + '. Clique para ver e conferir.' : 'Nenhum alerta nesta guia.';
+  const b = st.bloqueios.length, cr = st.criticos.length, pend = atencaoPendente(g, st).length, tot = st.A.length, n = b + pend;
+  const cls = b || cr ? 'bad' : pend ? 'warn' : tot ? 'ok' : '';
+  const tit = tot ? [b && pl(b, 'bloqueio', 'bloqueios'), cr && pl(cr, 'confirmação obrigatória', 'confirmações obrigatórias'), pend && pend + ' a conferir', st.obs.length && st.obs.length + ' com observação', pl(tot, 'alerta no total', 'alertas no total')].filter(Boolean).join(' · ') + '. Clique para ver e conferir.' : 'Nenhum alerta nesta guia.';
   return `<button type="button" class="mini-sino ${cls} ${Mini.verAlertas ? 'on' : ''}" data-mact="alertas" aria-expanded="${Mini.verAlertas ? 'true' : 'false'}" aria-label="Alertas e ocorrências: ${esc(tit)}" title="${esc(tit)}">${ic(b ? 'ban' : 'bell', 'sm')}${n ? `<span class="n">${n}</span>` : tot ? ic('check', 'sm') : ''}</button>`;
 }
 function htmlMiniAlertas(g, st) {
@@ -25,11 +25,11 @@ function htmlMiniAlertas(g, st) {
   const L = [...st.A].sort((a, b) => ordem(a) - ordem(b));
   if (!L.length) return `<div class="mini-alertas"><div class="mini-al ok">${ic('check', 'sm')}Nenhum alerta para esta guia.</div></div>`;
   return `<div class="mini-alertas" role="region" aria-label="Alertas e ocorrências">${L.map(a => {
-    const pede = pedeConferi(a), conf = pede && g.conf && g.conf[a.key];
-    const cls = a.modo === 'bloqueio' ? 'bad' : a.modo === 'obs' ? 'obs' : a.nivel === 'info' ? 'info' : conf ? 'ok' : 'warn';
-    const rot = a.modo === 'bloqueio' ? 'Bloqueio' : a.modo === 'obs' ? 'Com observação' : a.nivel === 'info' ? 'Informativo' : 'Atenção';
+    const pede = pedeConferi(a), conf = pede && g.conf && g.conf[a.key], crit = ehCritico(a);
+    const cls = a.modo === 'bloqueio' || (crit && !conf) ? 'bad' : a.modo === 'obs' ? 'obs' : a.nivel === 'info' ? 'info' : conf ? 'ok' : 'warn';
+    const rot = a.modo === 'bloqueio' ? 'Bloqueio' : crit ? 'Confirmação obrigatória' : a.modo === 'obs' ? 'Com observação' : a.nivel === 'info' ? 'Informativo' : 'Atenção';
     const noConferidor = a.vincular || a.acaoCarteira || a.cadastrarCodigo || a.aprendidoI != null;
-    return `<div class="mini-alerta ${cls}"><div class="ma-t"><b>${rot}:</b> ${esc(a.texto)}</div>${pede || noConferidor ? `<div class="mini-btns">${pede ? `<button type="button" class="btn sm conferi-btn ${conf ? 'on' : ''}" data-mact="conferi" data-conf="${esc(a.key)}" aria-pressed="${conf ? 'true' : 'false'}">${ic('check', 'sm')}${conf ? 'Conferido' : 'Conferi'}</button>` : ''}${noConferidor ? `<button type="button" class="btn sm ghost" data-mact="abrir">${ic('right', 'sm')}Resolver no conferidor</button>` : ''}</div>` : ''}</div>`;
+    return `<div class="mini-alerta ${cls}"><div class="ma-t"><b>${rot}:</b> ${esc(a.texto)}</div>${pede || noConferidor ? `<div class="mini-btns">${pede ? `<button type="button" class="btn sm conferi-btn ${conf ? 'on' : ''}" data-mact="conferi" data-conf="${esc(a.key)}" aria-pressed="${conf ? 'true' : 'false'}">${ic('check', 'sm')}${conf ? 'Conferido' : 'Conferi'}${a.conferiRot ? ': ' + esc(a.conferiRot) : ''}</button>` : ''}${noConferidor ? `<button type="button" class="btn sm ghost" data-mact="abrir">${ic('right', 'sm')}Resolver no conferidor</button>` : ''}</div>` : ''}</div>`;
   }).join('')}</div>`;
 }
 const htmlMiniMsg = () => miniMsg ? `<div class="mini-msg" role="status">${esc(miniMsg)}</div>` : '';
@@ -83,8 +83,11 @@ function htmlMini(g, { flutuante = false, semPrints = false } = {}) {
   const linha = x => `<button type="button" class="mini-row ${x.ok ? 'ok' : ''} ${x.v ? '' : 'vazio'} ${prox && x.k === prox.k ? 'prox' : ''}" data-mcopy="${esc(x.k)}" ${x.v ? '' : 'disabled'} title="${x.v ? 'Copiar' : 'Vazio'}"><span class="r">${esc(x.rot.replace(/^Qtd\. de \d+$/, 'Qtd.'))}</span><span class="v num">${esc(x.v || '—')}</span>${x.ok ? ic('check', 'sm') : ic('copy', 'sm')}</button>`;
   const prob = av ? [...av.checks, ...av.linhas].filter(x => x.sit === 'bad' || x.sit === 'warn') : [];
   const pc = comValor.length ? Math.round(100 * feitos / comValor.length) : 0;
-  const cab = `<div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(p.beneficiario || 'Beneficiário não informado')}</b><div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''} · etapa ${S.vista}</div></div><div class="mini-h-d">${flutuante ? htmlMiniSino(g, st) : ''}<span class="tag ${pc === 100 ? 'ok' : ''}" title="Campos copiados">${feitos}/${comValor.length}</span></div></div>
-    <div class="lst-barra"><i style="width:${pc}%"></i></div>${flutuante && Mini.verAlertas ? htmlMiniAlertas(g, st) : ''}`;
+  const ult = ultimaDaGuia(g), ultOk = ult && g.copiados.ultima === ult.guia;
+  const htmlUlt = ult ? `<button type="button" class="mini-ult ${ultOk ? 'ok' : ''}" data-mcopy="ultima" title="Copiar o nº da última guia deste paciente${ult.clinica ? ' (' + esc(ult.clinica) + ')' : ''}"><span>Última guia deste paciente:</span> <b class="num">${esc(ult.guia)}</b> <span class="muted">${fmtData(ult.concluidoEm)}</span>${ic(ultOk ? 'check' : 'copy', 'sm')}</button>` : '';
+  const htmlCrit = st.criticos.map(a => `<div class="mini-critico" role="alert"><div><b>Confirmação obrigatória:</b> ${esc(a.texto)}</div><div class="mini-btns">${a.guiaAnterior ? `<button type="button" class="btn sm line" data-mact="copValor" data-v="${esc(a.guiaAnterior)}" title="Copiar o nº da guia anterior">${ic('copy', 'sm')}${esc(a.guiaAnterior)}</button>` : ''}<button type="button" class="btn sm conferi-btn critico" data-mact="conferi" data-conf="${esc(a.key)}">${ic('check', 'sm')}Conferi${a.conferiRot ? ': ' + esc(a.conferiRot) : ''}</button></div></div>`).join('');
+  const cab = `<div class="mini-h"><div style="min-width:0"><b class="mini-nome">${esc(p.beneficiario || 'Beneficiário não informado')}</b>${htmlUlt}<div class="muted">${esc(cl ? cl.nome : S.email.remetente.email)}${S.guias.length > 1 ? ` · guia ${g.idx + 1} de ${S.guias.length}` : ''} · etapa ${S.vista}</div></div><div class="mini-h-d">${flutuante ? htmlMiniSino(g, st) : ''}<span class="tag ${pc === 100 ? 'ok' : ''}" title="Campos copiados">${feitos}/${comValor.length}</span></div></div>
+    <div class="lst-barra"><i style="width:${pc}%"></i></div>${etapa !== 'feita' ? htmlCrit : ''}${flutuante && Mini.verAlertas ? htmlMiniAlertas(g, st) : ''}`;
   if (etapa === 'final') return `<div class="mini">${abas}${cab}${htmlMiniFinal(g, st)}</div>`;
   if (etapa === 'feita') return `<div class="mini">${abas}${cab}${htmlMiniFeita(g)}</div>`;
   return `<div class="mini">${abas}${cab}
@@ -125,7 +128,7 @@ function htmlMiniLista() {
     <div class="lst-barra"><i style="width:${pc}%"></i></div>
     ${q > 1 ? `<div class="mini-al warn">${ic('alert', 'sm')}<b>Quantidade ${q}</b> neste serviço.</div>` : ''}
     ${it.obs ? `<div class="mini-al">${ic('message', 'sm')}<span><b>Obs.:</b> ${esc(it.obs)}</span></div>` : ''}
-    ${ja ? `<div class="mini-al warn">${ic('alert', 'sm')}<span>Já autorizada: <b>${esc(ja.guia)}</b> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</span></div>` : ''}
+    ${ja ? `<div class="mini-critico" role="alert"><div><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + esc(ja.operador) : ''}. Ao registrar, o painel pede confirmação.</div></div>` : ''}
     ${prox ? `<button type="button" class="mini-prox" data-mact="lstCopiar" data-k="${prox[0]}" title="Copia o próximo campo (atalho: barra de espaço)"><small>Copiar próximo</small><b>${esc(prox[1])}</b><span class="num">${esc(prox[2])}</span></button>` : `<div class="mini-al ok">${ic('check', 'sm')}Campos copiados. Registre o nº da guia.</div>`}
     <div class="mini-lista">${campos.map(([k, r, v]) => `<button type="button" class="mini-row ${cps[k] ? 'ok' : ''} ${v ? '' : 'vazio'} ${prox && prox[0] === k ? 'prox' : ''} ${k === 'qtd' && q > 1 ? 'qtd-alta' : ''}" data-mact="lstCopiar" data-k="${k}" ${v ? '' : 'disabled'}><span class="r">${esc(r)}</span><span class="v num">${esc(v || '—')}</span>${cps[k] ? ic('check', 'sm') : ic('copy', 'sm')}</button>`).join('')}
       <div class="mini-div muted">${esc(it.servico || '')}</div></div>
@@ -216,6 +219,7 @@ const Mini = {
       const inp = d.getElementById('miniLstGuia'), v = String((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g, '');
       if (inp) inp.blur(); this.pendente = false;
       if (!/^[TS]\d{7,8}$/.test(v)) { miniMsg = 'Nº da guia: T ou S + 7 ou 8 dígitos.'; this.atualizar(); return; }
+      const ja = Lista.jaAutorizada(it); if (ja && !this.win.confirm(Lista.textoJa(it, ja))) { miniMsg = 'Registro cancelado: confira o pedido repetido.'; this.atualizar(); return; }
       await Lista.registrar(L, it, { st: 'gerada', guia: v }); Lista.foco = null; miniMsg = `Guia ${v} registrada (${it.benef.split(' ')[0]}).`;
       render(); this.atualizar(); const n = d.getElementById('miniLstGuia'); if (n) n.focus(); return;
     }
@@ -234,10 +238,12 @@ const Mini = {
     switch (a) {
       case 'alertas': this.verAlertas = !this.verAlertas; this.atualizar(); return true;
       case 'conferi': acoes.conferiAlerta(b); return true;
+      case 'copValor': { const v = b.dataset.v || ''; this.avisar(v && await copiar(v, w) ? 'Copiado: ' + v : 'Não consegui copiar: clique de novo.'); return true; }
       case 'proximo': {
         const st = situacaoGuia(g);
         if (!guiaNumOk(g)) { this.avisar('Informe o nº da guia (T ou S + 7 ou 8 dígitos).'); return true; }
-        if (!st.pode) { this.verAlertas = true; this.avisar('Há bloqueio nesta guia: veja os alertas no sino ou resolva no conferidor.'); return true; }
+        if (st.bloqueios.length) { this.verAlertas = true; this.avisar('Há bloqueio nesta guia: veja os alertas no sino ou resolva no conferidor.'); return true; }
+        if (!st.pode) { this.avisar('Possível pedido repetido: confira o aviso em vermelho e marque "Conferi: não é repetido".'); return true; }
         if (!podeFinal(g, st)) { this.avisar('Falta a conferência da grade: leia os prints do sistema (ou confira no conferidor).'); return true; }
         if (g.status !== 'concluido') gravarGuia(g, g.status);
         miniMsg = ''; mudarVista(4); return true;

@@ -146,12 +146,17 @@ function avaliar(g) {
   const add = (tipo, texto, extra = {}) => {
     const modo = modoDe(tipo); if (modo === 'desativado') return;
     const c = cfg.alertas[tipo] || {};
-    A.push({ tipo, key: tipo + (extra.sub ? ':' + extra.sub : ''), modo, nivel: ALERTAS[tipo].nivel || 'alerta', texto, dest: c.dest === 'prestador' ? 'prestador' : 'guia', obsTexto: (c.texto || '').trim() || texto, ...extra });
+    let nivel = ALERTAS[tipo].nivel || 'alerta';
+    // aprendizado do "Conferi": o mesmo aviso, já conferido antes nesta clínica, vira informativo (não pede Conferi de novo)
+    const key = tipo + (extra.sub ? ':' + extra.sub : ''), aquiConferido = !!(g.conf && g.conf[key]);   // conferido nesta guia: continua com o Conferi (dá para desmarcar)
+    const ja = modo === 'atencao' && extra.apr != null && cl && APR_CONF_MIN[tipo] && !aquiConferido ? Apr.conferidoAntes(cl.id, tipo, extra.apr) : null;
+    if (ja && ja.n >= APR_CONF_MIN[tipo]) { nivel = 'info'; texto += ` Já conferido ${pl(ja.n, 'vez', 'vezes')} antes nesta clínica (aprendizado).`; }
+    A.push({ tipo, key, modo, nivel, texto, dest: c.dest === 'prestador' ? 'prestador' : 'guia', obsTexto: (c.texto || '').trim() || texto, ...extra, aprendidoConf: ja && ja.n >= APR_CONF_MIN[tipo] ? ja.n : 0 });
   };
   /* vários beneficiários */
   if (mu.excesso) add('excesso-benef', `Este e-mail traz mais de ${MAX_BENEFICIARIOS} beneficiários diferentes e esta solicitação passou do limite.`, { clinica: `O e-mail contém mais de ${MAX_BENEFICIARIOS} beneficiários diferentes. Por gentileza, envie os demais em outro e-mail.` });
   if (mu.mesmo > 1) add('mesmo-benef', `O mesmo beneficiário aparece em ${mu.mesmo} solicitações deste e-mail (esta é a ${mu.ocorrencia}ª). Cada uma gera uma guia independente, com os dados completos do beneficiário.`);
-  if (S.preambulo && g.idx === 0) add('preambulo', 'Há campos antes do primeiro beneficiário (por exemplo, médico ou CID). Eles não foram aplicados a nenhuma guia: confira se cada beneficiário tem os próprios dados.');
+  if (S.preambulo && g.idx === 0) add('preambulo', 'Há campos antes do primeiro beneficiário (por exemplo, médico ou CID). Eles não foram aplicados a nenhuma guia: confira se cada beneficiário tem os próprios dados.', { apr: '*' });
   if (mu.mesmo > 1) {
     const outras = S.guias.filter(o => o !== g && o.chave === g.chave && o.status !== 'descartado');
     outras.forEach(o => {
@@ -177,13 +182,13 @@ function avaliar(g) {
     if (it.qtd == null) add('qtd-ausente', `Quantidade não encontrada para ${it.codigo}.`, { sub: it.codigo, clinica: `Quantidade não informada para o serviço ${it.codigo}.` });
     else if (it.qtd < 1 || it.qtd > P.qtdMax) add('qtd-invalida', `Quantidade ${it.qtd} inválida para ${it.codigo} (aceita de 1 a ${P.qtdMax}).`, { sub: it.codigo, clinica: `Quantidade inválida (${it.qtd}) para o serviço ${it.codigo}.` });
   });
-  if (p.qtdUnicaAplicada) add('qtd-unica', 'Havia uma única "Quantidade" para vários serviços e ela foi aplicada a todos. Confirme no e-mail.');
-  p.itens.filter(i => i.origemQtd === 'fim-da-linha').forEach(i => add('qtd-inferida', `A quantidade ${i.qtd} de ${i.codigo} foi lida como o número solto no fim da linha. Confirme no e-mail.`, { sub: i.codigo }));
-  if (p.herdados && p.herdados.length) add('dados-comuns', `Dados escritos uma única vez no e-mail foram aplicados a esta guia: ${p.herdados.join(', ')}. Confira se valem para este beneficiário.`);
-  if (p.semRotulo) add('sem-rotulo', 'O pedido não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.');
-  (p.regras || []).forEach((t, k) => add('regra-clinica', t, { sub: String(k) }));
-  (p.aprendidos || []).forEach((e, k) => add('aprendido', `${{ codigo: 'Código', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data' }[e.campo] || e.campo} "${e.lido}" já foi corrigido para "${e.correto}" ${pl(e.n, 'vez', 'vezes')} em atendimentos desta clínica.`, { sub: e.campo + ':' + e.lido, aprendidoI: k }));
-  p.soltos.forEach(n => add('solto', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`, { sub: n }));
+  if (p.qtdUnicaAplicada) add('qtd-unica', 'Havia uma única "Quantidade" para vários serviços e ela foi aplicada a todos. Confirme no e-mail.', { apr: '*' });
+  p.itens.filter(i => i.origemQtd === 'fim-da-linha').forEach(i => add('qtd-inferida', `A quantidade ${i.qtd} de ${i.codigo} foi lida como o número solto no fim da linha. Confirme no e-mail.`, { sub: i.codigo, apr: '*' }));
+  if (p.herdados && p.herdados.length) add('dados-comuns', `Dados escritos uma única vez no e-mail foram aplicados a esta guia: ${p.herdados.join(', ')}. Confira se valem para este beneficiário.`, { apr: '*' });
+  if (p.semRotulo) add('sem-rotulo', 'O pedido não tem o rótulo "Serviço"; os códigos foram lidos de linhas soltas. Confira a lista de itens.', { apr: '*' });
+  (p.regras || []).forEach((t, k) => add('regra-clinica', t, { sub: String(k), apr: t }));
+  (p.aprendidos || []).forEach((e, k) => add('aprendido', `${{ executante: 'Credenciado executante', codigo: 'Código', medico: 'Médico', crm: 'CRM', cid: 'CID', local: 'Local', emissao: 'Data' }[e.campo] || e.campo} "${e.lido}" já foi corrigido para "${e.correto}" ${pl(e.n, 'vez', 'vezes')} em atendimentos desta clínica.`, { sub: e.campo + ':' + e.lido, aprendidoI: k }));
+  p.soltos.forEach(n => add('solto', `O número ${n} (8 dígitos) está no texto mas não virou item. Confirme que não é um serviço esquecido.`, { sub: n, apr: n }));
   if (g.itensEditados) add('editado', 'Dados ou itens foram corrigidos à mão. Confira de novo com o e-mail original.');
   /* pedido médico */
   if (!p.medico.nome && !p.medico.crm) add('falta-med', 'Médico solicitante não informado.', { clinica: 'Nome do médico solicitante não informado.' });
@@ -204,18 +209,18 @@ function avaliar(g) {
     const daSemana = Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== g.id && r.messageId !== e.messageId && normCart(r.carteira || '') === cartSem && new Date(r.concluidoEm || r.atualizadoEm || 0) >= ini && ['autorizada', 'parcial'].includes(resultadoDe(r)));
     p.itens.forEach(it => {
       const r = daSemana.find(x => (x.itens || []).some(i => i.c === it.codigo && i.aut !== false));
-      if (r) add('dup-semana', `O código ${it.codigo} já foi autorizado para esta carteira nesta semana: guia ${r.guia || 'sem número'} em ${fmtDH(r.concluidoEm)}${r.operador ? ' por ' + r.operador : ''}${r.clinica ? ' (' + r.clinica + ')' : ''}. Confira se não é pedido repetido.`, { sub: it.codigo });
+      if (r) add('dup-semana', `Possível pedido repetido: o código ${it.codigo} já foi autorizado para esta carteira nesta semana, na guia ${r.guia || 'sem número'}, em ${fmtDH(r.concluidoEm)}${r.operador ? ' por ' + r.operador : ''}${r.clinica ? ' (' + r.clinica + ')' : ''}. Confira antes de gerar outra guia.`, { sub: it.codigo, guiaAnterior: r.guia || '', conferiRot: 'não é repetido' });
     });
   }
   /* e-mail */
   if (!cl) add('remetente', `Remetente ${e.remetente.email || '(sem endereço)'} não está no cadastro de clínicas.`, { vincular: true });
   else {
-    if (S.clinicaComo === 'manual') add('rem-manual', `Clínica escolhida manualmente (${cl.nome}); o remetente ${e.remetente.email} não está no cadastro dela.`);
+    if (S.clinicaComo === 'manual') add('rem-manual', `Clínica escolhida manualmente (${cl.nome}); o remetente ${e.remetente.email} não está no cadastro dela.`, { apr: norm(e.remetente.email || '') });
     const ta = tokens(e.assunto);
-    if (ta.length && !tokens(cl.nome + ' ' + (cl.apelidos || '')).some(t => ta.includes(t))) add('assunto', `O assunto ("${e.assunto}") não cita ${cl.nome}, a clínica do remetente.`);
+    if (ta.length && !tokens(cl.nome + ' ' + (cl.apelidos || '')).some(t => ta.includes(t))) add('assunto', `O assunto ("${e.assunto}") não cita ${cl.nome}, a clínica do remetente.`, { apr: '*' });
   }
   if (/^\s*(re|res|enc|fw|fwd|tr)\s*:/i.test(e.assunto)) add('resposta', 'Assunto de resposta ou encaminhamento. Verifique se é correção, cobrança ou pedido novo antes de gerar guia.');
-  if (e.responderPara && e.responderPara.email && e.responderPara.email !== e.remetente.email) add('replyto', `A resposta irá para ${e.responderPara.email}, diferente do remetente ${e.remetente.email}.`);
+  if (e.responderPara && e.responderPara.email && e.responderPara.email !== e.remetente.email) add('replyto', `A resposta irá para ${e.responderPara.email}, diferente do remetente ${e.remetente.email}.`, { apr: norm(e.responderPara.email) });
   if (e.cortado) add('cortado', 'Mensagens anteriores da conversa foram ignoradas na leitura (em cinza no e-mail).');
   if (e.origem === 'colado') add('colado', 'Texto colado: remetente informado à mão, sem verificação pelo cabeçalho do e-mail.');
   /* duplicidade */
@@ -231,8 +236,8 @@ function avaliar(g) {
     if (!n && p.itens.length) add('clinica-sem-codigos', `${cl.nome} ainda não tem códigos cadastrados; as descrições exibidas vêm do e-mail.`);
     p.itens.forEach(it => {
       const cad = descCadastro(cl, it.codigo);
-      if (cad === undefined) add('cod-sem-cadastro', `Código ${it.codigo} sem cadastro para ${cl.nome}. A descrição do e-mail ("${it.desc || 'sem descrição'}") é usada como referência provisória.`, { sub: it.codigo, cadastrarCodigo: it.codigo });
-      else if (divergeDesc(cad, it.desc)) add('cod-divergente', `Código ${it.codigo}: o e-mail descreve "${it.desc}", mas o cadastro de ${cl.nome} diz "${cad}". O código solicitado foi mantido.`, { sub: it.codigo });
+      if (cad === undefined) add('cod-sem-cadastro', `Código ${it.codigo} sem cadastro para ${cl.nome}. A descrição do e-mail ("${it.desc || 'sem descrição'}") é usada como referência provisória.`, { sub: it.codigo, cadastrarCodigo: it.codigo, apr: assinDesc(it) });
+      else if (divergeDesc(cad, it.desc)) add('cod-divergente', `Código ${it.codigo}: o e-mail descreve "${it.desc}", mas o cadastro de ${cl.nome} diz "${cad}". O código solicitado foi mantido.`, { sub: it.codigo, apr: assinDesc(it) });
     });
   }
   /* parametrização */
@@ -254,8 +259,15 @@ function avaliar(g) {
 function situacaoGuia(g) {
   const A = avaliar(g);
   const bloqueios = A.filter(a => a.modo === 'bloqueio');
-  return { A, bloqueios, obs: A.filter(a => a.modo === 'obs'), atencao: A.filter(a => a.modo === 'atencao'), pode: !bloqueios.length };
+  const criticos = A.filter(a => ehCritico(a) && !(g.conf && g.conf[a.key]));   // confirmação obrigatória: segura a guia até o Conferi
+  return { A, bloqueios, criticos, obs: A.filter(a => a.modo === 'obs'), atencao: A.filter(a => a.modo === 'atencao'), pode: !bloqueios.length && !criticos.length };
 }
+const ehCritico = a => a.modo === 'atencao' && a.nivel === 'critico';
+/* aprendizado do Conferi: quantas vezes o mesmo aviso precisa ser conferido na clínica para virar informativo.
+   Só avisos que se repetem do mesmo jeito; os de cada caso (pedido repetido, carteira, parametrização…) não aprendem. */
+const APR_CONF_MIN = { 'cod-divergente': 1, 'cod-sem-cadastro': 1, solto: 1, replyto: 1, 'rem-manual': 2, 'regra-clinica': 2, assunto: 3, 'qtd-inferida': 3, 'qtd-unica': 3, 'sem-rotulo': 3, 'dados-comuns': 3, preambulo: 3 };
+/* código + descrição do e-mail ("50000470|psicologia"): o que o operador conferiu */
+const assinDesc = it => it.codigo + '|' + norm(it.desc || '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 /* avisos de atenção que pedem o "Conferi" (os meramente informativos não) */
 const pedeConferi = a => a.modo === 'atencao' && a.nivel !== 'info';
 const atencaoPendente = (g, st) => st.A.filter(a => pedeConferi(a) && !(g.conf && g.conf[a.key]));

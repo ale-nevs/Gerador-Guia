@@ -155,6 +155,24 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Aprendizado pelo Conferi, possível pedido repetido e última guia do paciente (versão 2.2.10)
+**Conferi vira aprendizado.** Cada "Conferi" num aviso que se repete do mesmo jeito fica registrado por clínica (pasta › `aprendizado/correcoes.json`). Quando o mesmo aviso aparece de novo num atendimento da mesma clínica, ele vem como **informativo** ("Já conferido N vezes antes nesta clínica"), sem pedir Conferi.
+- **Descrição do e-mail × cadastro** (ex.: 50000470 com "PSICOLOGIA" no e-mail e "SESSAO DE PSICOTERAPIA INDIVIDUAL POR PSICOLOGO" no cadastro da MRA): vale para o mesmo código com a mesma descrição. Basta 1 Conferi. Outra descrição continua pedindo Conferi.
+- **Código sem cadastro** (mesmo código e descrição), **número de 8 dígitos solto** (o mesmo número) e **responder-para diferente** (o mesmo endereço): 1 Conferi.
+- **Clínica escolhida manualmente** (mesmo remetente) e **ajuste pela regra da clínica**: 2 Conferi.
+- **Assunto que não cita a clínica**, **quantidade lida do fim da linha**, **quantidade única**, **códigos sem o rótulo Serviço**, **dados comuns** e **dados antes do primeiro beneficiário**: 3 Conferi na clínica.
+- Desmarcar o Conferi desfaz a contagem. Em Configurações › Aprendizado, a tabela **Avisos conferidos** mostra o que foi aprendido, quantas vezes e o efeito, com **Esquecer**.
+- **Não aprendem** (são de cada caso): possível pedido repetido, carteira diferente, parametrização, médico, e-mail já registrado, guia repetida.
+- **Edições na leitura:** além de médico, CRM, CID, local, data, código e quantidade, agora também o **credenciado executante** e **vários códigos corrigidos de uma vez** (pares na ordem, só os parecidos: dígito trocado, a mais ou a menos).
+
+**Possível pedido repetido (mesmo código e carteira já autorizados na semana): confirmação obrigatória.**
+- Faixa **vermelha no topo** das etapas 2, 3 e 4, e no painel flutuante, com a guia anterior (copiável) e o botão **Conferi: não é repetido**.
+- A guia **não segue** (Seguir para a guia, Próximo no painel, Concluir) até o Conferi. Na barra de baixo aparece "Possível pedido repetido".
+- Nunca vira aprendizado.
+- **Lista do dia (Erasmo):** o aviso de serviço já autorizado ficou vermelho, e registrar a guia (na tela, no painel ou ao reabrir) pede confirmação.
+
+**Última guia deste paciente:** no painel flutuante, embaixo do nome do beneficiário, "Última guia deste paciente: T… (data)". O clique copia o número. Também aparece na etapa 3 (Carteira / beneficiário) e no cartão "Última guia gerada" da etapa 2, com botão de copiar. É a guia mais recente da mesma carteira, de outro atendimento.
+
 ### Painel flutuante completo e Responder a todos no webmail (versão 2.2.9, extensão 1.3.0)
 **Painel flutuante:** dá para fazer a guia inteira por ele, sem voltar ao conferidor.
 - **Sininho** no topo do painel, ao lado do contador: mostra quantos alertas pedem ação (vermelho com bloqueio, amarelo com "Conferi" pendente, verde quando tudo foi conferido). O clique abre a lista de **alertas e ocorrências**, cada um com o botão **Conferi**. Os que precisam de uma ação de tela (vincular clínica, cadastrar código…) têm **Resolver no conferidor**.

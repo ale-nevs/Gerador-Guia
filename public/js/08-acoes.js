@@ -105,6 +105,13 @@ const alterarCampoGuia = (g, campo, v) => {
   }
 };
 /* Reavalia o botão Concluir enquanto se digita (sem redesenhar a tela e perder o foco) */
+/* Conferi num aviso: linha do tempo e aprendizado da clínica (o mesmo aviso, conferido de novo, vira informativo) */
+function marcarConferido(g, k, on) {
+  const al = situacaoGuia(g).A.find(a => a.key === k);
+  g.conf = g.conf || {}; g.conf[k] = on;
+  evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
+  if (al) Apr.marcarConferido(al, on).catch(() => { });
+}
 function atualizarConcluir(g) {
   const pend = pendenciasConclusao(g, situacaoGuia(g)), bt = $('[data-act=concluirGuia]'); if (bt) bt.disabled = pend.length > 0;
   const ul = $('#etapa ul.dica'); if (ul) { ul.innerHTML = pend.map(x => `<li>${esc(x)}</li>`).join(''); ul.classList.toggle('oculto', !pend.length); }
@@ -181,7 +188,7 @@ const acoes = {
   irVista(b) {
     const v = +b.dataset.v, g = guiaAtiva(), st = situacaoGuia(g);
     if (g.semGuia && g.status !== 'concluido' && v >= 2 && v !== 4) { acoes.desfazerSemGuia(); return; }
-    if (v === 3 && !st.pode) { toast('Há bloqueios na etapa 2: corrija os dados apontados nos alertas ou responda à clínica sem gerar a guia.', 'bad'); return; }
+    if (v === 3 && !st.pode) { toast(st.bloqueios.length ? 'Há bloqueios na etapa 2: corrija os dados apontados nos alertas ou responda à clínica sem gerar a guia.' : 'Possível pedido repetido: confira o aviso em vermelho e marque "Conferi: não é repetido" antes de seguir.', 'bad'); return; }
     if (v === 4 && g.status !== 'concluido' && !podeFinal(g, st)) { toast('Falta conferir a grade: cole os prints do sistema (ou faça a conferência sem prints) na etapa 3.', 'bad'); return; }
     if (v >= 3 && g.status !== 'concluido') gravarGuia(g, g.status);
     mudarVista(v);
@@ -226,6 +233,7 @@ const acoes = {
         const velhos = [...p.itens.map(i => i.codigo), ...p.invalidos], novos = it.map(x => x.codigo);
         const sairam = velhos.filter(c => !novos.includes(c)), entraram = novos.filter(c => !velhos.includes(c));
         if (sairam.length === 1 && entraram.length === 1) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'codigo', lido: sairam[0], correto: entraram[0] });
+        else if (sairam.length > 1 && sairam.length === entraram.length) sairam.forEach((c, i) => { if (distanciaTexto(c, entraram[i]) <= 2) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'codigo', lido: c, correto: entraram[i] }); });   // vários de uma vez: pares na ordem, só os parecidos (dígito trocado, a mais ou a menos)
         it.forEach(x => { const o = p.itens.find(i => i.codigo === x.codigo); if (o && String(o.qtd ?? '?') !== String(x.qtd || '?') && /^\d+$/.test(x.qtd)) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo: 'quantidade', lido: o.qtd ?? '?', correto: x.qtd, ref: x.codigo }); });
       }
     }
@@ -465,11 +473,8 @@ const acoes = {
     await Reg.excluir(r.id); render(); toast('Registro excluído.');
   },
   async regSync() { const n = await Reg.sincronizar(); await Reg.carregar(); render(); toast(Reg.nPendentes() ? 'Ainda não consegui gravar na pasta. Confira a conexão e tente de novo.' : n ? `${n} ${n === 1 ? 'atendimento enviado' : 'atendimentos enviados'} para a pasta.` : 'Nada pendente.', Reg.nPendentes() ? 'bad' : ''); },
-  conferiAlerta(b) {
-    const g = guiaAtiva(); if (!g) return; const k = b.dataset.conf, on = !(g.conf && g.conf[k]);
-    g.conf = g.conf || {}; g.conf[k] = on; const al = situacaoGuia(g).A.find(a => a.key === k);
-    evento(g, 'conferido', `${on ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : k}`); persistir(); render();
-  },
+  conferiAlerta(b) { const g = guiaAtiva(); if (g) marcarConferido(g, b.dataset.conf, !(g.conf && g.conf[b.dataset.conf])); },
+  copiarValor: async b => { const v = b.dataset.v || ''; if (v && await copiar(v)) toast('Copiado: ' + v); else toast('Não foi possível copiar.', 'bad'); },
   async pinLiberar() { const v = ($('#pinIn') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); render(); toast('Liberado por 15 minutos.'); } else { toast('PIN incorreto.', 'bad'); const i = $('#pinIn'); if (i) i.select(); } },
   async pinModalOk() { const v = ($('#pinModal') || {}).value || ''; if (await Pin.confere(v)) { Pin.liberar(); fecharModal(true); const d = Pin.depois; Pin.depois = null; render(); toast('Liberado por 15 minutos.'); if (d) d(); } else { toast('PIN incorreto.', 'bad'); $('#pinModal').select(); } },
   pinPedir() { pedirPin(null); },
@@ -786,7 +791,7 @@ document.addEventListener('change', async e => {
   }
   if (!S) return;
   const g = guiaAtiva();
-  if (t.dataset.conf) { g.conf = g.conf || {}; g.conf[t.dataset.conf] = t.checked; const al = situacaoGuia(g).A.find(a => a.key === t.dataset.conf); evento(g, 'conferido', `${t.checked ? 'Conferido' : 'Desmarcado'}: ${al ? al.texto : t.dataset.conf}`); persistir(); render(); return; }
+  if (t.dataset.conf) { marcarConferido(g, t.dataset.conf, t.checked); return; }
   if (t.dataset.campo) {
     const k = t.dataset.campo, v = t.value.trim(), p = g.pedido;
     const antes = k === 'medico' ? [p.medico.nome, p.medico.crm && 'CRM ' + p.medico.crm].filter(Boolean).join(' ') : k === 'emissao' ? (p.emissao.estado === 'valida' ? fmtData(p.emissao.data) : p.emissao.bruto || '') : k === 'beneficiario' ? p.beneficiario : (p[k] || '');
@@ -804,7 +809,7 @@ document.addEventListener('change', async e => {
     const k = t.dataset.cpcampo, de = t.dataset.orig ?? '', para = t.value.trim();
     if (de !== para) {
       evento(g, 'edicao-campo', `${ROT_COPIA[k] || k}: "${de || '—'}" → "${para || '—'}"`);
-      const cl = clinicaDe(S), campo = { medico_nome: 'medico', medico_crm: 'crm', cid: 'cid', local: 'local', data: 'emissao' }[k];
+      const cl = clinicaDe(S), campo = { medico_nome: 'medico', medico_crm: 'crm', cid: 'cid', local: 'local', data: 'emissao', executante: 'executante' }[k];
       if (cl && campo && de) Apr.registrar({ tipo: 'email', clinicaId: cl.id, clinica: cl.nome, campo, lido: de, correto: para });
       t.dataset.orig = para;
     }
