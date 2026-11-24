@@ -56,6 +56,22 @@ function parseParte(raw) {
   }
   return parte;
 }
+/* planilhas anexadas a um .eml (a planilha do dia mandada como arquivo): nome e bytes */
+const RE_PLANILHA_ARQ = /\.(xlsx|csv|tsv)$/i, RE_PLANILHA_ANEXO = /\.(xlsx|xls|xlsm|ods|csv|tsv)$/i;
+function planilhasDoEml(buf) {
+  const out = [];
+  (function andar(p) {
+    if (p.partes.length) { p.partes.forEach(andar); return; }
+    const disp = (p.h['content-disposition'] || [''])[0];
+    const m = disp.match(/filename\*?=\s*"?([^";]+)"?/i) || ((p.h['content-type'] || [''])[0]).match(/name\*?=\s*"?([^";]+)"?/i);
+    const nome = m ? decodificarPalavras(m[1]) : '';
+    if (!RE_PLANILHA_ANEXO.test(nome)) return;
+    const enc = ((p.h['content-transfer-encoding'] || [''])[0]).toLowerCase().trim();
+    let bin = p.corpo; if (enc === 'base64') { try { bin = atob(bin.replace(/[^A-Za-z0-9+/=]/g, '')); } catch (e) { return; } }
+    out.push({ nome, bytes: bin2bytes(bin) });
+  })(parseParte(bytes2bin(new Uint8Array(buf))));
+  return out;
+}
 function corpoTexto(p) {
   const enc = ((p.h['content-transfer-encoding'] || [''])[0]).toLowerCase().trim();
   let bin = p.corpo;

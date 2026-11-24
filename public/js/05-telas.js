@@ -332,16 +332,17 @@ function renderEntrada(app) {
   ${semOp ? `<div class="aviso">${ic('user')}<div>Escolha seu nome em <b>Operador</b>, no topo, antes de começar.</div></div>` : ''}
   ${!Pasta.ok ? `<div class="aviso">${ic('folderx')}<div>${Pasta.handle ? 'A pasta compartilhada precisa ser reautorizada (um clique por dia).' : 'A pasta compartilhada não está conectada: os registros ficam só neste computador e não há visão conjunta entre operadores.'}</div><span class="acoes"><button class="btn sm" data-act="pasta">${ic('folder', 'sm')}${Pasta.handle ? 'Reautorizar pasta' : 'Conectar pasta'}</button></span></div>` : ''}
   ${ultimoConcluido ? `<div class="ultimo">${ic('check')}<div>Último registrado: <b>${esc(ultimoConcluido.texto)}</b> às ${fmtHora(ultimoConcluido.em)}.</div></div>` : ''}
+  ${Planilha.pendente ? `<div class="aviso" id="avisoPlanilha">${ic('rows')}<div><b>Planilha do dia aguardando:</b> ${esc(Planilha.pendente.nome)}, do e-mail de ${esc(Planilha.pendente.email.remetente.nome || Planilha.pendente.email.remetente.email || 'remetente')}. Baixe o anexo no webmail e solte o arquivo aqui (ou escolha o arquivo): a lista do dia abre ligada a esse e-mail.</div><button class="btn sm pri" data-act="escolherEml">${ic('upload', 'sm')}Escolher a planilha</button><button class="btn sm ghost" data-act="descartarPlanilha">Descartar</button></div>` : ''}
   ${extInstalada() ? `<div class="vazio aguardando" id="zona">
     <div class="ico">${ic('mail', 'xl')}</div>
     <h2>Aguardando e-mail do webmail…</h2>
     <p>Abra o e-mail no webmail e clique em <b>Abrir no conferidor</b>, o botão no canto da tela. Ele chega aqui sozinho.</p>
-    <button class="btn line sm" data-act="escolherEml">${ic('upload', 'sm')}Ou envie o arquivo .eml</button>
+    <button class="btn line sm" data-act="escolherEml">${ic('upload', 'sm')}Ou envie o arquivo .eml ou a planilha do dia (.xlsx)</button>
   </div>` : `<div class="vazio" id="zona">
     <div class="ico">${ic('upload', 'xl')}</div>
     <h2>Nenhum pedido carregado</h2>
     ${htmlComoFazer('upload', 'Arraste aqui o .eml do e-mail que você vai atender ou escolha o arquivo.', `<p>No SmarterMail: abra o e-mail › menu ⋮ › baixar/salvar como .eml. Um e-mail pode ter de 1 a ${MAX_BENEFICIARIOS} beneficiários; cada um gera uma guia. Com a extensão do Chrome (ícone de download no topo), o e-mail vem com um clique, sem baixar arquivo.</p>`)}
-    <button class="btn pri" data-act="escolherEml">${ic('upload')}Fazer upload do e-mail (.eml)</button>
+    <button class="btn pri" data-act="escolherEml">${ic('upload')}Fazer upload do e-mail (.eml) ou da planilha do dia (.xlsx)</button>
   </div>`}
   <div class="card">
     <details>

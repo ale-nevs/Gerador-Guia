@@ -155,6 +155,15 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Planilha do dia em arquivo: upload do .xlsx (versão 2.2.13)
+A planilha do dia também é aceita **como arquivo** (.xlsx ou .csv), sem precisar estar colada no e-mail. Ela abre a mesma lista do dia.
+- **Upload ou arrastar:** na tela inicial, "Fazer upload do e-mail (.eml) ou da planilha do dia (.xlsx)", ou arraste o arquivo para o Conferidor (de qualquer tela; não mexe no atendimento aberto).
+- **E-mail com a planilha anexada, aberto pelo webmail:** o botão do webmail não traz o arquivo. O Conferidor avisa "Planilha do dia aguardando"; baixe o anexo no webmail e solte o arquivo. A lista abre ligada àquele e-mail (clínica pelo remetente, assunto e Responder no webmail). O nome baixado com "(1)" também vale.
+- **.eml com a planilha anexada:** abre a lista direto, com a clínica pelo remetente.
+- **Arquivo solto, sem o e-mail:** a janela da lista pede a clínica.
+- Lê a aba com cabeçalho Beneficiário, Carteira e Serviço; as abas Exemplo e Como preencher do modelo ficam de fora. Datas e números digitados no Excel são convertidos (20/11/2026, 4). CSV do Excel em português (ponto e vírgula) também vale. Arquivo .xls antigo ou .ods: salvar como .xlsx.
+- A aba das listas passa a se chamar "Listas do dia" quando há listas de mais de uma clínica no dia.
+
 ### Planilha do dia colada no e-mail (versão 2.2.12)
 A clínica com muitos pacientes no dia pode mandar uma planilha só, colada no corpo do e-mail: uma linha por paciente e serviço, com as colunas Beneficiário, Carteira, Serviço, Quantidade, Médico, CRM, CID, Emissão, Local de emissão e Observações. O Conferidor abre como **lista do dia**, igual à da Erasmo Neto: divisão entre operadores, Continuar, Acompanhar e e-mail de entrega.
 - **Reconhecida sozinha, de qualquer clínica:** tabela com as colunas Beneficiário, Carteira e Serviço e pelo menos 2 linhas. Não precisa marcar a clínica como "Manda a agenda do dia em lista". Uma tabela com uma linha só segue como atendimento normal.

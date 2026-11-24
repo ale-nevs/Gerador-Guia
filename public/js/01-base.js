@@ -1,5 +1,5 @@
 'use strict';
-const VERSAO = '2.2.12';
+const VERSAO = '2.2.13';
 const HIST_DIAS = 30;        // janela técnica de leitura dos registros (não configurável)
 const MAX_BENEFICIARIOS = 5; // beneficiários diferentes por e-mail
 

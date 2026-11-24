@@ -4,10 +4,26 @@
    ==================================================================== */
 async function abrirArquivo(f) {
   if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
-  if (!/\.eml$/i.test(f.name) && f.type !== 'message/rfc822') { toast('Esse arquivo não é um .eml. Envie o e-mail baixado do SmarterMail.', 'bad'); return; }
-  try { aba = 'atend'; await iniciar(lerEml(await f.arrayBuffer())); }
+  if (RE_PLANILHA_ANEXO.test(f.name)) { await abrirPlanilha(f.name, await f.arrayBuffer(), Planilha.base(f.name)); return; }   // planilha do dia (.xlsx/.csv)
+  if (!/\.eml$/i.test(f.name) && f.type !== 'message/rfc822') { toast('Esse arquivo não é um .eml nem uma planilha (.xlsx). Envie o e-mail baixado do SmarterMail ou a planilha do dia.', 'bad'); return; }
+  try {
+    const buf = await f.arrayBuffer(), email = lerEml(buf);
+    const anexo = semPedidoNoTexto(email) ? planilhasDoEml(buf).find(x => RE_PLANILHA_ANEXO.test(x.nome)) : null;   // planilha do dia só anexada: abre a lista com ela
+    if (anexo) { await abrirPlanilha(anexo.nome, anexo.bytes.buffer, { messageId: email.messageId, assunto: email.assunto, data: email.data, remetente: email.remetente }); return; }
+    aba = 'atend'; await iniciar(email);
+  }
   catch (e) { console.error(e); toast('Não consegui ler esse .eml: ' + e.message, 'bad'); }
 }
+/* planilha do dia em arquivo: vira a lista do dia (como a da Erasmo Neto) */
+async function abrirPlanilha(nome, buf, base) {
+  let r; try { r = await Planilha.email(nome, buf, base); } catch (e) { console.error(e); toast('Não consegui ler a planilha: ' + e.message + '.', 'bad'); return; }
+  Planilha.pendente = null; aba = 'atend';
+  const ac = acharClinica(r.email), cl = (ac && ac.cl) || { id: '', nome: 'Planilha do dia', emails: [] };   // sem o e-mail de origem: a clínica é escolhida na janela da lista
+  toast(`Planilha lida: ${pl(r.linhas, 'linha', 'linhas')}${r.folha && r.folha !== 'csv' ? ' (aba ' + r.folha + ')' : ''}.`);
+  await Lista.abrirEmail(r.email, cl);
+}
+/* o texto do e-mail não traz pedido nenhum (só a saudação): a planilha anexada é o pedido */
+const semPedidoNoTexto = email => lerListaTexto(email.textoCompleto || email.textoPrincipal).length < 2 && !pedidosDoEmail(email, null).blocos.some(b => b.pedido.beneficiario || b.pedido.itens.length || b.pedido.carteiraBruta);
 /* Quem abre o e-mail é quem o finaliza. Se um colega já trabalhou nele, avisa antes de abrir. */
 function avisoEmailJaAtendido(email) {
   const outros = Reg.cache.filter(r => !r.tipo && r.messageId === email.messageId && r.status !== 'descartado');
@@ -27,6 +43,12 @@ async function abrirDoWebmail(m) {
   if (S && S.email && S.email.messageId === email.messageId) { toast('Esse e-mail já está aberto aqui.'); return { ok: true, nomes: nomesAtend() }; }
   const clL = ehEmailLista(email);
   if (clL) { await Lista.abrirEmail(email, clL); return { ok: true, nomes: ['lista do dia · ' + clL.nome] }; }
+  const anexoPl = (email.anexos || []).find(n => RE_PLANILHA_ANEXO.test(n));
+  if (anexoPl && semPedidoNoTexto(email)) {   // planilha do dia só anexada: o webmail não entrega o arquivo; espera o download
+    Planilha.aguardar(email, anexoPl); aba = 'atend'; render();
+    toast(`Planilha do dia anexada (${anexoPl}): baixe o anexo no webmail e solte o arquivo aqui no Conferidor.`);
+    return { ok: true, nomes: ['planilha anexada: baixe e solte no conferidor'] };
+  }
   if (S && !confirm('Há um atendimento aberto. Abrir o e-mail do webmail no lugar dele?\n(o atendimento atual continua salvo como em andamento)')) return { ok: false, motivo: 'O atendimento aberto foi mantido.' };
   aba = 'atend';
   try { await iniciar(email); } catch (e) { console.error(e); toast('Não consegui abrir esse e-mail: ' + e.message, 'bad'); return { ok: false, motivo: e.message }; }
@@ -172,6 +194,7 @@ const acoes = {
   modalContinuar() { const b = $('.modal-desc'); if (b) b.remove(); const c = $('#modalFundo textarea, #modalFundo input[type=text]'); if (c) c.focus(); },
   modalDescartar() { if (modalAtual) modalAtual.descartar = true; fecharModal(); },
   escolherEml() { $('#arquivoEml').click(); },
+  descartarPlanilha() { Planilha.pendente = null; render(); },
   async usarColado() {
     const t = $('#coladoTxt').value; if (!t.trim()) { toast('Cole o texto do e-mail.', 'bad'); return; }
     if (!operador()) { toast('Escolha o operador no topo da página.', 'bad'); return; }
@@ -843,8 +866,11 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); acoes[e.target.dataset.enter](e.target); }
 });
-document.addEventListener('dragover', e => { if (aba === 'atend' && !S) e.preventDefault(); });
-document.addEventListener('drop', e => { if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
+document.addEventListener('dragover', e => { if ((aba === 'atend' && !S) || aba === 'lista' || Planilha.pendente) e.preventDefault(); });
+document.addEventListener('drop', e => {   // a planilha do dia pode ser solta em qualquer tela (vira lista, não mexe no atendimento aberto)
+  const fp = e.dataTransfer && [...e.dataTransfer.files].find(f => RE_PLANILHA_ANEXO.test(f.name));
+  if (fp && !(e.target.closest && e.target.closest('#zona, #zonaPrints'))) { e.preventDefault(); abrirArquivo(fp); return; }
+  if (aba === 'atend' && !S && !e.target.closest('#zona')) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) abrirArquivo(f); } });
 window.addEventListener('beforeunload', e => { if (cfgDirty) { e.preventDefault(); e.returnValue = ''; } });
 
 /* prints colados (Ctrl+V) ou arrastados na etapa 3 */
