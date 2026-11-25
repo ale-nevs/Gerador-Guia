@@ -155,6 +155,31 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Pedido repetido só na semana, campos das observações automáticas e nome errado (versão 2.2.14)
+- **Possível pedido repetido só na mesma semana:** as autorizações são semanais. O aviso compara só com guias concluídas desde a segunda-feira da semana atual (segunda a domingo), no atendimento e na lista do dia. Antes, a lista olhava os últimos 7 dias: uma guia de 18/11 avisava em 25/11. Agora não avisa mais.
+- **Mais campos nas observações automáticas** (Configurações › Observações automáticas › "Campos que podem entrar no texto"):
+  - Itens: {CODIGO}, {DESCRICAO}, {QTD_PEDIDO}, {QTD_SISTEMA}, {STATUS}.
+  - Qualquer divergência: {CAMPO}, {VALOR_PEDIDO}, {VALOR_SISTEMA}, {MOTIVO}.
+  - Pedido × sistema: {BENEFICIARIO} e {BENEFICIARIO_SISTEMA}, {NOME_CORRETO}, {CARTEIRA} e {CARTEIRA_SISTEMA}, {GUIA} e {GUIA_SISTEMA}, {MEDICO} e {MEDICO_SISTEMA}, {CRM} e {CRM_SISTEMA}, {DATA_PEDIDO} e {DATA_SISTEMA}, {CID} e {CID_SISTEMA}, {CREDENCIADO} e {CREDENCIADO_SISTEMA}. Os "_SISTEMA" trazem o que foi lido no print.
+- **Ignorar no nome do beneficiário: "Prestador pediu com o nome errado".** O motivo pede o nome correto, que já vem preenchido com o nome lido no sistema (confira). A guia passa a ter o nome correto, a linha do tempo registra a troca, e a observação para a clínica ("O nome do beneficiário veio errado no pedido (…). Nome correto: …") entra marcada. O texto pode ser mudado em Observações automáticas.
+
+### Planilha do dia em arquivo: upload do .xlsx (versão 2.2.13)
+A planilha do dia também é aceita **como arquivo** (.xlsx ou .csv), sem precisar estar colada no e-mail. Ela abre a mesma lista do dia.
+- **Upload ou arrastar:** na tela inicial, "Fazer upload do e-mail (.eml) ou da planilha do dia (.xlsx)", ou arraste o arquivo para o Conferidor (de qualquer tela; não mexe no atendimento aberto).
+- **E-mail com a planilha anexada, aberto pelo webmail:** o botão do webmail não traz o arquivo. O Conferidor avisa "Planilha do dia aguardando"; baixe o anexo no webmail e solte o arquivo. A lista abre ligada àquele e-mail (clínica pelo remetente, assunto e Responder no webmail). O nome baixado com "(1)" também vale.
+- **.eml com a planilha anexada:** abre a lista direto, com a clínica pelo remetente.
+- **Arquivo solto, sem o e-mail:** a janela da lista pede a clínica.
+- Lê a aba com cabeçalho Beneficiário, Carteira e Serviço; as abas Exemplo e Como preencher do modelo ficam de fora. Datas e números digitados no Excel são convertidos (20/11/2026, 4). CSV do Excel em português (ponto e vírgula) também vale. Arquivo .xls antigo ou .ods: salvar como .xlsx.
+- A aba das listas passa a se chamar "Listas do dia" quando há listas de mais de uma clínica no dia.
+
+### Planilha do dia colada no e-mail (versão 2.2.12)
+A clínica com muitos pacientes no dia pode mandar uma planilha só, colada no corpo do e-mail: uma linha por paciente e serviço, com as colunas Beneficiário, Carteira, Serviço, Quantidade, Médico, CRM, CID, Emissão, Local de emissão e Observações. O Conferidor abre como **lista do dia**, igual à da Erasmo Neto: divisão entre operadores, Continuar, Acompanhar e e-mail de entrega.
+- **Reconhecida sozinha, de qualquer clínica:** tabela com as colunas Beneficiário, Carteira e Serviço e pelo menos 2 linhas. Não precisa marcar a clínica como "Manda a agenda do dia em lista". Uma tabela com uma linha só segue como atendimento normal.
+- **Os três caminhos funcionam:** botão do webmail, arquivo .eml e texto colado (copiado do Excel). Quando o e-mail traz a tabela em HTML, a leitura usa essa versão, que mantém as colunas; no texto simples as células se misturam.
+- **Nomes de coluna flexíveis:** Paciente, Nº da carteira, Código do serviço, Qtd, Data do pedido, Local e Obs também valem. O CRM pode estar em coluna própria, em qualquer posição.
+- A planilha só anexada (sem a tabela colada no corpo do e-mail) não é lida.
+- O modelo para as clínicas (arquivo .xlsx com as abas Planilha do dia, Como preencher e Exemplo) e o e-mail de orientação estão no guia para as clínicas.
+
 ### Modelo "Dados não identificados no pedido" (versão 2.2.11)
 Novo modelo em **Responder sem gerar guia**. Ele lista para a clínica tudo o que não foi identificado no pedido, um por linha:
 - nome do beneficiário;

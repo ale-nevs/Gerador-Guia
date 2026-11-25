@@ -205,7 +205,7 @@ function avaliar(g) {
   /* mesmo código já autorizado para a mesma carteira nesta semana (segunda a domingo), em outro e-mail */
   const cartSem = normCart(g.carteiraUsada || p.carteira || '');
   if (cartSem) {
-    const ini = new Date(); ini.setHours(0, 0, 0, 0); ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7));
+    const ini = inicioDaSemana();
     const daSemana = Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== g.id && r.messageId !== e.messageId && normCart(r.carteira || '') === cartSem && new Date(r.concluidoEm || r.atualizadoEm || 0) >= ini && ['autorizada', 'parcial'].includes(resultadoDe(r)));
     p.itens.forEach(it => {
       const r = daSemana.find(x => (x.itens || []).some(i => i.c === it.codigo && i.aut !== false));

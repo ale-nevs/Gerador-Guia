@@ -13,21 +13,22 @@ const SEM_GUIA_LISTA = ['Paciente excluso', 'Guia já liberada em', 'Carteira n�
 
 /* ---------- leitura do e-mail da lista ---------- */
 function lerListaTexto(texto) {
-  const t = String(texto || '').replace(/\r/g, '').replace(/ /g, ' ');
+  const t = converterTabelas(String(texto || '').replace(/\r/g, '').replace(/ /g, ' '));   // planilha colada: cada linha vira um bloco com Beneficiário, Carteira etc.
   const linhas = t.split('\n');
   const ini = []; linhas.forEach((l, i) => { if (/^\s*benefici[aá]ri[oa]s?\s*:/i.test(l)) ini.push(i); });
-  const ROT = [['carteira', /^cart(eira|eirinha|ão|ao|\.)?\b/i], ['servico', /^(servi[cç]o|procedimento|terapia)/i], ['qtd', /^(quantidade|qtde?|qnt)/i],
+  const ROT = [['crm', /^crm\b/i], ['carteira', /^cart(eira|eirinha|ão|ao|\.)?\b/i], ['servico', /^(servi[cç]o|procedimento|terapia)/i], ['qtd', /^(quantidade|qtde?|qnt)/i],
     ['medico', /^(m[eé]dico|solicitante|profissional)/i], ['cid', /^cid/i], ['emissao', /^(emiss[aã]o|data)/i], ['local', /^local/i], ['obs', /^obs/i]];
   return ini.map((a, k) => {
     const bloco = linhas.slice(a, k + 1 < ini.length ? ini[k + 1] : linhas.length);
-    const it = { benef: bloco[0].replace(/^\s*benefici[aá]ri[oa]s?\s*:/i, '').replace(/\t/g, ' ').trim(), carteiraBruta: '', servicoBruto: '', qtd: null, medicoBruto: '', cid: '', emissao: '', local: '', obs: '' };
+    const it = { benef: bloco[0].replace(/^\s*benefici[aá]ri[oa]s?\s*:/i, '').replace(/\t/g, ' ').trim(), carteiraBruta: '', servicoBruto: '', qtd: null, medicoBruto: '', crmBruto: '', cid: '', emissao: '', local: '', obs: '' };
     let ultimo = null;
     bloco.slice(1).forEach(l0 => {
       const l = l0.replace(/\t/g, ' ').trim(); if (!l) return;
+      if (/^-{3,}$/.test(l)) { ultimo = null; return; }   // separador entre as linhas da planilha
       const m = l.match(/^([A-Za-zÀ-ÿ .]{2,30}?)\s*:\s*(.*)$/);
       if (m) { const r = ROT.find(([, re]) => re.test(m[1].trim())); if (r) { ultimo = r[0]; const v = m[2].trim();
         if (r[0] === 'carteira') it.carteiraBruta = v; else if (r[0] === 'servico') it.servicoBruto = v; else if (r[0] === 'qtd') { const q = v.match(/\d{1,3}/); it.qtd = q ? Number(q[0]) : null; }
-        else if (r[0] === 'medico') it.medicoBruto = v; else if (r[0] === 'cid') it.cid = v.replace(/\s+/g, '').toUpperCase(); else if (r[0] === 'emissao') it.emissao = v; else if (r[0] === 'local') it.local = v; else if (r[0] === 'obs') it.obs = v;
+        else if (r[0] === 'medico') it.medicoBruto = v; else if (r[0] === 'crm') it.crmBruto = v; else if (r[0] === 'cid') it.cid = v.replace(/\s+/g, '').toUpperCase(); else if (r[0] === 'emissao') it.emissao = v; else if (r[0] === 'local') it.local = v; else if (r[0] === 'obs') it.obs = v;
         return; } }
       if (ultimo === 'obs' && !/^(atenciosamente|att|obrigad)/i.test(l)) it.obs = (it.obs ? it.obs + ' ' : '') + l;   // observação em mais de uma linha
     });
@@ -36,6 +37,8 @@ function lerListaTexto(texto) {
     it.servico = it.servicoBruto.replace(/(?<!\d)\d{8}(?!\d)/, '').replace(/^[\s\-–—:]+/, '').trim();
     const md = it.medicoBruto.match(/^(?:crm\s*)?(\d{3,7})\s*[-–—:]?\s*(.*)$/i);
     it.crm = md ? md[1] : ''; it.medico = (md ? md[2] : it.medicoBruto).replace(/^[\s\-–—]+/, '').trim();
+    if (!it.crm) { const c = (it.crmBruto || '').match(/\d{3,7}/) || it.medico.match(/\bcrm\b\s*[:\-nº°.]*\s*(\d{3,7})(?:\s*[-\/]?\s*[A-Z]{2}\b)?/i);   // CRM em coluna própria, ou depois do nome
+      if (c) { it.crm = c[1] || c[0]; if (!it.crmBruto) it.medico = it.medico.replace(c[0], '').replace(/[\s\-–—,]+$/, '').trim(); } }
     it.carteira = normCart(it.carteiraBruta);
     if (/^[\s\-–—.]*$/.test(it.obs)) it.obs = '';
     it.bloco = bloco.join('\n').trim();
@@ -48,7 +51,119 @@ function clinicaListaDe(email) {
   if (cl && cl.lista) return cl;
   const rem = (email.remetente && email.remetente.email || '').toLowerCase();
   if (/@clinicaserasmoneto\.com\.br$/.test(rem) || /erasmo\s*neto/i.test(email.assunto || '')) return cl || cfg.clinicas.find(c => /erasmo/i.test(c.nome)) || { id: 'erasmo-neto', nome: 'Erasmo Neto', emails: [] };
+  if (temPlanilhaDoDia(email.textoCompleto || email.textoPrincipal)) return cl || { id: '', nome: (email.remetente && (email.remetente.nome || email.remetente.email)) || 'Planilha do dia', emails: [] };   // planilha do dia de qualquer clínica
   return null;
+}
+/* ---------- planilha do dia em arquivo (.xlsx ou .csv), sem biblioteca externa ----------
+   O .xlsx é um zip de XMLs: lê o diretório do zip, descompacta (DecompressionStream do navegador) e monta as linhas de
+   cada aba. Vale a primeira aba com cabeçalho Beneficiário, Carteira e Serviço e ao menos uma linha de paciente
+   (as abas "Exemplo" e "Como preencher" do modelo ficam de fora). Resultado: o texto da tabela, uma linha por paciente. */
+async function lerZip(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+  let fim = -1; for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { fim = i; break; }
+  if (fim < 0) throw new Error('o arquivo não é uma planilha .xlsx válida');
+  const arqs = {}; let p = dv.getUint32(fim + 16, true);
+  for (let k = 0, n = dv.getUint16(fim + 10, true); k < n && dv.getUint32(p, true) === 0x02014b50; k++) {
+    const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    arqs[new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl))] = { met: dv.getUint16(p + 10, true), tam: dv.getUint32(p + 20, true), off: dv.getUint32(p + 42, true) };
+    p += 46 + nl + el + cl;
+  }
+  return async nome => {
+    const a = arqs[nome]; if (!a) return null;
+    const ini = a.off + 30 + dv.getUint16(a.off + 26, true) + dv.getUint16(a.off + 28, true), dados = u.slice(ini, ini + a.tam);
+    if (a.met === 0) return new TextDecoder().decode(dados);
+    if (a.met !== 8) throw new Error('compressão da planilha não suportada');
+    return new TextDecoder().decode(await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  };
+}
+const dataDeSerial = n => { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(n * 86400000)); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
+function estilosDeData(st) {   // estilos de célula com formato de data (os embutidos 14–22 e 45–47, ou um formato com d/m/a)
+  const S = new Set(); if (!st) return S;
+  const fmt = {}; [...st.getElementsByTagName('numFmt')].forEach(f => { fmt[f.getAttribute('numFmtId')] = f.getAttribute('formatCode') || ''; });
+  const xfs = st.getElementsByTagName('cellXfs')[0];
+  [...(xfs ? xfs.getElementsByTagName('xf') : [])].forEach((x, i) => { const id = +x.getAttribute('numFmtId'), c = (fmt[id] || '').replace(/"[^"]*"|\[[^\]]*\]/g, '');
+    if ((id >= 14 && id <= 22) || (id >= 45 && id <= 47) || /[dy]/i.test(c)) S.add(i); });
+  return S;
+}
+async function folhasDoXlsx(buf) {
+  const ler = await lerZip(buf), xml = s => new DOMParser().parseFromString(s, 'application/xml');
+  const wbTxt = await ler('xl/workbook.xml'); if (!wbTxt) throw new Error('o arquivo não é uma planilha .xlsx válida');
+  const rels = {}; [...xml((await ler('xl/_rels/workbook.xml.rels')) || '<x/>').getElementsByTagName('Relationship')].forEach(r => { rels[r.getAttribute('Id')] = r.getAttribute('Target') || ''; });
+  const ss = await ler('xl/sharedStrings.xml'), strs = ss ? [...xml(ss).getElementsByTagName('si')].map(si => [...si.getElementsByTagName('t')].map(t => t.textContent).join('')) : [];
+  const st = await ler('xl/styles.xml'), datas = estilosDeData(st ? xml(st) : null);
+  const colDe = ref => [...(ref.match(/^[A-Z]+/) || ['A'])[0]].reduce((s, ch) => s * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  const out = [];
+  for (const sh of xml(wbTxt).getElementsByTagName('sheet')) {
+    const alvo = rels[sh.getAttribute('r:id')] || ''; if (!alvo) continue;
+    const txt = await ler(alvo.startsWith('/') ? alvo.slice(1) : 'xl/' + alvo.replace(/^\.\//, '')); if (!txt) continue;
+    const linhas = [];
+    for (const row of xml(txt).getElementsByTagName('row')) {
+      const r = []; let prox = 0;
+      for (const c of row.getElementsByTagName('c')) {
+        const col = c.getAttribute('r') ? colDe(c.getAttribute('r')) : prox, t = c.getAttribute('t'), vEl = c.getElementsByTagName('v')[0], v = vEl ? vEl.textContent : null;
+        let val = '';
+        if (t === 's') val = strs[+v] ?? '';
+        else if (t === 'inlineStr') val = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+        else if (t === 'str' || t === 'e') val = v || '';
+        else if (t === 'b') val = v === '1' ? 'VERDADEIRO' : 'FALSO';
+        else if (v != null && v !== '') { const num = Number(v); val = isNaN(num) ? v : datas.has(+(c.getAttribute('s') || 0)) ? dataDeSerial(num) : Number.isInteger(num) ? String(num) : String(+num.toFixed(6)); }
+        r[col] = String(val).replace(/[\t\r\n]+/g, ' ').trim(); prox = col + 1;
+      }
+      linhas[(+row.getAttribute('r') || linhas.length + 1) - 1] = r;
+    }
+    out.push({ nome: sh.getAttribute('name') || '', linhas: Array.from(linhas, r => Array.from(r || [], x => x || '')) });
+  }
+  return out;
+}
+function linhasDoCsv(txt) {
+  const l1 = txt.split('\n')[0] || '', sep = ['\t', ';', ','].map(s => [s, l1.split(s).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const L = []; let r = [], c = '', q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i];
+    if (q) { if (ch === '"') { if (txt[i + 1] === '"') { c += '"'; i++; } else q = false; } else c += ch; continue; }
+    if (ch === '"' && !c) q = true; else if (ch === sep) { r.push(c); c = ''; } else if (ch === '\n') { r.push(c); L.push(r); r = []; c = ''; } else if (ch !== '\r') c += ch;
+  }
+  if (c || r.length) { r.push(c); L.push(r); }
+  return L.map(x => x.map(v => v.replace(/[\t\r\n]+/g, ' ').trim()));
+}
+async function textoDaPlanilha(nome, buf) {
+  if (/\.(xls|xlsm|ods)$/i.test(nome)) throw new Error('salve a planilha como .xlsx (Excel) e tente de novo');
+  let folhas;
+  if (/\.xlsx$/i.test(nome)) folhas = await folhasDoXlsx(buf);
+  else { let t; try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { t = new TextDecoder('windows-1252').decode(buf); }   // CSV do Excel em português vem em ANSI
+    folhas = [{ nome: 'csv', linhas: linhasDoCsv(t.replace(/^\uFEFF/, '')) }]; }
+  const ehCab = r => (ks => ['beneficiario', 'carteira', 'servico'].every(k => ks.includes(k)))(r.map(c => rotuloDeCelula(c || '')));
+  for (const f of folhas) {
+    if (/exemplo|instru|como preencher/i.test(f.nome)) continue;
+    const i = f.linhas.findIndex(r => r && ehCab(r)); if (i < 0) continue;
+    const tab = f.linhas.slice(i).filter(r => r && r.some(Boolean));
+    if (tab.length < 2) continue;
+    return { folha: f.nome, linhas: tab.length - 1, texto: tab.map(r => r.join('\t')).join('\n') };
+  }
+  throw new Error('não achei a tabela da planilha do dia (cabeçalho com Beneficiário, Carteira e Serviço e ao menos uma linha preenchida)');
+}
+/* e-mail com a planilha do dia só anexada, aberto pelo webmail: espera o arquivo baixado para abrir a lista ligada a ele */
+const Planilha = {
+  pendente: null,
+  aguardar(email, nome) { this.pendente = { nome, em: Date.now(), email: { messageId: email.messageId, assunto: email.assunto, data: email.data, remetente: email.remetente } }; },
+  base(nomeArq) {
+    const p = this.pendente; if (!p || Date.now() - p.em > 4 * 3600000) return null;
+    const n = s => norm(String(s || '').replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)$/, ''));
+    return n(nomeArq) === n(p.nome) || confirm(`Usar este arquivo como a planilha do e-mail de ${p.email.remetente.nome || p.email.remetente.email} ("${p.email.assunto}")?\n\nO anexo esperado era: ${p.nome}`) ? p.email : null;
+  },
+  /* monta o "e-mail" da planilha: com o e-mail de origem (clínica, assunto, resposta) quando ele é conhecido */
+  async email(nome, buf, base) {
+    const r = await textoDaPlanilha(nome, buf);
+    const e = emailDeTexto(r.texto, base ? `${base.remetente.nome || ''} <${base.remetente.email || ''}>` : '');
+    Object.assign(e, { assunto: base ? base.assunto : 'Planilha do dia: ' + nome, messageId: base ? base.messageId : 'planilha-' + hashTexto(nome + r.texto), data: (base && base.data) || e.data, anexos: [nome], origem: 'planilha' });
+    return { email: e, ...r };
+  }
+};
+/* planilha do dia colada no corpo do e-mail: cabeçalho com Beneficiário, Carteira e Serviço e ao menos 2 linhas de pacientes */
+function temPlanilhaDoDia(texto) {
+  const L = String(texto || '').split('\n');
+  const i = L.findIndex(l => l.includes('\t') && (ks => ['beneficiario', 'carteira', 'servico'].every(k => ks.includes(k)))(l.split('\t').map(c => rotuloDeCelula(c.trim()))));
+  return i >= 0 && L.slice(i + 1).filter(l => l.includes('\t') && l.replace(/\t/g, '').trim()).length >= 2;
 }
 const ehEmailLista = email => { const cl = clinicaListaDe(email); return cl && lerListaTexto(email.textoCompleto || email.textoPrincipal).length >= 2 ? cl : null; };
 const normNomeLista = s => norm(String(s || '')).replace(/\s+/g, ' ').trim();
@@ -141,7 +256,8 @@ const Lista = {
     const m = M, base = m.modo === 'adicionar' ? m.novos : m.itens;
     const prev = dividirLista(base.map((i, k) => ({ ...i, ord: k })), m.ops);
     const pac = new Set(base.map(i => normNomeLista(i.benef))).size, q2 = base.filter(i => (i.qtd || 1) > 1).length;
-    const corpo = `<p style="margin:0 0 10px"><b>${esc(m.cl.nome)}</b>: ${pl(m.itens.length, 'guia', 'guias')} de ${pl(new Set(m.itens.map(i => normNomeLista(i.benef))).size, 'beneficiário', 'beneficiários')}${q2 ? ` · <span class="tag warn">${q2} com quantidade maior que 1</span>` : ''}${m.itens.some(i => !i.codigo) ? ` · <span class="tag bad">${m.itens.filter(i => !i.codigo).length} sem código</span>` : ''}</p>
+    const escolher = !m.cl.id ? `<div style="margin:0 0 12px"><label class="lbl" for="lstCl">Clínica desta planilha</label><select id="lstCl" data-lstcl="1" class="sel-busca"><option value="">Escolha a clínica…</option>${cfg.clinicas.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}</select><p class="dica" style="margin:4px 0 0">A clínica não foi identificada pelo remetente (ou a planilha veio sem o e-mail): escolha a clínica para o registro e o e-mail de entrega.</p></div>` : '';
+    const corpo = `${escolher}<p style="margin:0 0 10px"><b>${esc(m.cl.nome)}</b>: ${pl(m.itens.length, 'guia', 'guias')} de ${pl(new Set(m.itens.map(i => normNomeLista(i.benef))).size, 'beneficiário', 'beneficiários')}${q2 ? ` · <span class="tag warn">${q2} com quantidade maior que 1</span>` : ''}${m.itens.some(i => !i.codigo) ? ` · <span class="tag bad">${m.itens.filter(i => !i.codigo).length} sem código</span>` : ''}</p>
       ${m.abertas.length ? `<div class="stack" role="radiogroup" style="margin-bottom:12px">
         <label class="chk"><input type="radio" name="lstModo" value="adicionar" ${m.modo === 'adicionar' ? 'checked' : ''}><span><b>Adicionar à lista do dia</b> (${esc(m.abertas[m.abertas.length - 1].nome)}): ${pl(m.novos.length, 'guia nova', 'guias novas')}${m.itens.length - m.novos.length ? `, ${m.itens.length - m.novos.length} já estão na lista e ficam de fora` : ''}</span></label>
         <label class="chk"><input type="radio" name="lstModo" value="nova" ${m.modo === 'nova' ? 'checked' : ''}><span><b>Criar uma lista separada</b> (Lista ${this.listas.filter(l => l.dia === isoDia(new Date())).length + 1}) com as ${m.itens.length} guias deste e-mail</span></label></div>` : ''}
@@ -229,17 +345,18 @@ const Lista = {
       corpo: `<dl class="kv"><dt>Beneficiário</dt><dd>${esc(it.benef)}</dd><dt>Carteira</dt><dd class="num">${esc(it.carteira || '—')}</dd>
         <dt>Serviço</dt><dd><span class="num">${esc(it.codigo)}</span> ${esc(it.servico || '')} × <b>${esc(q)}</b>${q > 1 ? ' <span class="tag warn">quantidade maior que 1</span>' : ''}</dd>
         <dt>Registrado</dt><dd>${atual}${a ? ` <span class="muted">— ${esc(a.por || '')}, ${fmtDH(a.em)}</span>` : ''}</dd></dl>
-        ${ja ? `<div class="faixa-critica" style="margin:8px 0">${ic('alert')}<div class="tx"><b>Possível pedido repetido</b>Já há guia autorizada para esta carteira e este código: <span class="num">${esc(ja.guia)}</span> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
+        ${ja ? `<div class="faixa-critica" style="margin:8px 0">${ic('alert')}<div class="tx"><b>Possível pedido repetido</b>Já há guia autorizada nesta semana para esta carteira e este código: <span class="num">${esc(ja.guia)}</span> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
         <label class="lbl" for="lstReGuia" style="margin-top:10px">Nº da guia</label><input type="text" id="lstReGuia" class="num" value="${esc(a && a.st === 'gerada' ? a.guia : '')}" placeholder="Ex.: T1234567" autocomplete="off" data-enter="lstReAutorizar" autofocus>
         <p class="dica" style="margin-top:8px">Autorizar registra a guia com este número em seu nome, com a situação <b>Autorizada</b>. Ela entra no e-mail de entrega da lista, e o histórico guarda o que estava registrado antes.</p>`,
       rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn line" data-act="lstReAutorizarEmail" title="Autoriza e abre o e-mail avisando a clínica que a guia foi ajustada">${ic('mail')}Autorizar e gerar e-mail de ajuste</button><button class="btn pri" data-act="lstReAutorizar">${ic('check')}Autorizar</button>` });
     M = { tipo: 'lstReabrir', L, it };   // depois de abrir (abrirModal limpa o estado)
   },
-  textoJa: (it, ja) => `POSSÍVEL PEDIDO REPETIDO\n\nO serviço ${it.codigo} já foi autorizado para esta carteira na guia ${ja.guia}, em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + ja.operador : ''}.\n\nConferiu e não é repetido? Registrar a nova guia mesmo assim?`,
-  /* guia já autorizada para a mesma carteira e código nos últimos 7 dias (fora desta lista) */
+  textoJa: (it, ja) => `POSSÍVEL PEDIDO REPETIDO\n\nO serviço ${it.codigo} já foi autorizado para esta carteira nesta semana, na guia ${ja.guia}, em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + ja.operador : ''}.\n\nConferiu e não é repetido? Registrar a nova guia mesmo assim?`,
+  /* guia já autorizada para a mesma carteira e código NESTA SEMANA (segunda a domingo), fora desta linha da lista:
+     as autorizações são semanais, então uma guia da semana passada não é pedido repetido */
   jaAutorizada(it) {
-    const c = normCart(it.carteira), lim = isoDia(addDias(new Date(), -7));
-    return Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== 'lst-' + it.id && normCart(r.carteira || '') === c && (r.dia || '') >= lim && (r.itens || []).some(x => x.c === it.codigo && x.aut !== false) && r.guia)
+    const c = normCart(it.carteira), ini = inicioDaSemana();
+    return Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== 'lst-' + it.id && normCart(r.carteira || '') === c && new Date(r.concluidoEm || r.atualizadoEm || 0) >= ini && (r.itens || []).some(x => x.c === it.codigo && x.aut !== false) && r.guia)
       .sort((a, b) => ((a.concluidoEm || '') < (b.concluidoEm || '') ? 1 : -1))[0] || null;
   },
 
@@ -285,7 +402,13 @@ ${intro.split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${esc(p).replace(/\
     if (!L) { app.innerHTML = topo + `<div class="vazio"><div class="ico">${ic('rows', 'xl')}</div><h2>Nenhuma lista neste dia</h2><p>Abra o e-mail da agenda da Erasmo Neto (pela extensão, pelo .eml ou colando o texto em Atendimento): ele vira uma lista dividida entre os operadores.</p><button class="btn pri" data-act="lstColar">${ic('clip')}Colar o texto da agenda</button></div>`; return; }
     app.innerHTML = topo + (this.sub === 'acompanhar' ? this.htmlAcompanhar(L) : this.sub === 'email' ? this.htmlEntrega(L) : this.htmlContinuar(L));
   },
-  nomeCurto(L) { const n = (L && L.clinica) || (cfg.clinicas.find(c => c.lista) || {}).nome || 'Erasmo'; return /erasmo/i.test(n) ? 'Erasmo' : n.split(' ').slice(0, 2).join(' '); },
+  nomeCurto(L) {   // nome da aba: a clínica da lista; com listas de mais de uma clínica no dia (planilhas), "Listas do dia"
+    const curto = n => /erasmo/i.test(n) ? 'Erasmo' : n.split(' ').slice(0, 2).join(' ');
+    if (L) return curto(L.clinica || 'Lista');
+    const cls = unicos(this.listas.filter(l => !l.finalizadaEm).map(l => l.clinica || ''));
+    if (cls.length > 1) return 'Listas do dia';
+    return curto(cls[0] || (cfg.clinicas.find(c => c.lista) || {}).nome || 'Erasmo');
+  },
   htmlCompacto(L, it) {
     const r = it.r, q = it.qtd ?? 1;
     return `<div class="lst-item compacto ${r ? 'feito' : ''}" data-item="${esc(it.id)}"><b>${esc(it.benef)}</b><span class="num">${esc(it.codigo || '—')}</span><span class="muted">${esc(it.servico || '')}</span>${q > 1 ? `<span class="tag warn">×${q}</span>` : ''}${it.obs ? `<span class="tag info" title="${esc(it.obs)}">${ic('message', 'sm')}obs.</span>` : ''}
@@ -308,7 +431,7 @@ ${intro.split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${esc(p).replace(/\
         <span class="lst-desc">${esc(it.servico || '')}</span>
         ${it.obs ? `<div class="lst-obs">${ic('message', 'sm')}<b>Obs. da clínica:</b> ${esc(it.obs)}</div>` : ''}
         ${!it.codigo ? `<div class="lst-obs bad">${ic('alert', 'sm')}Sem código de serviço no e-mail: confira o texto (${esc(it.servicoBruto || 'vazio')}).</div>` : ''}
-        ${ja ? `<div class="lst-obs bad critico">${ic('alert', 'sm')}<span><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)} por ${esc(ja.operador || '—')}. Confira antes de gerar de novo: o registro pede confirmação.</span></div>` : ''}
+        ${ja ? `<div class="lst-obs bad critico">${ic('alert', 'sm')}<span><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira nesta semana, na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)} por ${esc(ja.operador || '—')}. Confira antes de gerar de novo: o registro pede confirmação.</span></div>` : ''}
       </div>` : ''}
       ${!r ? `<div class="lst-acoes">
         <label class="sr" for="lstGuia-${esc(it.id)}">Nº da guia</label><input type="text" id="lstGuia-${esc(it.id)}" class="num lst-guia" data-lstguia="${esc(it.id)}" value="${esc(this.rascunho[it.id] || '')}" maxlength="10" placeholder="Nº da guia" autocomplete="off" ${atual ? 'autofocus' : ''}>
@@ -423,6 +546,7 @@ document.addEventListener('input', e => {
 document.addEventListener('keydown', e => { const t = e.target; if (e.key === 'Enter' && t && t.dataset && t.dataset.lstguia) { e.preventDefault(); acoes.lstRegistrar({ dataset: { item: t.dataset.lstguia } }); } });
 document.addEventListener('change', async e => {
   const t = e.target; if (!t || !t.dataset) return;
+  if (t.dataset.lstcl && M && M.tipo === 'lstNova') { const cl = cfg.clinicas.find(c => c.id === t.value); if (cl) Lista.abrirEmail(M.email, cl); return; }
   if (t.dataset.lstop != null && M && M.tipo === 'lstNova') { M.ops = $$('[data-lstop]').filter(x => x.checked).map(x => x.dataset.lstop); Lista.modalNova(); return; }
   if (t.name === 'lstModo' && M && M.tipo === 'lstNova') { M.modo = t.value; Lista.modalNova(); return; }
   if (t.dataset.lstf) { Lista.filtro[t.dataset.lstf] = t.value; render(); return; }

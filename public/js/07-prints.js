@@ -582,17 +582,32 @@ function resumoPrints(av, ign) {
   return { em: agora(), ok: av.ok, completo: av.completo, itens: av.nSistema, ign: ign || {}, ressalvas: av.ressalvas,
     divergencias: [...av.checks.filter(c => c.sit === 'bad' || c.sit === 'warn').map(c => c.rot + (c.sit === 'bad' ? ': diverge' : ': conferir')), ...av.linhas.filter(l => l.sit !== 'ok' && l.sit !== 'ign').map(l => `${l.codigo}: ${l.nota}`)] };
 }
-/* texto que vai para as observações adicionais da resposta à clínica (sem nome, CID ou carteira) */
-function linhaIgnorada(x) {
+/* valores dos campos das observações automáticas (CAMPOS_OBS_AUTO): o pedido, o que o print leu e o motivo */
+function camposObsAuto(g, x, motivo) {
+  const p = g.pedido, av = avaliarPrints(g), lido = k => { const c = av && av.checks.find(y => y.k === k); return c && c.lido != null && c.lido !== '' ? String(c.lido) : '—'; };
+  const it = x.codigo ? p.itens.find(i => i.codigo === x.codigo) : null;
+  return {
+    CODIGO: x.codigo || '', DESCRICAO: it ? descRef(g, it) : '', QTD_PEDIDO: x.qPed ?? '—', QTD_SISTEMA: x.qSis ?? '—', STATUS: (ST_ROT[x.stSis] || x.stSis || '').toLowerCase(),
+    CAMPO: x.rot || 'Item ' + (x.codigo || ''), VALOR_PEDIDO: x.ped ?? x.qPed ?? '—', VALOR_SISTEMA: x.lido ?? x.qSis ?? '—', MOTIVO: motivo ? [motivo.texto, motivo.detalhe].filter(Boolean).join(': ') : '',
+    BENEFICIARIO: p.beneficiario || '—', BENEFICIARIO_SISTEMA: lido('paciente'), NOME_CORRETO: (motivo && motivo.nomeCorreto) || lido('paciente'),
+    CARTEIRA: g.carteiraUsada || p.carteiraBruta || '—', CARTEIRA_SISTEMA: lido('ident'), GUIA: g.numero || '—', GUIA_SISTEMA: lido('guia'),
+    MEDICO: p.medico.nome || '—', MEDICO_SISTEMA: lido('profissional'), CRM: p.medico.crm || '—', CRM_SISTEMA: lido('registro'),
+    DATA_PEDIDO: dataPedidoTxt(p) || '—', DATA_SISTEMA: lido('dtSolic'), CID: p.cid || '—', CID_SISTEMA: lido('cid'),
+    CREDENCIADO: valorCopia(g, 'executante') || '—', CREDENCIADO_SISTEMA: lido('credNome')
+  };
+}
+/* texto que vai para as observações adicionais da resposta à clínica */
+function linhaIgnorada(x, g, motivo) {
   let key, t = 'ign';
   if (x.chave.startsWith('i:')) {
     if (x.nota === 'Não aparece nos prints.') { key = 'item-ausente'; t = 'menor'; }
     else if (x.nota === 'Quantidade diferente.') { const menor = x.qSis != null && x.qPed != null && x.qSis < x.qPed; key = menor ? 'item-menor' : 'item-qtd'; t = menor ? 'menor' : 'ign'; }
     else if (/^Status no sistema/.test(x.nota)) { key = 'item-status'; t = 'ign'; }
     else key = 'item-extra';
-  } else key = x.chave.slice(2);
+  } else key = motivo && motivo.tipo === 'nomeErrado' ? 'paciente-errado' : x.chave.slice(2);
   const o = (cfg.obsAuto && cfg.obsAuto[key]) || OBS_AUTO[key] || { texto: x.rot + ': diferente do pedido.', padrao: true };
-  const linha = o.texto.replace(/\{CODIGO\}/g, x.codigo || '').replace(/\{QTD_PEDIDO\}/g, x.qPed ?? '—').replace(/\{QTD_SISTEMA\}/g, x.qSis ?? '—').replace(/\{STATUS\}/g, (ST_ROT[x.stSis] || x.stSis || '').toLowerCase());
+  const v = g ? camposObsAuto(g, x, motivo) : { CODIGO: x.codigo || '', QTD_PEDIDO: x.qPed ?? '—', QTD_SISTEMA: x.qSis ?? '—', STATUS: (ST_ROT[x.stSis] || x.stSis || '').toLowerCase() };
+  const linha = o.texto.replace(/\{([A-Z_]+)\}/g, (m, k) => v[k] != null ? String(v[k]) : m);
   return { t, key, linha, on: o.padrao !== false };
 }
 function sincronizarObsPrints(g) {
