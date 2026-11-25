@@ -155,6 +155,14 @@ A Erasmo Neto manda a agenda do dia num e-mail só, com muitos beneficiários ("
 - Bloqueios no topo, quantidade maior que 1 em destaque, divergências dos prints com o valor lido e o pedido, captura/colar print e o **nº da guia digitável no painel** (vai para a etapa 4).
 - Abas **Guia atual** e **Erasmo** (quando há lista do dia).
 
+### Pedido repetido só na semana, campos das observações automáticas e nome errado (versão 2.2.14)
+- **Possível pedido repetido só na mesma semana:** as autorizações são semanais. O aviso compara só com guias concluídas desde a segunda-feira da semana atual (segunda a domingo), no atendimento e na lista do dia. Antes, a lista olhava os últimos 7 dias: uma guia de 18/11 avisava em 25/11. Agora não avisa mais.
+- **Mais campos nas observações automáticas** (Configurações › Observações automáticas › "Campos que podem entrar no texto"):
+  - Itens: {CODIGO}, {DESCRICAO}, {QTD_PEDIDO}, {QTD_SISTEMA}, {STATUS}.
+  - Qualquer divergência: {CAMPO}, {VALOR_PEDIDO}, {VALOR_SISTEMA}, {MOTIVO}.
+  - Pedido × sistema: {BENEFICIARIO} e {BENEFICIARIO_SISTEMA}, {NOME_CORRETO}, {CARTEIRA} e {CARTEIRA_SISTEMA}, {GUIA} e {GUIA_SISTEMA}, {MEDICO} e {MEDICO_SISTEMA}, {CRM} e {CRM_SISTEMA}, {DATA_PEDIDO} e {DATA_SISTEMA}, {CID} e {CID_SISTEMA}, {CREDENCIADO} e {CREDENCIADO_SISTEMA}. Os "_SISTEMA" trazem o que foi lido no print.
+- **Ignorar no nome do beneficiário: "Prestador pediu com o nome errado".** O motivo pede o nome correto, que já vem preenchido com o nome lido no sistema (confira). A guia passa a ter o nome correto, a linha do tempo registra a troca, e a observação para a clínica ("O nome do beneficiário veio errado no pedido (…). Nome correto: …") entra marcada. O texto pode ser mudado em Observações automáticas.
+
 ### Planilha do dia em arquivo: upload do .xlsx (versão 2.2.13)
 A planilha do dia também é aceita **como arquivo** (.xlsx ou .csv), sem precisar estar colada no e-mail. Ela abre a mesma lista do dia.
 - **Upload ou arrastar:** na tela inicial, "Fazer upload do e-mail (.eml) ou da planilha do dia (.xlsx)", ou arraste o arquivo para o Conferidor (de qualquer tela; não mexe no atendimento aberto).

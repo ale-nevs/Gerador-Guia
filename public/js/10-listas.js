@@ -345,17 +345,18 @@ const Lista = {
       corpo: `<dl class="kv"><dt>Beneficiário</dt><dd>${esc(it.benef)}</dd><dt>Carteira</dt><dd class="num">${esc(it.carteira || '—')}</dd>
         <dt>Serviço</dt><dd><span class="num">${esc(it.codigo)}</span> ${esc(it.servico || '')} × <b>${esc(q)}</b>${q > 1 ? ' <span class="tag warn">quantidade maior que 1</span>' : ''}</dd>
         <dt>Registrado</dt><dd>${atual}${a ? ` <span class="muted">— ${esc(a.por || '')}, ${fmtDH(a.em)}</span>` : ''}</dd></dl>
-        ${ja ? `<div class="faixa-critica" style="margin:8px 0">${ic('alert')}<div class="tx"><b>Possível pedido repetido</b>Já há guia autorizada para esta carteira e este código: <span class="num">${esc(ja.guia)}</span> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
+        ${ja ? `<div class="faixa-critica" style="margin:8px 0">${ic('alert')}<div class="tx"><b>Possível pedido repetido</b>Já há guia autorizada nesta semana para esta carteira e este código: <span class="num">${esc(ja.guia)}</span> em ${fmtData(ja.concluidoEm)} (${esc(ja.operador || '')}).</div></div>` : ''}
         <label class="lbl" for="lstReGuia" style="margin-top:10px">Nº da guia</label><input type="text" id="lstReGuia" class="num" value="${esc(a && a.st === 'gerada' ? a.guia : '')}" placeholder="Ex.: T1234567" autocomplete="off" data-enter="lstReAutorizar" autofocus>
         <p class="dica" style="margin-top:8px">Autorizar registra a guia com este número em seu nome, com a situação <b>Autorizada</b>. Ela entra no e-mail de entrega da lista, e o histórico guarda o que estava registrado antes.</p>`,
       rodape: `<span style="flex:1"></span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn line" data-act="lstReAutorizarEmail" title="Autoriza e abre o e-mail avisando a clínica que a guia foi ajustada">${ic('mail')}Autorizar e gerar e-mail de ajuste</button><button class="btn pri" data-act="lstReAutorizar">${ic('check')}Autorizar</button>` });
     M = { tipo: 'lstReabrir', L, it };   // depois de abrir (abrirModal limpa o estado)
   },
-  textoJa: (it, ja) => `POSSÍVEL PEDIDO REPETIDO\n\nO serviço ${it.codigo} já foi autorizado para esta carteira na guia ${ja.guia}, em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + ja.operador : ''}.\n\nConferiu e não é repetido? Registrar a nova guia mesmo assim?`,
-  /* guia já autorizada para a mesma carteira e código nos últimos 7 dias (fora desta lista) */
+  textoJa: (it, ja) => `POSSÍVEL PEDIDO REPETIDO\n\nO serviço ${it.codigo} já foi autorizado para esta carteira nesta semana, na guia ${ja.guia}, em ${fmtDH(ja.concluidoEm)}${ja.operador ? ' por ' + ja.operador : ''}.\n\nConferiu e não é repetido? Registrar a nova guia mesmo assim?`,
+  /* guia já autorizada para a mesma carteira e código NESTA SEMANA (segunda a domingo), fora desta linha da lista:
+     as autorizações são semanais, então uma guia da semana passada não é pedido repetido */
   jaAutorizada(it) {
-    const c = normCart(it.carteira), lim = isoDia(addDias(new Date(), -7));
-    return Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== 'lst-' + it.id && normCart(r.carteira || '') === c && (r.dia || '') >= lim && (r.itens || []).some(x => x.c === it.codigo && x.aut !== false) && r.guia)
+    const c = normCart(it.carteira), ini = inicioDaSemana();
+    return Reg.cache.filter(r => !r.tipo && r.status === 'concluido' && r.id !== 'lst-' + it.id && normCart(r.carteira || '') === c && new Date(r.concluidoEm || r.atualizadoEm || 0) >= ini && (r.itens || []).some(x => x.c === it.codigo && x.aut !== false) && r.guia)
       .sort((a, b) => ((a.concluidoEm || '') < (b.concluidoEm || '') ? 1 : -1))[0] || null;
   },
 
@@ -430,7 +431,7 @@ ${intro.split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${esc(p).replace(/\
         <span class="lst-desc">${esc(it.servico || '')}</span>
         ${it.obs ? `<div class="lst-obs">${ic('message', 'sm')}<b>Obs. da clínica:</b> ${esc(it.obs)}</div>` : ''}
         ${!it.codigo ? `<div class="lst-obs bad">${ic('alert', 'sm')}Sem código de serviço no e-mail: confira o texto (${esc(it.servicoBruto || 'vazio')}).</div>` : ''}
-        ${ja ? `<div class="lst-obs bad critico">${ic('alert', 'sm')}<span><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)} por ${esc(ja.operador || '—')}. Confira antes de gerar de novo: o registro pede confirmação.</span></div>` : ''}
+        ${ja ? `<div class="lst-obs bad critico">${ic('alert', 'sm')}<span><b>Possível pedido repetido:</b> serviço já autorizado para esta carteira nesta semana, na guia <b class="num">${esc(ja.guia)}</b> em ${fmtDH(ja.concluidoEm)} por ${esc(ja.operador || '—')}. Confira antes de gerar de novo: o registro pede confirmação.</span></div>` : ''}
       </div>` : ''}
       ${!r ? `<div class="lst-acoes">
         <label class="sr" for="lstGuia-${esc(it.id)}">Nº da guia</label><input type="text" id="lstGuia-${esc(it.id)}" class="num lst-guia" data-lstguia="${esc(it.id)}" value="${esc(this.rascunho[it.id] || '')}" maxlength="10" placeholder="Nº da guia" autocomplete="off" ${atual ? 'autofocus' : ''}>

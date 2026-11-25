@@ -1,5 +1,5 @@
 'use strict';
-const VERSAO = '2.2.13';
+const VERSAO = '2.2.14';
 const HIST_DIAS = 30;        // janela técnica de leitura dos registros (não configurável)
 const MAX_BENEFICIARIOS = 5; // beneficiários diferentes por e-mail
 
@@ -20,6 +20,8 @@ const addDias = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); r
 const fmtData = v => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
 const fmtHora = v => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const fmtDH = v => `${fmtData(v)} ${fmtHora(v)}`;
+/* as autorizações são semanais: a semana vai de segunda a domingo */
+const inicioDaSemana = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const diaBR = iso => (iso || '').split('-').reverse().join('/');
 const agora = () => new Date().toISOString();
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2));

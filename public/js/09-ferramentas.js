@@ -589,7 +589,7 @@ async function relerDivergencia(g, x, aviso) {
 /* motivo ao aceitar uma divergência (obrigatório para nome e carteira) */
 const MOTIVOS_IGN = {
   comum: [['leitura', 'Erro de leitura do print: conferi na tela do sistema e está igual ao pedido']],
-  paciente: [['abreviado', 'Nome abreviado ou cortado no sistema'], ['cadastro', 'Nome diferente no cadastro (casamento, grafia, nome social)']],
+  paciente: [['abreviado', 'Nome abreviado ou cortado no sistema'], ['cadastro', 'Nome diferente no cadastro (casamento, grafia, nome social)'], ['nomeErrado', 'Prestador pediu com o nome errado (informe o nome correto)']],
   ident: [['nova', 'Carteira nova ou trocada no sistema (o e-mail veio com a antiga)'], ['dependente', 'Titular/dependente: carteira diferente da informada']],
   item: [['menor', 'Autorizado a menor (regra, limite ou saldo)'], ['naoLiberado', 'Item não liberado no sistema'], ['outroCodigo', 'Liberado com outro código equivalente']],
   outro: [['outro', 'Outro motivo (descreva)']]
@@ -617,23 +617,30 @@ function abrirMotivoIgnorar(g, x) {
     corpo: `<p class="dica" style="margin:0 0 10px">O print já foi lido de novo e continua diferente. ${obrig ? '<b>Para nome e carteira o motivo é obrigatório.</b>' : 'Diga o motivo: ele fica no histórico da guia.'}</p>
       ${(x.ped ?? x.qPed) != null && (x.lido ?? x.qSis) != null ? htmlDiferenca(String(x.ped ?? x.qPed), String(x.lido ?? x.qSis)) : ''}
       <div class="stack" role="radiogroup">${ops.map(([v, t], i) => `<label class="chk"><input type="radio" name="motIgn" value="${v}"><span><kbd>${i + 1}</kbd> <span class="mot-t">${esc(t)}</span></span></label>`).join('')}</div>
+      ${k === 'paciente' ? `<div id="motNomeBox" class="oculto" style="margin-top:10px"><label class="lbl" for="motNome">Qual é o nome correto do beneficiário?</label><input type="text" id="motNome" value="${esc(x.lido || '')}" autocomplete="off"><p class="dica" style="margin:4px 0 0">Vem preenchido com o nome lido no sistema: confira. O nome da guia passa a ser este, e a observação para a clínica informa o nome errado e o correto.</p></div>` : ''}
       <label class="lbl" for="motIgnTxt" style="margin-top:10px">Detalhe ${obrig ? '(obrigatório em "Outro")' : '(opcional)'}</label><textarea id="motIgnTxt" rows="2" placeholder="Ex.: no sistema está JANY G. DA SILVA"></textarea>`,
     rodape: `<span class="dica">Escolha o motivo (ou tecle 1 a ${ops.length}).</span><button class="btn" data-act="fecharModal">Cancelar</button><button class="btn pri" data-act="motivoIgnOk" id="motIgnOk" disabled>${ic('check')}Aceitar divergência</button>` });
   const fundo = $('#modalFundo'), ok = $('#motIgnOk');
-  fundo.addEventListener('change', ev => { if (ev.target.name === 'motIgn') ok.disabled = false; });
+  const nomeBox = () => { const s = $('input[name=motIgn]:checked', fundo), b = $('#motNomeBox', fundo); if (b) { b.classList.toggle('oculto', !(s && s.value === 'nomeErrado')); if (s && s.value === 'nomeErrado') { const i = $('#motNome', fundo); i.focus(); i.select(); } } };
+  fundo.addEventListener('change', ev => { if (ev.target.name === 'motIgn') { ok.disabled = false; nomeBox(); } });
   fundo.addEventListener('keydown', ev => {
-    if (ev.target.matches('textarea') || ev.ctrlKey || ev.altKey) return;
+    if (ev.target.matches('textarea, input[type=text]') || ev.ctrlKey || ev.altKey) return;
     const n = parseInt(ev.key, 10), r = $$('input[name=motIgn]', fundo);
-    if (n >= 1 && n <= r.length) { ev.preventDefault(); r[n - 1].checked = true; r[n - 1].focus(); ok.disabled = false; if (r[n - 1].value === 'outro') $('#motIgnTxt').focus(); }
+    if (n >= 1 && n <= r.length) { ev.preventDefault(); r[n - 1].checked = true; r[n - 1].focus(); ok.disabled = false; nomeBox(); if (r[n - 1].value === 'outro') $('#motIgnTxt').focus(); }
   });
   setTimeout(() => { const r = $('input[name=motIgn]', fundo); if (r) r.focus(); }, 40);
 }
 function confirmarIgnorar(g, x, motivo) {
   g.prints = g.prints || { ign: {} }; g.prints.ign = g.prints.ign || {};
-  const ign = { ...linhaIgnorada(x), ...(motivo ? { motivo } : {}) };
+  const ign = { ...linhaIgnorada(x, g, motivo), ...(motivo ? { motivo } : {}) };
   if (motivo && motivo.tipo === 'leitura') { ign.on = false; ign.leitura = true; }   // erro de leitura: não vai observação à clínica
   g.prints.ign[x.chave] = ign;
   evento(g, 'ignorado', `${x.rot || 'Item ' + x.codigo}: pedido "${x.ped ?? x.qPed ?? '—'}", lido "${x.lido ?? x.qSis ?? '—'}"${motivo ? ' — ' + motivo.texto + (motivo.detalhe ? ': ' + motivo.detalhe : '') : ''}`, { chave: x.chave, motivo: motivo || null });
+  if (motivo && motivo.tipo === 'nomeErrado' && motivo.nomeCorreto) {   // o prestador errou o nome: a guia fica com o nome correto
+    const p = g.pedido, antes = p.beneficiario;
+    p.beneficiario = motivo.nomeCorreto; p.beneficiarios = [motivo.nomeCorreto]; marcarOrigem(g, 'beneficiario', 'digitado');
+    evento(g, 'edicao-campo', `Beneficiário: "${antes || '—'}" → "${motivo.nomeCorreto}" (prestador pediu com o nome errado)`);
+  }
   if (motivo && motivo.tipo === 'leitura') {
     const campo = x.chave.startsWith('c:') ? x.chave.slice(2) : 'item';
     Apr.registrar({ tipo: 'print', campo, lido: x.lido ?? x.qSis ?? '', correto: x.ped ?? x.qPed ?? '', sistema: (PRINTS_MEM.get(g.id) || {}).sistema || '', clinicaId: S.clinicaId, clinica: (clinicaDe(S) || {}).nome || '' });
@@ -663,9 +670,11 @@ Object.assign(acoes, {
     const sel = $('input[name="motIgn"]:checked'), det = ($('#motIgnTxt') || {}).value.trim();
     if (!sel) { toast('Escolha o motivo.', 'bad'); return; }
     if (sel.value === 'outro' && det.length < 4) { toast('Descreva o motivo.', 'bad'); $('#motIgnTxt').focus(); return; }
+    const nomeCorreto = sel.value === 'nomeErrado' ? String(($('#motNome') || {}).value || '').replace(/\s+/g, ' ').trim().toUpperCase() : '';
+    if (sel.value === 'nomeErrado' && nomeCorreto.split(' ').length < 2) { toast('Informe o nome correto completo do beneficiário.', 'bad'); $('#motNome').focus(); return; }
     const texto = (sel.closest('label').querySelector('.mot-t') || sel.closest('label')).textContent.trim();
     fecharModal(true);
-    confirmarIgnorar(g, x, { tipo: sel.value, texto, detalhe: det });
+    confirmarIgnorar(g, x, { tipo: sel.value, texto, detalhe: det, ...(nomeCorreto ? { nomeCorreto } : {}) });
   },
   desfazerPrint(b) {
     const g = guiaAtiva(); if (!g.prints || !g.prints.ign) return;

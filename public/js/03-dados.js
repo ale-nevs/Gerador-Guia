@@ -477,7 +477,7 @@ const MOTIVOS_PADRAO = [
   { id: 'outro', nome: 'Outro motivo (descrever nas observações)', modelo: '' }
 ];
 /* Observações automáticas da conferência pelos prints: aparecem como sugestão marcável, nunca entram sozinhas se desmarcadas.
-   Campos: {CODIGO} {QTD_PEDIDO} {QTD_SISTEMA}. Os textos e a marcação padrão podem ser mudados nas configurações. */
+   Campos: CAMPOS_OBS_AUTO (abaixo). Os textos e a marcação padrão podem ser mudados nas configurações. */
 const OBS_AUTO = {
   'item-ausente': { nome: 'Item que não consta na guia gerada', texto: 'Item {CODIGO}: não consta na guia gerada (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
   'item-menor': { nome: 'Item autorizado com quantidade menor', texto: 'Item {CODIGO}: autorizado com quantidade {QTD_SISTEMA} (solicitado {QTD_PEDIDO}).', padrao: true, itens: true },
@@ -488,11 +488,19 @@ const OBS_AUTO = {
   registro: { nome: 'Registro (CRM) diferente', texto: 'Registro do médico no sistema difere do informado no pedido.', padrao: false },
   dtSolic: { nome: 'Data da solicitação diferente', texto: 'Data da solicitação no sistema difere da data do pedido.', padrao: false },
   guia: { nome: 'Número da guia diferente do digitado', texto: 'Número da guia diferente do digitado.', padrao: true },
+  'paciente-errado': { nome: 'Prestador pediu com o nome errado (Ignorar no nome)', texto: 'O nome do beneficiário veio errado no pedido ({BENEFICIARIO}). Nome correto: {NOME_CORRETO}.', padrao: true },
   paciente: { nome: 'Nome do beneficiário diferente', texto: 'Nome do beneficiário no sistema difere do informado no pedido.', padrao: true },
   credNome: { nome: 'Credenciado executante diferente', texto: 'Credenciado executante no sistema difere do cadastrado.', padrao: true },
   ident: { nome: 'Carteira incorreta', texto: 'Carteira no sistema difere da carteira usada.', padrao: false },
   cid: { nome: 'CID diferente', texto: 'CID no sistema difere do informado no pedido.', padrao: false }
 };
+/* campos que os textos das observações automáticas aceitam (o pedido e o que foi lido no print do sistema) */
+const CAMPOS_OBS_AUTO = [
+  ['Itens', [['CODIGO', 'código do item'], ['DESCRICAO', 'descrição do serviço'], ['QTD_PEDIDO', 'quantidade pedida'], ['QTD_SISTEMA', 'quantidade na guia'], ['STATUS', 'status do item no sistema']]],
+  ['Qualquer divergência', [['CAMPO', 'nome do campo'], ['VALOR_PEDIDO', 'valor no pedido'], ['VALOR_SISTEMA', 'valor lido no sistema'], ['MOTIVO', 'motivo escolhido ao ignorar']]],
+  ['Pedido × sistema', [['BENEFICIARIO', 'nome no pedido'], ['BENEFICIARIO_SISTEMA', 'nome no sistema'], ['NOME_CORRETO', 'nome correto informado'], ['CARTEIRA', 'carteira usada'], ['CARTEIRA_SISTEMA', 'carteira no sistema'], ['GUIA', 'nº da guia digitado'], ['GUIA_SISTEMA', 'nº da guia no sistema'],
+    ['MEDICO', 'médico no pedido'], ['MEDICO_SISTEMA', 'médico no sistema'], ['CRM', 'CRM no pedido'], ['CRM_SISTEMA', 'CRM no sistema'], ['DATA_PEDIDO', 'data do pedido'], ['DATA_SISTEMA', 'data da solicitação no sistema'], ['CID', 'CID no pedido'], ['CID_SISTEMA', 'CID no sistema'], ['CREDENCIADO', 'credenciado do cadastro'], ['CREDENCIADO_SISTEMA', 'credenciado no sistema']]]
+];
 const obsAutoPadrao = () => Object.fromEntries(Object.entries(OBS_AUTO).map(([k, v]) => [k, { texto: v.texto, padrao: v.padrao }]));
 const PREFS_PADRAO = { conferenciaCega: true, qtdMax: 9, obsParametrizadoAuto: false, acoesMinutos: 10, guardarPrints: true, minutosParado: 10 };
 

@@ -291,7 +291,8 @@ function cfgObsAuto() {
     <label class="lbl" for="oa-${k}">Texto da observação</label><input type="text" id="oa-${k}" data-cfg="obsAuto.${k}.texto" value="${esc(o[k].texto)}"></div>`;
   return `<div class="card">${cabSecao('Observações automáticas')}
     <p class="dica">Quando você usa <b>Ignorar</b> numa divergência da conferência pelos prints, o sistema sugere uma observação para a clínica. Aqui você muda o texto e define se ela já vem <b>marcada</b>. Em qualquer caso, ela só entra na resposta se estiver marcada (a marcação pode ser mudada em cada atendimento).</p>
-    <p class="dica">Campos para os itens: <code>{CODIGO}</code>, <code>{QTD_PEDIDO}</code>, <code>{QTD_SISTEMA}</code> e <code>{STATUS}</code>.</p>
+    <details class="campos-obs"><summary>Campos que podem entrar no texto</summary><div class="tabela-scroll"><table class="t"><tbody>${CAMPOS_OBS_AUTO.map(([grupo, cs]) => `<tr><th style="white-space:nowrap">${esc(grupo)}</th><td>${cs.map(([k, d]) => `<code title="${esc(d)}">{${k}}</code> ${esc(d)}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+      <p class="dica" style="margin:6px 0 0">Os campos “_SISTEMA” trazem o que foi lido no print. Ex.: <code>Nome do beneficiário no sistema ({BENEFICIARIO_SISTEMA}) difere do pedido ({BENEFICIARIO}).</code></p></details>
     <h3>Itens</h3>${Object.entries(OBS_AUTO).filter(([, v]) => v.itens).map(linha).join('')}
     <h3>Campos da guia</h3>${Object.entries(OBS_AUTO).filter(([, v]) => !v.itens).map(linha).join('')}
     <div class="acoes"><button class="btn line" data-act="obsAutoRestaurar">${ic('undo', 'sm')}Restaurar padrões</button></div></div>`;
